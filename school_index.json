@@ -1,0 +1,2424 @@
+{
+  "schools": {
+    "qingguo": [
+      {
+        "id": "HNSWZY",
+        "name": "湖南商务职业技术学院",
+        "city": "长沙",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.hnswxy.com",
+        "isV8": true
+      },
+      {
+        "id": "JYZZY",
+        "name": "济源职业技术学院",
+        "city": "济源",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.jyvtc.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNMMC",
+        "name": "湖南大众传媒职业技术学院",
+        "city": "长沙",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.hnmmc.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNVTC",
+        "name": "湖南铁道职业技术学院",
+        "city": "株洲",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.hnrpc.com",
+        "isV8": true
+      },
+      {
+        "id": "CDATC",
+        "name": "成都航空职业技术学院",
+        "city": "成都",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.cap.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "SZPT",
+        "name": "深圳职业技术大学",
+        "city": "深圳",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.szpu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "GDCP",
+        "name": "广东交通职业技术学院",
+        "city": "广州",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.gdcp.cn",
+        "isV8": true
+      },
+      {
+        "id": "GZIT",
+        "name": "广州航海学院",
+        "city": "广州",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.gzmtu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "GZVT",
+        "name": "广州科技贸易职业学院",
+        "city": "广州",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.gzkmu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "NSXY",
+        "name": "烟台南山学院",
+        "city": "烟台",
+        "jwType": "QINGGUO",
+        "baseUrl": "https://jw.nanshan.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNZY",
+        "name": "河南职业技术学院",
+        "city": "",
+        "jwType": "QINGGUO",
+        "baseUrl": "http://jwgl.hnzj.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "TSU",
+        "name": "泰山学院",
+        "city": "",
+        "jwType": "QINGGUO",
+        "baseUrl": "http://jwxt.tsu.edu.cn",
+        "isV8": true
+      }
+    ],
+    "qiangzhi": [
+      {
+        "id": "FOSU",
+        "name": "佛山大学",
+        "city": "佛山",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.fosu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "YNUFE",
+        "name": "云南财经大学",
+        "city": "昆明",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.ynufe.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNNU",
+        "name": "湖南师范大学",
+        "city": "长沙",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.hunnu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "CSUFT",
+        "name": "中南林业科技大学",
+        "city": "长沙",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.csuft.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HUNNU",
+        "name": "湖南农业大学",
+        "city": "长沙",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.hunau.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNUC",
+        "name": "湖南工商大学",
+        "city": "长沙",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.hnuc.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "SDMU",
+        "name": "山东管理学院",
+        "city": "济南",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.sdmu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "SDFMU",
+        "name": "山东第一医科大学",
+        "city": "济南",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.sdfmu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "QDUST",
+        "name": "青岛科技大学",
+        "city": "青岛",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.qust.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "LDU",
+        "name": "鲁东大学",
+        "city": "烟台",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://xsjw.ldu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "SDJU2",
+        "name": "山东交通学院",
+        "city": "济南",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.sdjtu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "LYU",
+        "name": "临沂大学",
+        "city": "临沂",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.lyu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "BZU",
+        "name": "滨州医学院",
+        "city": "烟台",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.sdmpu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "WFU",
+        "name": "潍坊学院",
+        "city": "潍坊",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.wfu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "DZU",
+        "name": "德州学院",
+        "city": "德州",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.dzu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HZU",
+        "name": "菏泽学院",
+        "city": "菏泽",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.hezeu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "JYU",
+        "name": "嘉应学院",
+        "city": "梅州",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.jyu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HKUST",
+        "name": "河南科技学院",
+        "city": "新乡",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.hist.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "XXMU",
+        "name": "新乡医学院",
+        "city": "新乡",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.xxmu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "AYIT",
+        "name": "安阳工学院",
+        "city": "安阳",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.ayit.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNUAS",
+        "name": "湖南文理学院",
+        "city": "常德",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.huas.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HUSE",
+        "name": "湖南科技学院",
+        "city": "永州",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.huse.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HUHST",
+        "name": "湖南人文科技学院",
+        "city": "娄底",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.huhst.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "SICNU",
+        "name": "四川师范大学",
+        "city": "成都",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.sicnu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "XNATC",
+        "name": "兴义民族师范学院",
+        "city": "兴义",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.xnnun.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "CQCST",
+        "name": "重庆城市科技学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://jw.cqcst.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "GXDLXY",
+        "name": "广西电力职业技术学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.gxdlxy.com",
+        "isV8": true
+      },
+      {
+        "id": "GZST",
+        "name": "广州松田职业学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.educationgroup.cn",
+        "isV8": true
+      },
+      {
+        "id": "HBLGXY",
+        "name": "淮北理工学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://a.hblgxy.edu.cn:5111",
+        "isV8": true
+      },
+      {
+        "id": "HYNU",
+        "name": "衡阳师范学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://hysfjw.hynu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "STCNCHU",
+        "name": "南昌航空大学科技学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://qzjwxt.stcnchu.edu.cn:800",
+        "isV8": true
+      },
+      {
+        "id": "XJIE",
+        "name": "新疆工程学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jwxt.xjie.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HDXY",
+        "name": "青岛农业大学海都学院",
+        "city": "烟台",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.hdxy.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "YTKJ",
+        "name": "烟台科技学院",
+        "city": "烟台",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.educationgroup.cn/ytkjxy",
+        "isV8": true
+      },
+      {
+        "id": "SDTBU",
+        "name": "山东工商学院",
+        "city": "烟台",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://cas.sdtbu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "NJFU",
+        "name": "南京林业大学",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://jwxt.njfu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "WBU",
+        "name": "武汉商学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://jw.wbu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "CCIT",
+        "name": "长春工程学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://cgcjw.ccit.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "CQRK",
+        "name": "重庆人文科技学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://jwxt.cqrk.edu.cn:18080",
+        "isV8": true
+      },
+      {
+        "id": "GDIPU",
+        "name": "广东轻工职业技术大学",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://jw.gdipu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HBGUHX",
+        "name": "河北地质大学华信学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "http://61.182.88.214:8090",
+        "isV8": true
+      },
+      {
+        "id": "ZHKU",
+        "name": "仲恺农业工程学院",
+        "city": "",
+        "jwType": "QIANGZHI",
+        "baseUrl": "https://edu-admin.zhku.edu.cn",
+        "isV8": true
+      }
+    ],
+    "zhengfang": [
+      {
+        "id": "YIT",
+        "name": "烟台理工学院",
+        "city": "烟台",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jwxt.yitsd.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YTU",
+        "name": "烟台大学",
+        "city": "烟台",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://210.47.245.4/",
+        "isV8": false
+      },
+      {
+        "id": "PKU",
+        "name": "北京大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.pku.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "THU",
+        "name": "清华大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tsinghua.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZJU",
+        "name": "浙江大学",
+        "city": "杭州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zju.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "FDU",
+        "name": "复旦大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.fudan.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SJTU",
+        "name": "上海交通大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NJU",
+        "name": "南京大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nju.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "USTC",
+        "name": "中国科学技术大学",
+        "city": "合肥",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ustc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HUST",
+        "name": "华中科技大学",
+        "city": "武汉",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "WHU",
+        "name": "武汉大学",
+        "city": "武汉",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.whu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XJTU",
+        "name": "西安交通大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SDU",
+        "name": "山东大学",
+        "city": "济南",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sdu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SEU",
+        "name": "东南大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.seu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HIT",
+        "name": "哈尔滨工业大学",
+        "city": "哈尔滨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hit.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BIT",
+        "name": "北京理工大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.bit.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BUAA",
+        "name": "北京航空航天大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.buaa.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NUDT",
+        "name": "国防科技大学",
+        "city": "长沙",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nudt.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NKU",
+        "name": "南开大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nankai.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TJU",
+        "name": "天津大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tju.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "DLUT",
+        "name": "大连理工大学",
+        "city": "大连",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.dlut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JLU",
+        "name": "吉林大学",
+        "city": "长春",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jlu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ECNU",
+        "name": "华东师范大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ecnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XMU",
+        "name": "厦门大学",
+        "city": "厦门",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xmu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SCU",
+        "name": "四川大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.scu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CSU",
+        "name": "中南大学",
+        "city": "长沙",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.csu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SYSU",
+        "name": "中山大学",
+        "city": "广州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sysu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "LZU",
+        "name": "兰州大学",
+        "city": "兰州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.lzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NWPU",
+        "name": "西北工业大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nwpu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CAU",
+        "name": "中国农业大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cau.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BNU",
+        "name": "北京师范大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.bnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "RUC",
+        "name": "中国人民大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ruc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUST",
+        "name": "长春理工大学",
+        "city": "长春",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQU",
+        "name": "重庆大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cqu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQJTU",
+        "name": "重庆交通大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cqjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQUT",
+        "name": "重庆理工大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cqut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NEU",
+        "name": "东北大学",
+        "city": "沈阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.neu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SCUT",
+        "name": "华南理工大学",
+        "city": "广州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.scut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TONGJI",
+        "name": "同济大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tongji.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JNU",
+        "name": "暨南大学",
+        "city": "广州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SUDA",
+        "name": "苏州大学",
+        "city": "苏州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.suda.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NJNU",
+        "name": "南京师范大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.njnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NEAU",
+        "name": "东北农业大学",
+        "city": "哈尔滨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.neau.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NENU",
+        "name": "东北师范大学",
+        "city": "长春",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nenu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HAUST",
+        "name": "河南科技大学",
+        "city": "洛阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.haust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HAUT",
+        "name": "河南工业大学",
+        "city": "郑州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.haut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JSNU",
+        "name": "江苏师范大学",
+        "city": "徐州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jsnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NCUT",
+        "name": "北方工业大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ncut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUP",
+        "name": "中国石油大学（北京）",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cup.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "UPC",
+        "name": "中国石油大学（华东）",
+        "city": "青岛",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.upc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CAUC",
+        "name": "中国民航大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cauc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "DLMU",
+        "name": "大连海事大学",
+        "city": "大连",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.dlmu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "UJS",
+        "name": "江苏大学",
+        "city": "镇江",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ujs.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ECJTU",
+        "name": "华东交通大学",
+        "city": "南昌",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ecjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JXUST",
+        "name": "江西理工大学",
+        "city": "赣州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jxust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JXNU",
+        "name": "江西师范大学",
+        "city": "南昌",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jxnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XATU",
+        "name": "西安工业大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xatu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XAUT",
+        "name": "西安理工大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xaut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZJUT",
+        "name": "浙江工业大学",
+        "city": "杭州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zjut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NJUT",
+        "name": "南京工业大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.njut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUIT",
+        "name": "成都信息工程大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cuit.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TCU",
+        "name": "天津城建大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tcu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SDNU",
+        "name": "山东师范大学",
+        "city": "济南",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sdnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "UJN",
+        "name": "济南大学",
+        "city": "济南",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ujn.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YIBIN",
+        "name": "宜宾学院",
+        "city": "宜宾",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.yibinu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQUET",
+        "name": "重庆邮电大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cqupt.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SWU",
+        "name": "西南大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.swu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SWJTU",
+        "name": "西南交通大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.swjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "UESTC",
+        "name": "电子科技大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.uestc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SWUFE",
+        "name": "西南财经大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.swufe.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CCNU",
+        "name": "华中师范大学",
+        "city": "武汉",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ccnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "WHUT",
+        "name": "武汉理工大学",
+        "city": "武汉",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.whut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZNUEL",
+        "name": "中南财经政法大学",
+        "city": "武汉",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zuel.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HNU",
+        "name": "湖南大学",
+        "city": "长沙",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CSUST",
+        "name": "长沙理工大学",
+        "city": "长沙",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.csust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XTU",
+        "name": "湘潭大学",
+        "city": "湘潭",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NCU",
+        "name": "南昌大学",
+        "city": "南昌",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ncu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JXAU",
+        "name": "江西农业大学",
+        "city": "南昌",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jxau.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NCHU",
+        "name": "南昌航空大学",
+        "city": "南昌",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nchu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "FZU",
+        "name": "福州大学",
+        "city": "福州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.fzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "FJNU",
+        "name": "福建师范大学",
+        "city": "福州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.fjnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZQU",
+        "name": "肇庆学院",
+        "city": "肇庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zqu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GUET",
+        "name": "桂林电子科技大学",
+        "city": "桂林",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.guet.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GXU",
+        "name": "广西大学",
+        "city": "南宁",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gxu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GXNU",
+        "name": "广西师范大学",
+        "city": "桂林",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gxnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YNUC",
+        "name": "云南民族大学",
+        "city": "昆明",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ynni.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YNU",
+        "name": "云南大学",
+        "city": "昆明",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ynu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GZU",
+        "name": "贵州大学",
+        "city": "贵阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GZNU",
+        "name": "贵州师范大学",
+        "city": "贵阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gznu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HAINU",
+        "name": "海南大学",
+        "city": "海口",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hainanu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "QDU",
+        "name": "青岛大学",
+        "city": "青岛",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.qdu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SDAU",
+        "name": "山东农业大学",
+        "city": "泰安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sdau.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SDUT",
+        "name": "山东理工大学",
+        "city": "淄博",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sdut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZZU",
+        "name": "郑州大学",
+        "city": "郑州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HENU",
+        "name": "河南大学",
+        "city": "开封",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.henu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "AYNU",
+        "name": "安阳师范学院",
+        "city": "安阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.aynu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HBU",
+        "name": "河北大学",
+        "city": "保定",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hbu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HEBUT",
+        "name": "河北工业大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hebut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YSU",
+        "name": "燕山大学",
+        "city": "秦皇岛",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ysu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SXU",
+        "name": "山西大学",
+        "city": "太原",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sxu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TYUT",
+        "name": "太原理工大学",
+        "city": "太原",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tyut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "IMU",
+        "name": "内蒙古大学",
+        "city": "呼和浩特",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.imu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "LNU",
+        "name": "辽宁大学",
+        "city": "沈阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.lnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SYU",
+        "name": "沈阳大学",
+        "city": "沈阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.syu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NEFU",
+        "name": "东北林业大学",
+        "city": "哈尔滨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nefu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HRBUST",
+        "name": "哈尔滨理工大学",
+        "city": "哈尔滨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hrbust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HEU",
+        "name": "哈尔滨工程大学",
+        "city": "哈尔滨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hrbeu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HLJU",
+        "name": "黑龙江大学",
+        "city": "哈尔滨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hlju.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SHU",
+        "name": "上海大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.shu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ECUST",
+        "name": "华东理工大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ecust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "DHU",
+        "name": "东华大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.dhu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NJUPT",
+        "name": "南京邮电大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.njupt.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HHU",
+        "name": "河海大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hhu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUMT",
+        "name": "中国矿业大学",
+        "city": "徐州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cumt.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YZU",
+        "name": "扬州大学",
+        "city": "扬州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.yzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NTU",
+        "name": "南通大学",
+        "city": "南通",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ntu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZSTU",
+        "name": "浙江理工大学",
+        "city": "杭州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zstu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HDU",
+        "name": "杭州电子科技大学",
+        "city": "杭州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hdu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZJNU",
+        "name": "浙江师范大学",
+        "city": "金华",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zjnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NBU",
+        "name": "宁波大学",
+        "city": "宁波",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nbu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "AHU",
+        "name": "安徽大学",
+        "city": "合肥",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ahu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HFUT",
+        "name": "合肥工业大学",
+        "city": "合肥",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hfut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "AHNU",
+        "name": "安徽师范大学",
+        "city": "芜湖",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ahnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HQU",
+        "name": "华侨大学",
+        "city": "厦门",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.hqu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JIMEI",
+        "name": "集美大学",
+        "city": "厦门",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jmu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "FJUT",
+        "name": "福建理工大学",
+        "city": "福州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.fjut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SDJU",
+        "name": "山东建筑大学",
+        "city": "济南",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sdjzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "QUT",
+        "name": "青岛理工大学",
+        "city": "青岛",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.qut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NWAFU",
+        "name": "西北农林科技大学",
+        "city": "杨凌",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nwafu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XDU",
+        "name": "西安电子科技大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xidian.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CHD",
+        "name": "长安大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.chd.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SNNU",
+        "name": "陕西师范大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.snnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NWNU",
+        "name": "西北师范大学",
+        "city": "兰州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nwnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "LZJTU",
+        "name": "兰州交通大学",
+        "city": "兰州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.lzjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GSUT",
+        "name": "兰州理工大学",
+        "city": "兰州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.lut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NXU",
+        "name": "宁夏大学",
+        "city": "银川",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nxu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "QHU",
+        "name": "青海大学",
+        "city": "西宁",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.qhu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XJU",
+        "name": "新疆大学",
+        "city": "乌鲁木齐",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xju.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XJNU",
+        "name": "新疆师范大学",
+        "city": "乌鲁木齐",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xjnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TIBETU",
+        "name": "西藏大学",
+        "city": "拉萨",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.utibet.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BUPT",
+        "name": "北京邮电大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jwgl.bupt.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BJTU",
+        "name": "北京交通大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.bjtu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BJUT",
+        "name": "北京工业大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.bjut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "BUCT",
+        "name": "北京化工大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.buct.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUC",
+        "name": "中国传媒大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cuc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUFE",
+        "name": "中央财经大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cufe.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUPL",
+        "name": "中国政法大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cupl.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "UIBE",
+        "name": "对外经济贸易大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.uibe.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUMTB",
+        "name": "中国矿业大学（北京）",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cumtb.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NCEPU",
+        "name": "华北电力大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.ncepu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CUN",
+        "name": "中央民族大学",
+        "city": "北京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.muc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SUFE",
+        "name": "上海财经大学",
+        "city": "上海",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sufe.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TJUT",
+        "name": "天津理工大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tjut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "TJNU",
+        "name": "天津师范大学",
+        "city": "天津",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.tjnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NJMU",
+        "name": "南京医科大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.njmu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "NJUFE",
+        "name": "南京财经大学",
+        "city": "南京",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.nufe.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CZU",
+        "name": "常州大学",
+        "city": "常州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cczu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZGUC",
+        "name": "中国计量大学",
+        "city": "杭州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cjlu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "ZJGSU",
+        "name": "浙江工商大学",
+        "city": "杭州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.zjgsu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "WZU",
+        "name": "温州大学",
+        "city": "温州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.wzu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GDMU",
+        "name": "广东医科大学",
+        "city": "湛江",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gdmu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GDUT",
+        "name": "广东工业大学",
+        "city": "广州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gdut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GDUFS",
+        "name": "广东外语外贸大学",
+        "city": "广州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gdufs.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GDOU",
+        "name": "广东海洋大学",
+        "city": "湛江",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gdou.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GZHU",
+        "name": "广州大学",
+        "city": "广州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gzhu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SZU",
+        "name": "深圳大学",
+        "city": "深圳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.szu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "STU",
+        "name": "汕头大学",
+        "city": "汕头",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.stu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "JGS",
+        "name": "井冈山大学",
+        "city": "吉安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.jgsu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CTGU",
+        "name": "重庆三峡学院",
+        "city": "万州",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sanxiau.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQNU",
+        "name": "重庆师范大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cqnu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQUST",
+        "name": "重庆科技大学",
+        "city": "重庆",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cqust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SWUN",
+        "name": "西南民族大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.swun.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CDUT",
+        "name": "成都理工大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cdut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SWPU",
+        "name": "西南石油大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.swpu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CDU",
+        "name": "成都大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.cdu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XHU",
+        "name": "西华大学",
+        "city": "成都",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xhu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SUSE",
+        "name": "四川轻化工大学",
+        "city": "自贡",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.suse.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XISU",
+        "name": "西安外国语大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xisu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XUFE",
+        "name": "西安财经大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xaufe.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XUST",
+        "name": "西安科技大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xust.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XAUAT",
+        "name": "西安建筑科技大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xauat.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XPU",
+        "name": "西安工程大学",
+        "city": "西安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.xpu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YAU",
+        "name": "延安大学",
+        "city": "延安",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.yau.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SXPI",
+        "name": "陕西工业职业技术学院",
+        "city": "咸阳",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.sxpi.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "AHSZU",
+        "name": "宿州学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "AHZYYGZ",
+        "name": "安徽中医药高等专科学校",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "CAPU",
+        "name": "成都航空职业技术大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "CFEC",
+        "name": "重庆财经学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jwmis.cfec.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CMC",
+        "name": "成都医学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jwgl.cmc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "CQCIVC",
+        "name": "重庆化工职业学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "DLU",
+        "name": "大连大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://202.199.155.130/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "FJCPC",
+        "name": "福建船政交通职业学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "GDPU",
+        "name": "广东药科大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "GLMU",
+        "name": "桂林医科大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "GSMC",
+        "name": "甘肃医学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.gsmc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "GUIT",
+        "name": "桂林信息科技学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "HBMU",
+        "name": "湖北医药学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "HIIT",
+        "name": "河南信息科技学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "HNIU",
+        "name": "湖南信息职业技术学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "HNSF",
+        "name": "河南师范大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "HUAT",
+        "name": "湖北汽车工业学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "HUAYU",
+        "name": "山东华宇工学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jwgl.huayu.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "HUEL",
+        "name": "河南财经政法大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://xk.huel.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "IMNC",
+        "name": "呼和浩特民族学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://ehall.imnc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "IMUT",
+        "name": "内蒙古工业大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "JXFU",
+        "name": "江西飞行学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "KSU",
+        "name": "喀什大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "MMPT",
+        "name": "茂名职业技术学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jwc.mmpt.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "NBUT",
+        "name": "宁波工程学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jwxt.nbut.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SCUEC",
+        "name": "中南民族大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "SDDFVC",
+        "name": "山东药品食品职业学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "SDIPCT",
+        "name": "山东石油化工学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "SDLIVC",
+        "name": "山东轻工职业学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "SHZQ",
+        "name": "上海中侨职业技术大学",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw.shzq.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "UZZ",
+        "name": "枣庄学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "WENHUA",
+        "name": "文华学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jw1.hustwenhua.net/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "WHCB",
+        "name": "武汉船舶职业技术学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://ehall.wspc.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XAWL",
+        "name": "西安文理学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jwgl.xawl.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "XMCU",
+        "name": "厦门城市职业学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "XYAFU",
+        "name": "信阳农林学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "",
+        "isV8": true
+      },
+      {
+        "id": "XZIT",
+        "name": "徐州工程学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jwglxt.xzit.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YXHMC",
+        "name": "成都银杏酒店管理学院",
+        "city": "",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://zfjw.gingkoc.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "SDBI",
+        "name": "山东商务职业学院",
+        "city": "烟台",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "https://jwglxt.sdbi.edu.cn/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "SDCC",
+        "name": "山东城市服务职业学院",
+        "city": "烟台",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://jw.sdcc.edu.cn:8080/jwglxt",
+        "isV8": true
+      },
+      {
+        "id": "YVCCT",
+        "name": "烟台文化旅游职业学院",
+        "city": "烟台",
+        "jwType": "ZHENGFANG",
+        "baseUrl": "http://ehall.yvcct.edu.cn/jwglxt",
+        "isV8": true
+      }
+    ],
+    "urp": [
+      {
+        "id": "URP_DEMO1",
+        "name": "哈尔滨商业大学",
+        "city": "哈尔滨",
+        "jwType": "URP",
+        "baseUrl": "https://jw.hrbcu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "URP_DEMO2",
+        "name": "黑龙江科技大学",
+        "city": "哈尔滨",
+        "jwType": "URP",
+        "baseUrl": "https://jw.usth.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "URP_DEMO3",
+        "name": "东北石油大学",
+        "city": "大庆",
+        "jwType": "URP",
+        "baseUrl": "https://jw.nepu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "URP_DEMO4",
+        "name": "齐齐哈尔大学",
+        "city": "齐齐哈尔",
+        "jwType": "URP",
+        "baseUrl": "https://jw.qqhru.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "URP_DEMO5",
+        "name": "佳木斯大学",
+        "city": "佳木斯",
+        "jwType": "URP",
+        "baseUrl": "https://jw.jmsu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "URP_DEMO6",
+        "name": "哈尔滨师范大学",
+        "city": "哈尔滨",
+        "jwType": "URP",
+        "baseUrl": "https://jw.hrbnu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "URP_DEMO7",
+        "name": "黑龙江八一农垦大学",
+        "city": "大庆",
+        "jwType": "URP",
+        "baseUrl": "https://jw.byau.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "CUPK",
+        "name": "中国石油大学（北京）克拉玛依校区",
+        "city": "",
+        "jwType": "URP",
+        "baseUrl": "https://eams.cupk.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "NEUQ",
+        "name": "东北大学秦皇岛分校",
+        "city": "",
+        "jwType": "URP",
+        "baseUrl": "https://jwxt.neuq.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "TJAU",
+        "name": "天津农学院",
+        "city": "",
+        "jwType": "URP",
+        "baseUrl": "http://jwxt.tjau.edu.cn",
+        "isV8": true
+      }
+    ],
+    "chaoxing": [
+      {
+        "id": "GDST",
+        "name": "广东科技学院",
+        "city": "东莞",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.gdust.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HNUST",
+        "name": "湖南科技大学",
+        "city": "湘潭",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.hnust.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "TARU",
+        "name": "塔里木大学",
+        "city": "阿拉尔",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.taru.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "GDUPT",
+        "name": "广东石油化工学院",
+        "city": "茂名",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.gdupt.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HUE",
+        "name": "湖北工程学院",
+        "city": "孝感",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.hbeu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "HBUT",
+        "name": "湖北工业大学",
+        "city": "武汉",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.hbut.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "WUST",
+        "name": "武汉科技大学",
+        "city": "武汉",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.wust.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "YANGTZE",
+        "name": "长江大学",
+        "city": "荆州",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.yangtzeu.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "YTHJ",
+        "name": "烟台黄金职业学院",
+        "city": "烟台",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://ytgc.jw.chaoxing.com",
+        "isV8": true
+      },
+      {
+        "id": "SXGCXY",
+        "name": "山西工程职业学院",
+        "city": "",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://sxevc.jw.chaoxing.com",
+        "isV8": true
+      },
+      {
+        "id": "SDTCM",
+        "name": "山东中医药高等专科学校",
+        "city": "烟台",
+        "jwType": "CHAOXING",
+        "baseUrl": "https://jw.sdctcm.edu.cn",
+        "isV8": true
+      },
+      {
+        "id": "YTQCVC",
+        "name": "烟台汽车工程职业学院",
+        "city": "烟台",
+        "jwType": "CHAOXING",
+        "baseUrl": "http://jwxt.ytqcvc.cn",
+        "isV8": true
+      }
+    ]
+  },
+  "protocol_version": 1,
+  "version_id": "TIME_20260929141453_001"
+}
