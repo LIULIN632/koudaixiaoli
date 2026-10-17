@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 53,
-    "versionName": "0.1.52",
+    "versionCode": 54,
+    "versionName": "0.1.53",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.52/koudaixiaoli_v0.1.52.apk",
-    "sha256": "fa241fa9db34b0f485dbaeecc7e6b0515bb24eb70ebe10ad890f6af074508709",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.53/koudaixiaoli_v0.1.53.apk",
+    "sha256": "be2e88c2a8c53ecb20ce9c636b95423d093006ead04571ee2ea666c0abe9dc73",
     "rollout": 100,
     "notes": [
-      "下载失败的版本会自动换仓再试：Gitee 不通就换 GitHub，两边是同一份安装包，校验规则不变",
-      "同一个版本只下一次：换源、退出再进、点「继续安装」都命中缓存里那个已校验的包",
-      "校验不过的坏包当场删掉，不会留给下一次安装"
+      "检查更新失败时会直接说出缺的是哪个类，不再只有一句 NoClassDefFoundError",
+      "失败原因同时记进网络日志：「开发者实验室 → 网络日志」里能翻到这条记录",
+      "补了一条主线程调度器的混淆保护，避免类名被 R8 改掉后在运行时找不到"
     ]
   },
   "announcements": []
