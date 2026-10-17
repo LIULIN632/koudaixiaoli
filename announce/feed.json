@@ -8,18 +8,26 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 42,
-    "versionName": "0.1.41",
+    "versionCode": 43,
+    "versionName": "0.1.42",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.41/koudaixiaoli_v0.1.41.apk",
-    "sha256": "e544f19ccc476074059c941fa03a6371189fb64e066bcf56b9c52c35469c0e28",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.42/koudaixiaoli_v0.1.42.apk",
+    "sha256": "9b505fd98afbdf03e0044adf9870ed54a195a1b4cb74e444da5e4290073c73d2",
     "rollout": 100,
     "notes": [
-      "修：通知抽屉把「检查失败」显示成「正在检查…」，等再久也不会出结果",
-      "修：失败时会说明卡在哪 —— 哪个镜像、HTTP 几、什么异常；底部还有「重试」",
-      "改：「自动更新校园数据」从更新页移到「数据与诊断」，更新页只留版本与公告",
-      "保留：应用内下载安装、SHA-256 校验、强更与必须确认的公告"
+      "更新日志重新写：从 v0.1.41 开始记，旧版本不再追补（需要翻历史去 git）",
+      "修「我的 → 更新日志」里最新一版说明与 feed 对不上：现在以 feed 下发的为准",
+      "打包规则补上 WorkManager 与通知层的 keep —— 内测里那个 NoClassDefFoundError 是任务类被改名/裁剪导致的",
+      "内测公告：铃铛与弹窗现在会显示测试公告，验证完会删掉"
     ]
   },
-  "announcements": []
+  "announcements": [
+    {
+      "id": "beta-test-2026-10-17",
+      "level": "CRITICAL",
+      "title": "内测公告（测试用）",
+      "body": "看到这一条，说明公告通道是通的：它由 announce/feed.json 下发，不是写死在 App 里。点「知道了」之后不会再弹（同一个 id 只提醒一次）。这条验证完就删掉。",
+      "minVersionCode": 42
+    }
+  ]
 }
