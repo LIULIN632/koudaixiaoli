@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 57,
-    "versionName": "0.1.56",
+    "versionCode": 58,
+    "versionName": "0.1.57",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.56/koudaixiaoli_v0.1.56.apk",
-    "sha256": "554ae13f72499d4edc38c7ecb6403be9eb6726bd7db2b8e56b5177bc5cb72577",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.57/koudaixiaoli_v0.1.57.apk",
+    "sha256": "49f313c3f1fe547e4d3749096ba303cd11606fa4b330ecfccb20204382a901cd",
     "rollout": 100,
     "notes": [
-      "选设置项时弹出的选项气泡换成 MIUIX 原生的下拉卡片，和岱宗同一套",
-      "检查到新版本只弹提示，下载要你自己按「下载并安装」",
-      "课表切换学期、教务类型选择也换成同一个气泡"
+      "修好 0.1.56 的闪退：点开「更新渠道」「学期切换」这类选项气泡就会崩",
+      "气泡本身没换，换的是它依赖的系统级返回事件宿主：现在随应用一起挂上",
+      "更早的「检查更新」报告缺类名的问题也一并留在 0.1.53 起的新提示里"
     ]
   },
   "announcements": []
