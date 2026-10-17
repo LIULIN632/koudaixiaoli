@@ -8,11 +8,11 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 41,
-    "versionName": "0.1.40",
+    "versionCode": 42,
+    "versionName": "0.1.41",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.40/koudaixiaoli_v0.1.40.apk",
-    "sha256": "baa7c069f729c72d2ca84c1b5caada93950bd3686264e6ec64c08785dce96a0f",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.41/koudaixiaoli_v0.1.41.apk",
+    "sha256": "e544f19ccc476074059c941fa03a6371189fb64e066bcf56b9c52c35469c0e28",
     "rollout": 100,
     "notes": [
       "新增「版本与公告」：打开 App 自动检查更新，首页铃铛里能看到新版本与公告",
