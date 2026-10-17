@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 56,
-    "versionName": "0.1.55",
+    "versionCode": 57,
+    "versionName": "0.1.56",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.55/koudaixiaoli_v0.1.55.apk",
-    "sha256": "a83085dedea36f9829ba581b4552e178f18d7f4322a83eaf4c99e778ac359c4b",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.56/koudaixiaoli_v0.1.56.apk",
+    "sha256": "554ae13f72499d4edc38c7ecb6403be9eb6726bd7db2b8e56b5177bc5cb72577",
     "rollout": 100,
     "notes": [
-      "更新气泡换成岱宗同款的底部面板，高度只包住内容，不再撑到半屏",
-      "面板里只剩版本号、三条说明和一个按钮，没有多余的分隔线和入口",
-      "强制更新时不再给「稍后提醒」，避免看起来能跳过"
+      "选设置项时弹出的选项气泡换成 MIUIX 原生的下拉卡片，和岱宗同一套",
+      "检查到新版本只弹提示，下载要你自己按「下载并安装」",
+      "课表切换学期、教务类型选择也换成同一个气泡"
     ]
   },
   "announcements": []
