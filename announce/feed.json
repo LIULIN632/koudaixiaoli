@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 45,
-    "versionName": "0.1.44",
+    "versionCode": 46,
+    "versionName": "0.1.45",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.44/koudaixiaoli_v0.1.44.apk",
-    "sha256": "9afdc2b59c5e8e8003a76a5f1afc07ab5e9b91b312cca1003e59272e80961355",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.45/koudaixiaoli_v0.1.45.apk",
+    "sha256": "a320c515d6e8d881cbb11bd96848685caa6c1e98eb0a595e9c295cfbe9af13c6",
     "rollout": 100,
-            "notes": [
-      "「我的 → 检查更新」里不再有「更新学校列表」按钮：本产品只服务烟台理工，全国 301 条的学校列表在产品里没有用处",
-      "启动时也不再自动更新它（0.1.43 起），少一次跨洋请求，启动更快",
-      "节假日数据源改为 jsDelivr 优先、raw.githubusercontent 兜底（实测后者卡 26 秒才失败）",
+    "notes": [
+      "「检查更新」与应用内下载安装全程加了兜底：任何异常都变成一行提示，不再闪退",
+      "去系统设置授权「安装未知应用」后，回到 App 会自动继续安装，不用再点第二次",
+      "授权前会先把包下载好（先下后要权），回到 App 就能直接装",
       "内测公告仍在，验证完会删"
     ]
   },
