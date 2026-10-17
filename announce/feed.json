@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 50,
-    "versionName": "0.1.49",
+    "versionCode": 51,
+    "versionName": "0.1.50",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.49/koudaixiaoli_v0.1.49.apk",
-    "sha256": "1246a40b8e80c9613591621941f958b11fe032d4064ebaa02d8dbf2a40c398a9",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.50/koudaixiaoli_v0.1.50.apk",
+    "sha256": "cdfbd8d74410326bee53aad51482b6e96f2e12a9ab9345a4be67cdc1795997e5",
     "rollout": 100,
     "notes": [
-      "点「检查更新」就地开始检查，不再先弹一个空面板",
-      "只有真的发现新版才弹底部气泡：标题带版本号、可看更新说明、下载进度，装完直接进安装器",
-      "已是最新版本改为一句轻提示，不再打断当前页面"
+      "后台检查从 6 小时改成 15 分钟：发版后最迟十几分钟就能收到通知",
+      "首次打开会申请一次通知权限（以前只有开课程提醒才申请，导致从未开过提醒的人收不到发版通知）",
+      "冷启动检查到新版/新公告时，同时补发一条通知，不用一直盯着 App"
     ]
   },
   "announcements": []
