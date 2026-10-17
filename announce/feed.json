@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 55,
-    "versionName": "0.1.54",
+    "versionCode": 56,
+    "versionName": "0.1.55",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.54/koudaixiaoli_v0.1.54.apk",
-    "sha256": "571629d089553489eefc67402740e040e9b9cb1d562c25f17099930f1982c7b2",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.55/koudaixiaoli_v0.1.55.apk",
+    "sha256": "a83085dedea36f9829ba581b4552e178f18d7f4322a83eaf4c99e778ac359c4b",
     "rollout": 100,
     "notes": [
-      "修好了「检查更新」总是失败：原因是解析代码里一条正则，Android 不认它，整个解析类报废",
-      "顺带让 Release 正文里的备用更新信息能正确读到（以前遇到嵌套结构会截断）",
-      "失败提示会直接说出出问题的是哪个类，查问题不用再猜"
+      "更新气泡换成岱宗同款的底部面板，高度只包住内容，不再撑到半屏",
+      "面板里只剩版本号、三条说明和一个按钮，没有多余的分隔线和入口",
+      "强制更新时不再给「稍后提醒」，避免看起来能跳过"
     ]
   },
   "announcements": []
