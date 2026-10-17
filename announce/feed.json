@@ -8,17 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 49,
-    "versionName": "0.1.48",
+    "versionCode": 50,
+    "versionName": "0.1.49",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.48/koudaixiaoli_v0.1.48.apk",
-    "sha256": "16ccdb54f2bd38c36cf578410de1cb473e9c8e0831529c72101210a8a0ec7be4",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.49/koudaixiaoli_v0.1.49.apk",
+    "sha256": "1246a40b8e80c9613591621941f958b11fe032d4064ebaa02d8dbf2a40c398a9",
     "rollout": 100,
     "notes": [
-      "点「检查更新」查到新版就直接开始下载安装，不用再点第二下",
-      "设置里「一行多选」（如更新渠道）改成气泡菜单：从点的地方胀开、带一点回弹，收起时缩回去淡掉",
-      "更新面板的标题与进度条随状态变化（发现新版本／正在下载 42%／准备安装）",
-      "两个仓的发行版页都挂了安装包，可直接覆盖安装"
+      "点「检查更新」就地开始检查，不再先弹一个空面板",
+      "只有真的发现新版才弹底部气泡：标题带版本号、可看更新说明、下载进度，装完直接进安装器",
+      "已是最新版本改为一句轻提示，不再打断当前页面"
     ]
   },
   "announcements": []
