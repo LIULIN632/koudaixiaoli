@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 58,
-    "versionName": "0.1.57",
+    "versionCode": 59,
+    "versionName": "0.1.58",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.57/koudaixiaoli_v0.1.57.apk",
-    "sha256": "49f313c3f1fe547e4d3749096ba303cd11606fa4b330ecfccb20204382a901cd",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.58/koudaixiaoli_v0.1.58.apk",
+    "sha256": "ff09b1fed7ccadee91052773ea39ab7372aa96c34500a10f385aef18b7a62417",
     "rollout": 100,
     "notes": [
-      "修好 0.1.56 的闪退：点开「更新渠道」「学期切换」这类选项气泡就会崩",
-      "气泡本身没换，换的是它依赖的系统级返回事件宿主：现在随应用一起挂上",
-      "更早的「检查更新」报告缺类名的问题也一并留在 0.1.53 起的新提示里"
+      "修掉 0.1.57 一打开就闪退的问题（它把「缺少返回事件宿主」的检查撞在了启动路径上）",
+      "这次显式创建根 dispatcher：parent 传 null，库才不会去要一个不存在的上级",
+      "选项气泡、更新气泡仍是岱宗同款组件，0.1.56 的首次弹出崩溃同样保持修复"
     ]
   },
   "announcements": []
