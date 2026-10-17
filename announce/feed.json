@@ -8,17 +8,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 43,
-    "versionName": "0.1.42",
+    "versionCode": 44,
+    "versionName": "0.1.43",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.42/koudaixiaoli_v0.1.42.apk",
-    "sha256": "9b505fd98afbdf03e0044adf9870ed54a195a1b4cb74e444da5e4290073c73d2",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.43/koudaixiaoli_v0.1.43.apk",
+    "sha256": "4e6966ce07e1a2307b3a0574bffed0004bd87f1291f6e4fc0b9e63e7b38f3dcd",
     "rollout": 100,
-    "notes": [
-      "更新日志重新写：从 v0.1.41 开始记，旧版本不再追补（需要翻历史去 git）",
-      "修「我的 → 更新日志」里最新一版说明与 feed 对不上：现在以 feed 下发的为准",
-      "打包规则补上 WorkManager 与通知层的 keep —— 内测里那个 NoClassDefFoundError 是任务类被改名/裁剪导致的",
-      "内测公告：铃铛与弹窗现在会显示测试公告，验证完会删掉"
+        "notes": [
+      "去掉「自动更新校园数据」：学校列表是全国 301 条，本产品入口下不可达，启动时去拉纯浪费",
+      "顺带修了启动慢：节假日数据原先先试 raw.githubusercontent（实测卡 26 秒才失败），现在先走 jsDelivr",
+      "知识库改为启动时静默刷新（24 小时节流），不再挂在一个用户看不见的开关上",
+      "内测公告仍在，验证完会删"
     ]
   },
   "announcements": [
