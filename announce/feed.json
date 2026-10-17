@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 51,
-    "versionName": "0.1.50",
+    "versionCode": 52,
+    "versionName": "0.1.51",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.50/koudaixiaoli_v0.1.50.apk",
-    "sha256": "cdfbd8d74410326bee53aad51482b6e96f2e12a9ab9345a4be67cdc1795997e5",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.51/koudaixiaoli_v0.1.51.apk",
+    "sha256": "877e8136efe5c32a393ad5e2f8bd184630945abe96914aacdadaa1e6b515651a",
     "rollout": 100,
     "notes": [
-      "后台检查从 6 小时改成 15 分钟：发版后最迟十几分钟就能收到通知",
-      "首次打开会申请一次通知权限（以前只有开课程提醒才申请，导致从未开过提醒的人收不到发版通知）",
-      "冷启动检查到新版/新公告时，同时补发一条通知，不用一直盯着 App"
+      "「发现新版本」气泡改小了：标题 + 版本号 + 三条更新说明 + 一个主按钮 + 稍后提醒，不再是一整页",
+      "主按钮带下载图标，下载中原地变成「转圈 + 百分比」，不再额外顶一条进度条",
+      "SHA 校验值、更新日志入口、GitHub 卡片不再塞进气泡，要看全文去「我的 → 更新日志」"
     ]
   },
   "announcements": []
