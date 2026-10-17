@@ -8,26 +8,18 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 46,
-    "versionName": "0.1.45",
+    "versionCode": 49,
+    "versionName": "0.1.48",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.45/koudaixiaoli_v0.1.45.apk",
-    "sha256": "a320c515d6e8d881cbb11bd96848685caa6c1e98eb0a595e9c295cfbe9af13c6",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.48/koudaixiaoli_v0.1.48.apk",
+    "sha256": "16ccdb54f2bd38c36cf578410de1cb473e9c8e0831529c72101210a8a0ec7be4",
     "rollout": 100,
     "notes": [
-      "「检查更新」与应用内下载安装全程加了兜底：任何异常都变成一行提示，不再闪退",
-      "去系统设置授权「安装未知应用」后，回到 App 会自动继续安装，不用再点第二次",
-      "授权前会先把包下载好（先下后要权），回到 App 就能直接装",
-      "内测公告仍在，验证完会删"
+      "点「检查更新」查到新版就直接开始下载安装，不用再点第二下",
+      "设置里「一行多选」（如更新渠道）改成气泡菜单：从点的地方胀开、带一点回弹，收起时缩回去淡掉",
+      "更新面板的标题与进度条随状态变化（发现新版本／正在下载 42%／准备安装）",
+      "两个仓的发行版页都挂了安装包，可直接覆盖安装"
     ]
   },
-  "announcements": [
-    {
-      "id": "beta-test-2026-10-17",
-      "level": "CRITICAL",
-      "title": "内测公告（测试用）",
-      "body": "看到这一条，说明公告通道是通的：它由 announce/feed.json 下发，不是写死在 App 里。点「知道了」之后不会再弹（同一个 id 只提醒一次）。这条验证完就删掉。",
-      "minVersionCode": 42
-    }
-  ]
+  "announcements": []
 }
