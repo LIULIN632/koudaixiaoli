@@ -8,16 +8,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 54,
-    "versionName": "0.1.53",
+    "versionCode": 55,
+    "versionName": "0.1.54",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.53/koudaixiaoli_v0.1.53.apk",
-    "sha256": "be2e88c2a8c53ecb20ce9c636b95423d093006ead04571ee2ea666c0abe9dc73",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.54/koudaixiaoli_v0.1.54.apk",
+    "sha256": "571629d089553489eefc67402740e040e9b9cb1d562c25f17099930f1982c7b2",
     "rollout": 100,
     "notes": [
-      "检查更新失败时会直接说出缺的是哪个类，不再只有一句 NoClassDefFoundError",
-      "失败原因同时记进网络日志：「开发者实验室 → 网络日志」里能翻到这条记录",
-      "补了一条主线程调度器的混淆保护，避免类名被 R8 改掉后在运行时找不到"
+      "修好了「检查更新」总是失败：原因是解析代码里一条正则，Android 不认它，整个解析类报废",
+      "顺带让 Release 正文里的备用更新信息能正确读到（以前遇到嵌套结构会截断）",
+      "失败提示会直接说出出问题的是哪个类，查问题不用再猜"
     ]
   },
   "announcements": []
