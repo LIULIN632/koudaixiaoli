@@ -1,0 +1,26 @@
+{
+  "_readme": [
+    "口袋小鲤的更新与公告数据源。改完提交即可生效，不需要发版、不需要跑 CI。",
+    "app.versionCode 必须与 gradle.properties 的 versionCode 一致（唯一真源，只增不减）。",
+    "minSupported = 低于它的客户端必须升级（不可取消）；0 表示不强制。",
+    "rollout = 灰度百分比 0..100，0 是「刹车」，100 是全量。",
+    "announcements 里每条必须有稳定的 id 与 title；id 用于已读去重，改文案不要改 id。",
+    "字段与判定规则的完整说明见 docs/更新与公告.md。"
+  ],
+  "app": {
+    "versionCode": 41,
+    "versionName": "0.1.40",
+    "minSupported": 0,
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.40/koudaixiaoli_v0.1.40.apk",
+    "sha256": "baa7c069f729c72d2ca84c1b5caada93950bd3686264e6ec64c08785dce96a0f",
+    "rollout": 100,
+    "notes": [
+      "新增「版本与公告」：打开 App 自动检查更新，首页铃铛里能看到新版本与公告",
+      "后台每 6 小时检查一次，有新版本会发通知（可在 设置 → 更新 里单独关掉）",
+      "更新页支持应用内下载并安装，下载前校验长度、文件头与 SHA-256",
+      "重要公告与强更会弹必须确认的对话框，点外面关不掉",
+      "发版说明以后由 feed.json 下发，不必再发一个包才能改文案"
+    ]
+  },
+  "announcements": []
+}
