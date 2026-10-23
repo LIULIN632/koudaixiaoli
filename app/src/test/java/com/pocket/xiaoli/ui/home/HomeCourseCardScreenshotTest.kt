@@ -69,9 +69,9 @@ class HomeCourseCardScreenshotTest {
 
     private val sample = HomeCourse(
         course = CourseEntity(
-            name = "建设法规",
-            teacher = "王若黎",
-            room = "文二教109",
+            name = "示例课程",
+            teacher = "王老师",
+            room = "文二教101",
             dayOfWeek = 4,
             startSlot = 9,
             endSlot = 10,

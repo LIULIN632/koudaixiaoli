@@ -297,7 +297,7 @@ internal fun ImportOptionCard(
                         maxLines = 1,
                     )
                     Spacer(Modifier.width(6.dp))
-                    MethodTag(text = tag, tint = tint)
+                    ImportTag(text = tag, tint = tint)
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -319,8 +319,9 @@ internal fun ImportOptionCard(
     }
 }
 
+/** 小圆角标签：导入方式（通用 / 更快 / 兜底）与导入结果（成功 / 失败）共用。 */
 @Composable
-private fun MethodTag(text: String, tint: Color) {
+internal fun ImportTag(text: String, tint: Color) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(percent = 50))
@@ -421,7 +422,7 @@ private fun RecentImportCard(
                             modifier = Modifier.weight(1f, fill = false),
                         )
                         Spacer(Modifier.width(6.dp))
-                        MethodTag(text = if (success) "成功" else "失败", tint = statusTint)
+                        ImportTag(text = if (success) "成功" else "失败", tint = statusTint)
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(

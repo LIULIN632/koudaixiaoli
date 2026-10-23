@@ -81,13 +81,13 @@ class HomeTodoScreenshotTest {
 
     private val exam = ExamEntity(
         id = 1,
-        courseName = "建设法规",
+        courseName = "示例课程",
         // ⚠️ 日期刻意留空：填 `1月15日` 这种可解析的写法会渲染出「还有 N 天」的倒计时，
         // 而 N 每天都在变 —— 那张基准图明天就红。考试行只是这一屏的**背景**，
         // 倒计时本身另有 `ExamCountdownTest` 守。
         date = "",
         time = "09:00-11:00",
-        location = "文二教109",
+        location = "文二教101",
         seat = "12",
         schemeId = 0,
     )
@@ -121,7 +121,7 @@ class HomeTodoScreenshotTest {
                             // 带截止日期的待办（= 教务/学习平台导入的作业走的那条）
                             TodoRow(
                                 title = "P45 习题 3-5",
-                                detail = "建设法规",
+                                detail = "示例课程",
                                 dueDate = "6月15日",
                                 completed = false,
                                 onToggle = {},

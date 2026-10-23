@@ -134,6 +134,8 @@ config.local.*
 # 例外：`docs/用户协议.md` 与 `tools/promos.example.json` 保留（前者是产品文档，
 #      后者被 `PromoExampleConfigTest` 读取，缺了单测会红）。
 /docs/*
+!/docs/images/
+!/docs/images/**
 !/docs/用户协议.md
 /memory/
 /server/

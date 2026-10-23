@@ -9,18 +9,18 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 81,
-    "versionName": "0.1.80",
+    "versionCode": 82,
+    "versionName": "0.1.81",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.80/koudaixiaoli_v0.1.80.apk",
-    "sha256": "2b56882feff215cdfa39d65fea6c53595c15ba46eb0cdbdfba0ee0fdcb05ce0b",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.81/koudaixiaoli_v0.1.81.apk",
+    "sha256": "f366f465e6cbf1769c16669f29b829166e10983d9a57373ff5bd684ef8ee29b1",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "底栏整体放大了一圈、也抬高了 6dp：离屏幕底边更远，选中那一格改成横向椭圆",
-      "鲤鱼那一格的形象缩到 38dp，转动时也不会顶出椭圆",
-      "首页时钟旁多了天气：现在气温与天气，点开看逐小时、未来几天和穿衣建议",
-      "鲤鱼 AI 设置页重新排版：形象、动作、表情一屏看全，点一下当场演给你看"
+      "修「关于 → 用户协议」点进去一片空白：现在整页打开，可随时查看",
+      "用教务系统时不再白等三次「验证码加载失败，正在重试」（本校本来就不需要验证码）",
+      "关于页去掉「服务页推广位」开关：那条是学校与周边资源的介绍，仅作展示",
+      "导出的网络日志会对 ticket / token 自动打码"
     ]
   },
   "announcements": []

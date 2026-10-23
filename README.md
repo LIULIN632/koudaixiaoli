@@ -1,231 +1,113 @@
 # 口袋小鲤
 
-> 本仓库**只放软件源码**：App 模块、构建脚本、许可证与更新数据。
-> 设计文档、运维脚本、后端与内部笔记不随源码公开。
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Android-green?logo=android" alt="Android" />
+  <img src="https://img.shields.io/badge/minSdk-29%20(Android%2010)-blue" alt="minSdk 29" />
+  <img src="https://img.shields.io/github/v/release/LIULIN632/koudaixiaoli?label=version&color=orange" alt="version" />
+  <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0" />
+</p>
 
-## ⚠️ 产品定位：烟台理工**专用**
+面向**烟台理工学院**的 Android 校园助手。Kotlin + Jetpack Compose 原生开发，覆盖课表、成绩、服务聚合、校园地图与 AI 助手，**不经过任何自建业务中转服务器** —— 账号凭据与教务数据只在你手机和学校系统之间流动。
 
-**这是烟台理工学院专用校园助手，不是通用课表工具。** 这决定了：
+非官方项目，不代表学校；开源、无广告、无第三方统计/推送 SDK。
 
-- **导入页锁定本校**：进入即自动带出当前校区的学校，**不展示全国学校列表**
-- **教务系统只有正方**：本校用的是正方 v8（`jwxt.yitsd.edu.cn/jwglxt`）
-- **服务链接按校区适配**：本校区指向公共服务大厅、教务处、图书馆、招生就业处等
+> [!NOTE]
+> 本仓库**只放软件源码**（`app/`、构建配置、单元测试与截图基线、更新数据）。
+> 设计文档、运维脚本、后端与内部笔记不在仓库内。
 
-> 代码里另有 `SchoolRegistry` + `assets/schools_*.json`（301 条学校索引）与强智客户端，
-> 那是**既有导入引擎的能力**，只在导入流程内部生效、**不在本产品的入口暴露**，
-> 也不构成"支持多所学校"的承诺。
+---
 
-## 目录结构
+## 目录
 
 | 目录 | 内容 |
 |---|---|
-| `app/` | Android 应用（Kotlin + Compose），含单元测试与截图基线 |
-| `gradle/`、`build.gradle.kts`、`settings.gradle.kts` | 构建配置 |
+| `app/` | Android 应用（Kotlin + Compose），含 2000+ 条单元测试与 190 张截图基线 |
+| `gradle/`、`build.gradle.kts`、`settings.gradle.kts` | 构建配置（Gradle 9、AGP 9） |
 | `announce/` | 更新与公告数据（`feed.json`、`promos.json`），客户端远程读取 |
 | `docs/用户协议.md` | 用户协议的人读版（App 内为唯一真源） |
 | `tools/promos.example.json` | 推广位配置样例（被单测读取） |
 
-## 参考项目（只借鉴思路，不直接复制代码）
-- Neuland Next：地图、教室搜索、校园服务产品结构
-- CampusConnect：校园地图、路线、Campus Assistant
-- HFUT-Schedule：国内校园服务、Compose、教务、导航、Deep Link
-- BJTUselfService：教务、成绩、考试、作业、校园服务
-- Traintime PDA：校园生活功能池、数据聚合
-- UCSD Campus Mobile：大型校园 App 模块化与服务组织
+## 它能做什么
 
+| 模块 | 能力 |
+|---|---|
+| 首页 | 下一节课倒计时、待办与考试、天气、全局搜索、消息（更新 + 公告） |
+| 课表 | 周课表、调停课、当前周切换、导入/导出（ICS / 图片 / 日历）、桌面小组件 |
+| 鲤鱼（AI 助手） | 自行配置模型与 Key；查课表、成绩、空教室、天气等；工具可单独开关；形象与表情可换 |
+| 服务 | 成绩与修课查询、选课、空教室、教师查询、图书馆、热水、快递、校园卡、资料站、快问快答 |
+| 校园地图 | 全屏 3D 沙盘（旋转/缩放）、楼栋档案与分层平面图、教室搜索、导览、室内平面图 |
+| 我的 | 外观（9 套皮肤 / 深浅色 / 强调色）、更新与公告、意见反馈、用户协议 |
+| 更新 | 双仓镜像 + 灰度 + 内测通道 + 断点续传 + SHA-256 校验，下载完先验再装 |
 
-口袋小鲤是一个独立的 Android 校园助手。
-目标是把待办、课程表、校园服务和教务入口收进一个 App，打开就知道接下来上什么课、还有什么没做。
+## 界面
 
-## 功能
+<p align="center">
+  <img src="docs/images/home.jpg" width="180" alt="首页" />
+  <img src="docs/images/campus-3d.jpg" width="180" alt="3D 校园" />
+  <img src="docs/images/assistant.jpg" width="180" alt="鲤鱼" />
+  <img src="docs/images/services.jpg" width="180" alt="服务" />
+</p>
 
-### 首页
-- 只保留两张卡：正在上的课 / 下一节课（今天没课则显示下次课）
-- 待办作业清单：作业与自定义待办混排、快速添加、勾选完成、删除
-- 首页不再放快捷动作 / 同步入口；学习通作业同步在「我的 → 绑定信息 → 学习平台」
+<p align="center">
+  <img src="docs/images/weather.jpg" width="180" alt="天气" />
+  <img src="docs/images/settings.jpg" width="180" alt="设置" />
+</p>
 
-### 课程表
-- 周视图、单双周、冲突合并、拖拽换课
-- 多课表方案、成绩查询、修课情况、成绩存档
-- 教务导入：烟台理工专用，进入导入页自动锁定当前校区学校，不再显示全国学校列表；在「绑定信息」二级页一次绑定校区 + 教务账号（含学习平台），之后直接一键拉取课表；「课表 → 导入」与「我的 → 导入课表」共用同一个导入方式选择页（网页导入 / 教务直连 / 文件导入 / 分享口令 / 申请学校适配 / 导入历史），入口只有一处，旧的两套对话框已移除。校区切换在「我的 → 课表设置 → 当前校区」
-- 多渠道导入：Excel、HTML、JSON 备份、分享码
+<sub>以上是单元测试里的截图基线（Pixel 5 / 3x），不是效果图。</sub>
 
-### 服务
-- 常用：校园卡、洗衣机、校园网、空教室查询、快递、通知公告；顶部「常用服务」4 格可自行编辑（长按入口右侧「编辑」，选择保存，支持恢复默认）
-- 快递：点击选择淘宝 / 拼多多，**直达身份码（取件码）页**；深链失效自动退回 App 首页
-- 学习考试：考试成绩、四级六级、普通话考试、选课、评教、转专业、专升本（含合作推广位）、考研（研招网报名/查分）
-- 生活服务：宿舍电费、洗澡、热水、报修、返乡大巴（线路介绍 + 合作推广位）、地图导航、今日校园、就业
-- 工具箱：学习资源、我的课程、成绩查询、修课情况、教室分布图、查询老师、今天吃什么、好物清单、任务清单、留声树洞
+## 下载与更新
 
-### 我的
-- 个人信息卡：只显示昵称 / 学校 / 学号脱敏 / 学习平台绑定数量；点整张卡进入「绑定信息」二级页，在那里统一绑定校区、教务账号（学号+密码）、学习通 / 智慧树，并支持同步学习提醒到待办
-- 统一登录面板：选校区、自动带出学校、填学号密码、加密保存
-- 生活服务四格：宿舍电费 / 校园余额 / 洗衣剩余 / 快递取件码，点击直达对应服务
-- 成绩存档、课表设置、外观主题、通知与通用设置
-- 学习平台：学习通 / 智慧树使用 App 内 WebView 登录，Cookie 加密保存在本机；**学习通已支持自动同步作业**（课程列表 → 课程页作业入口 → 作业列表解析，去重后写入待办），智慧树接口待接入；手动粘贴导入保留为兜底
+| 渠道 | 地址 |
+|---|---|
+| Gitee（主） | [gitee.com/liulin62633/pocket-carp/releases](https://gitee.com/liulin62633/pocket-carp/releases) |
+| GitHub（备） | [github.com/LIULIN632/koudaixiaoli/releases](https://github.com/LIULIN632/koudaixiaoli/releases) |
 
-### 校区
-- 烟台理工学院本校区（正方教务 v8，https://jwxt.yitsd.edu.cn/jwglxt）
-- 烟大南校区（接入后勤能源缴费页，宿舍电费走 https://ydny.ytu.edu.cn/pms/wechat/ytdx/payItemAdd）
-- 烟台理工新校区（建设中，暂不可选）
-- 校区不锁定时（如南校区）导入页仍可选择学校，不再出现全国列表弹窗
-- 服务链接按校区适配：本校区指向公共服务大厅、教务处、图书馆、招生就业处等
-- 洗衣房服务商：本校区使用「浣熊先生」
+两个渠道是**同一份字节**（每次发版都核对 SHA-256）。检查到新版本会先弹说明，由你决定是否下载；
+下载失败会自动换另一个仓库重试，断开后可以接着下。
 
-## 设计风格
+## 从源码构建
 
-现代极简、Material 3、低饱和马卡龙配色、大圆角、卡片式布局、悬浮胶囊底部导航。
-两套外观：彩虹模式（全界面多彩卡片）；纯净模式（只有课程表多色，其他界面统一柔蓝白卡）。
+**环境**：JDK 21、Android SDK（`compileSdk 37`、`build-tools 37.0.0`）。
 
-## 技术栈
+```bash
+# Linux / macOS
+./gradlew :app:assembleRelease
 
-Kotlin + Jetpack Compose + Material3 + Room + OkHttp + MVVM。
-Android 10+（minSdk 29 / targetSdk 34）· compileSdk 37 · Gradle 9.6.1 · AGP 9.4.1 · Kotlin 2.4.20。
-UI 组件基于 MIUIX 0.9.3（Apache-2.0）。依赖清单与工具链细节见 `CLAUDE.md`。
+# Windows
+.\build.ps1
+```
 
-## 安装
+- 仓库里**没有签名密钥**。在根目录放一份 `keystore.properties`（`storeFile` / `storePassword` / `keyAlias` / `keyPassword`）才会签名；
+  没有它也能构建，只是产物未签名。
+- `build.ps1` 是本项目的正式打包脚本：递增 `gradle.properties` 的版本号 → 构建 → 改名 → 校验签名。
 
-- **要装到手机上**：到 [Releases](https://github.com/LIULIN632/koudaixiaoli/releases) 下载最新
-  `口袋小鲤_vX.Y.Z.apk`，旁边有一个 `.sha256` 文件 —— **先核对校验和再安装**
-  （实测过两次内容不同的构建会产生完全相同的字节数，只看文件大小靠不住）。
-- 系统要求：Android 10 及以上（`minSdk 29`）。安装包只含 `arm64-v8a`。
-- 首次打开若被系统拦截，需要允许「安装未知来源应用」。
-- **这不是学校官方应用**，与烟台理工学院无隶属关系；登录用的是你自己的教务账号，
-  密码只在本机加密保存。
-- 想从源码构建 → 见下一节「构建」。
+## 测试
 
-## 构建
+```bash
+./gradlew :app:testDebugUnitTest
+```
 
-开发测试：`./gradlew assembleDebug`
-正式发布：`.\build.ps1`（Windows 推荐）或 `./build.sh`（bash）
-也可以双击 `build.bat` 一键构建。
-
-> ⚠️ Windows 下不要用 `./build.sh` —— 它依赖 bash 的 `sed -i` / `grep -oP`，`build.ps1` 是等价实现。
+- 2000+ 条单元测试；其中约 190 张是 Compose 截图基线（`app/src/test/screenshots/`），
+  改了观感需要 `-PrecordScreenshots` 重录并**看图**确认。
+- 基线覆盖深浅色、窄屏（360dp）、大字号等边界。
 
 ## 隐私
 
-### 什么**永不**离开本机
+- **课表、成绩、待办、笔记全部存本机**；`allowBackup="false"`，系统云备份不会带走它们。
+- **学号与密码用 Android Keystore 加密后只存本机**（AES-256-GCM），不上传、不进日志。
+- **无第三方广告 / 统计 / 推送 SDK**；崩溃日志只写在本机，是否导出由你决定。
+- 唯一自动上报的是**匿名运行统计**（启动、更新、崩溃的次数与版本号，无设备标识、30 天换号），
+  可在「我的 → 设置 → 关于 → 隐私」关闭；关掉后本机不再产生数据。
+- 完整条款见 [用户协议与免责声明](docs/用户协议.md)，首次启动需同意。
 
-课表、作业、待办、成绩存档、课堂笔记、树洞、校园地图纠错 —— 全部只存在手机本地的
-Room 数据库。**学号、密码、学习平台 Cookie** 用加密存储保存，仅本机可解。
+## 许可与致谢
 
-### 什么**会**联网
+以 **GNU GPL v3.0** 发布，见 [LICENSE](LICENSE)。移植过的上游代码与素材、各自的许可证与义务见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)；感谢岱宗盒子、拾光课程表、DeepSeek-Bot、grok-ball、
+LaoA-GrokBot、npface、MIUIX、Backdrop 等项目。
 
-| 内容 | 何时 | 说明 |
-|---|---|---|
-| 教务登录与课表/成绩拉取 | 你主动操作时 | 发往**学校自己的教务系统** |
-| 学校索引 / 节假日数据 | 定期检查更新 | 只拉取，不上传任何本地数据 |
-| 崩溃日志 | 只在崩溃发生时**写在本机** | 不会自动上传；见下 |
-| 「让鲤鱼看看」的 AI 分析 | 你主动点它时 | 诊断报告发往**你自己配置的** AI 服务 |
+## 参与贡献
 
-### 崩溃日志的边界
-
-**本应用没有崩溃上报服务，也不会自动上传任何诊断数据。** 崩溃时只在本机
-`Android/data/com.pocket.xiaoli/files/Download/crash_logs/` 写一个文本文件，
-要不要交出去完全由你决定。
-
-- **只包含**：崩溃堆栈、机型、系统版本、App 版本、崩溃时的界面名
-- **绝不包含**：学号、姓名、密码、课表、成绩、作业、笔记、聊天记录
-- **导出前已自动脱敏**：7 位以上连续数字（学号/身份证/手机号）→ `***`、
-  `/data/...` 等绝对路径 → `<path>`、邮箱只保留域名（实现见
-  `util/DiagnosticReport.redact`，有单测覆盖）
-- **不采集任何设备追踪标识**：不使用 Android ID / IMEI / 手机号做标识，
-  需要区分设备时只用**首次安装时随机生成的 UUID**，与你的账号无任何关联
-
-要把它交给开发者，只有一条路：你自己在「我的 → 设置 → 关于 → 导出日志」
-里导出，再自行发送。同一页还有一个「让鲤鱼看看」，点它会把这份已脱敏的报告交给你
-**自己在设置里配置的** AI 服务 —— 不点就什么都不发。
-
-崩溃日志也属于本地数据：会随「我的 → 设置 → 危险操作 → 删除全部本地数据」一起清掉。
-
-### 推广内容的边界
-
-服务页的部分介绍页（专升本 / 返乡大巴等）会展示**合作推广位**：
-
-- 推广内容由服务端下发，**均带「推广」标识**，可识别
-- 推广位只接收**你自己控制的域名**下的跳转链接（客户端有域名白名单校验，
-  见 `data/promo/PromoConfig.kt`）；非法或可疑链接会被降级为不可点的纯文字
-- 推广内容**不读取、不上传**任何本地数据
-
-### 一句话概括
-
-**无第三方广告 SDK、无第三方埋点、无用户行为追踪、无崩溃自动上报服务。**
-
-唯一会主动发出去的，是**我们自己服务器上的一套匿名运行统计**（默认开，首启告知一次，随时可关）：
-
-- **只记六件事的次数**：启动、更新提示弹出、点「更新」、下载完成、装完打开新版、崩溃次数。
-  只有版本号与系统版本，没有页面路径、没有点击轨迹、没有自定义属性
-- **没有设备标识**：标识符是随机生成的，**每 30 天换一个新的**；服务端没有按它查单台设备的接口，
-  连"设备表"都不存在
-- **不含内容**：机型、学号、课表、成绩、笔记、聊天记录一律不上传；崩溃只记次数，**不带堆栈**
-- **关掉就是真的关掉**：「设置 → 关于口袋小鲤 → 隐私」关掉后，本机连队列都不写，
-  不是"记着不发"（实现见 `app/…/telemetry/TelemetryStore.kt`）
-- 给合作方报数用的口径在面板「对外口径」页，那里也写着这个数字的已知偏差
-
-崩溃日志仍然只写在本机，要不要交出去由你决定。
-
-## 开源与致谢
-
-本项目在实现教务适配和学校数据时参考了以下开源项目的接口思路与格式：
-- dairoot/school-api
-- openschoolcn/zfn_api
-- XingHeYuZhuan/shiguang_warehouse
-- chettoy/FxxkStar（AGPL-3.0，学习通协议参考）
-- gh-orange/chaoxing（GPL-3.0，学习通接口路径参考）
-- luoyily/zhihuishu-tool（GPL-3.0，智慧树接口参考）
-- yeliqin666/xjtu-toolbox-android（岱宗盒子，GPL-3.0，**部分代码移植**）
-- Fei2411/DeepSeek-Bot（Apache-2.0，**吉祥物 path 与分层数据直接取自其源码**）
-- TyCoding/grok-ball（MIT，**三种球体轮廓、25 组眼环与 32 个表情数据直接取自其源码**）
-- zhulin025/LaoA-GrokBot（MIT，表情 / 状态阶梯的参考，未复制几何）
-- scccc6ut/npface（MIT，**头盔 / 遮阳板 / 方眼几何直接取自其源码**）
-
-以上项目仅作学习、格式兼容、接口协议与路径参考。
-
-**真正复制/移植过代码与素材的清单、各自的许可证与义务**见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-**关于岱宗盒子**：本项目与其同为 GPL-3.0，更新与公告机制上直接移植了它的实现，
-逐处保留原作者版权声明与来源（文件头注释写明原文件路径与 commit）：
-
-| 本项目文件 | 来源（v5.1.1 / `efc78be`） |
-|---|---|
-| `app/src/main/java/com/pocket/xiaoli/network/VersionCompare.kt` | `app/src/main/java/com/xjtu/toolbox/bulletin/Bulletin.kt:254-312` |
-
-**关于 DeepSeek-Bot（谢谢作者 Fei2411）**：AI 形象里的「星星」「蓝鲸」「月亮」「幽灵」
-「方糖」「睡猫」「雪花」7 个，其 path 数据、阴影 / 高光分层与眼位倾角
-**直接取自** [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot) 的
-`ds-bot/src/client/characters.js`（Apache-2.0）。本项目只把渲染
-换成了自己的「本色 + 顶部提亮」渐变，并按 GPL-3.0 兼容方式保留署名：
-代码里见 `app/src/main/java/com/pocket/xiaoli/ui/theme/Mascot.kt` 的 `MascotShapes`，
-App 内见「鲤鱼 → AI 设置 → 形象」这一段下方的署名行。
-
-其余 GPL/AGPL 项目未直接复制代码；如后续复用，同样按原协议处理并保留版权声明。
-
-**关于 Grok Ball 与 npface（谢谢两位作者，都是 MIT）**：AI 形象的「圆球」「楔子」「宝石」
-取自 [TyCoding/grok-ball](https://github.com/TyCoding/grok-ball) 的
-`window.EB_RINGS.SHAPES`（blob / wedge / gem 三种身体环）与 `window.EB_RINGS.EXPRESSIONS`
-（**25 组、每组左右各 48 点的眼环**，静态一帧取 Idle），身体与眼睛**用同一套 bbox 变换**缩进
-100 视口，眼位按它渲染器的投影公式（`face.sx/sy/eye` + `轮廓夹取` + `sin(theta)` 球面偏移）算好再落地，
-配色是它 README 示例的黑球 + 白眼睛；「头盔」取自 [scccc6ut/npface](https://github.com/scccc6ut/npface) 的
-`geometry.ts`（`HELMET` / `VISOR` / `EYE_HOME`）与 `states.ts` 的 `BASE_EYE`，配色用它自己的
-navy `#0f1d3a` + lime `#c7f636`。代码里见 `MascotShapes` 与 `ui/theme/MascotFaces.kt`
-（后者是生成文件：Grok Ball 的 **32 个表情**全部收录，眼下 7 个动作各对一张脸，
-也可以在「AI 设置 → 形象 → 表情」里单独挑），App 内见该页下方的署名行。
-原版的彩带/果冻小动作与表情轮播没有搬（需要常驻计时器，与快照可复现冲突）。
-
-另外记一笔**没搬的**：[zhulin025/LaoA-GrokBot](https://github.com/zhulin025/LaoA-GrokBot)（MIT）
-与 Grok Ball 共用同一套眼环数据，八个形状是在 `app.js` 里程序化拼装身体部件与配饰、
-没有可直接复制的静态 path，所以只留下它的 25 表情 / 39 状态作为状态阶梯的参考；
-[sam70361/aora-bot](https://github.com/sam70361/aora-bot) 的球形形象写明「仅供个人学习研究、
-永不开放商用」，**不能搬**。
-
-## 许可
-
-本项目以 **GNU General Public License v3.0** 发布，全文见仓库根目录 `LICENSE`。
-
-你可以自由使用、修改、再分发；**再分发时必须同样以 GPL-3.0 开源**，并保留版权声明。
-校内同学改一版自己用完全可以；把它打包成闭源应用去卖则不被许可。
-
-另外请注意：这是一款**个人开发的第三方工具**，仅限个人学习使用，
-**请勿用于商业用途，也不要冒充学校官方应用**。
-
-关于页已内置声明：个人开发的第三方工具，非烟台理工学院官方应用，与学校无隶属关系、未获授权或背书。
+- 问题与建议：[GitHub Issues](https://github.com/LIULIN632/koudaixiaoli/issues)
+- 提 PR 前先跑 `./gradlew :app:testDebugUnitTest`；截图基线有变要一并提交。
+- 只服务烟台理工这一所学校，不接"支持多校"的贡献。

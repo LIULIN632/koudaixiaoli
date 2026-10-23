@@ -63,9 +63,9 @@ class HomePageScreenshotTest {
 
     private val course = HomeCourse(
         course = CourseEntity(
-            name = "建设法规",
-            teacher = "王若黎",
-            room = "文二教109",
+            name = "示例课程",
+            teacher = "王老师",
+            room = "文二教101",
             dayOfWeek = 3,
             startSlot = 9,
             endSlot = 10,
@@ -77,16 +77,16 @@ class HomePageScreenshotTest {
 
     private val exam = ExamEntity(
         id = 1,
-        courseName = "建设法规",
+        courseName = "示例课程",
         date = "",
         time = "09:00-11:00",
-        location = "文二教109",
+        location = "文二教101",
         seat = "12",
     )
 
     private val homework = HomeworkEntity(
         id = 2,
-        courseName = "建设法规",
+        courseName = "示例课程",
         content = "P45 习题 3-5",
         dueDate = "6月15日",
     )
