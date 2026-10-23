@@ -70,6 +70,13 @@ android {
         ).forEach { key ->
             val value = (project.findProperty(key) as String?)?.trim().orEmpty()
             buildConfigField("String", key, "\"$value\"")
+
+        // ── F-Droid 构建开关 ────────────────────────────────────────
+        // `./gradlew assembleRelease -Pfdroid=true` 生成「F-Droid 版」：
+        // 匿名统计**完全不初始化**（不建队列、不发请求），上架时不带 Tracking 反特性。
+        // 普通构建（不带这个属性）行为完全不变。
+        val fdroidBuild = (project.findProperty("fdroid") as String?)?.toBoolean() == true
+        buildConfigField("boolean", "FDROID", fdroidBuild.toString())
         }
     }
 

@@ -79,6 +79,8 @@
 
 - 仓库里**没有签名密钥**。在根目录放一份 `keystore.properties`（`storeFile` / `storePassword` / `keyAlias` / `keyPassword`）才会签名；
   没有它也能构建，只是产物未签名。
+- `./gradlew :app:assembleRelease -Pfdroid=true` 生成 **F-Droid 版**：匿名运行统计完全不初始化（不建队列、不发请求），
+  其余功能与正式版一致。普通构建不带这个属性，行为不变。
 - `build.ps1` 是本项目的正式打包脚本：递增 `gradle.properties` 的版本号 → 构建 → 改名 → 校验签名。
 
 ## 测试

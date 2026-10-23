@@ -51,8 +51,15 @@ object Telemetry {
     @Volatile
     private var uploader: TelemetryUploader? = null
 
-    /** 在 `Application.onCreate` 里调一次；重复调用无副作用。 */
+    /**
+     * 在 `Application.onCreate` 里调一次；重复调用无副作用。
+     *
+     * ⚠️ F-Droid 构建（`-Pfdroid=true`）**直接不初始化**：没有 store、没有 uploader，
+     * 于是 `track()` 第一行就 return —— 连队列都不会建，不是"记下来不发"。
+     * 这样上架 F-Droid 时不带 Tracking 反特性，也不需要用户在设置里关一次。
+     */
     fun init(context: Context) {
+        if (BuildConfig.FDROID) return
         if (store != null) return
         val s = TelemetryStore(context.applicationContext)
         store = s
@@ -62,8 +69,10 @@ object Telemetry {
 
     // ── 设置页用的三个入口 ──────────────────────────────────────────────
 
-    fun isEnabled(context: Context): Boolean =
-        store?.enabled() ?: TelemetryStore(context.applicationContext).enabled()
+    fun isEnabled(context: Context): Boolean {
+        if (BuildConfig.FDROID) return false
+        return store?.enabled() ?: TelemetryStore(context.applicationContext).enabled()
+    }
 
     fun setEnabled(context: Context, enabled: Boolean) {
         val s = store ?: TelemetryStore(context.applicationContext).also { store = it }
@@ -76,9 +85,9 @@ object Telemetry {
         }
     }
 
-    /** 首启那条说明还没给他看过 */
+    /** 首启那条说明还没给他看过（F-Droid 版没有统计，也就不弹这条） */
     fun shouldShowNotice(context: Context): Boolean =
-        !(store ?: TelemetryStore(context.applicationContext)).noticeSeen()
+        !BuildConfig.FDROID && !(store ?: TelemetryStore(context.applicationContext)).noticeSeen()
 
     fun markNoticeShown(context: Context) {
         (store ?: TelemetryStore(context.applicationContext)).markNoticeSeen()
@@ -145,7 +154,11 @@ object Telemetry {
     }
 
     /** 纯函数：两个条件缺一个就一条都不发。 */
-    internal fun shouldRecord(enabled: Boolean, configured: Boolean): Boolean = enabled && configured
+    internal fun shouldRecord(
+    enabled: Boolean,
+    configured: Boolean,
+    fdroid: Boolean = BuildConfig.FDROID,
+): Boolean = !fdroid && enabled && configured
 
     private fun TelemetryEvent.toJson(nowMs: Long, fromVc: Int?): String = buildString {
         append("{\"n\":\"").append(wire).append('"')

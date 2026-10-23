@@ -125,4 +125,15 @@ class TelemetryUploaderTest {
         assertFalse(Telemetry.shouldRecord(enabled = false, configured = false))
         assertTrue(Telemetry.shouldRecord(enabled = true, configured = true))
     }
+
+    @Test
+    fun `F-Droid 构建里即使开关全开也不记账`() {
+        // `-Pfdroid=true` 的包：`Telemetry.init` 直接 return，这里的闸门是第二道保险。
+        // 上架 F-Droid 不想要 Tracking 反特性，所以这一条必须永远为 false。
+        assertFalse(Telemetry.shouldRecord(enabled = true, configured = true, fdroid = true))
+        assertFalse(Telemetry.shouldRecord(enabled = true, configured = false, fdroid = true))
+        assertFalse(Telemetry.shouldRecord(enabled = false, configured = true, fdroid = true))
+        // 普通构建不受影响
+        assertTrue(Telemetry.shouldRecord(enabled = true, configured = true, fdroid = false))
+    }
 }
