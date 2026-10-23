@@ -31,6 +31,7 @@ class AppFeedViewTest {
         error: String? = null,
         rolloutId: String? = null,
         betaEnabled: Boolean = false,
+        updatesEnabled: Boolean = true,
     ) = AppFeedView.build(
         feed = feed,
         currentVersionCode = currentVersionCode,
@@ -42,6 +43,7 @@ class AppFeedViewTest {
         error = error,
         rolloutId = rolloutId,
         betaEnabled = betaEnabled,
+        updatesEnabled = updatesEnabled,
     )
 
     private fun announcement(id: String, level: AnnouncementLevel = AnnouncementLevel.INFO) =
@@ -412,5 +414,35 @@ class AppFeedViewTest {
         // beta 块里没有 announcements 这一段（解析器就不读），所以两个通道看到同一份公告
         assertEquals(off.announcements.map { it.id }, on.announcements.map { it.id })
         assertEquals(1, on.announcements.size)
+    }
+
+    @Test
+    fun `F-Droid 构建不提示更新，但公告照常显示`() {
+        // `-Pfdroid=true` 的包走这里：更新交给 F-Droid 自己，应用内不再挂下载入口。
+        val feed = AppReleaseFeed(
+            versionCode = 41,
+            versionName = "0.1.41",
+            apkUrl = "https://example.com/a.apk",
+            announcements = listOf(announcement("a")),
+        )
+
+        val state = build(feed, updatesEnabled = false)
+
+        assertFalse("F-Droid 版不该提示更新", state.updateAvailable)
+        assertEquals("公告不受影响", 1, state.announcements.size)
+        // 红点只由未读公告撑起来（没有更新可提示）
+        assertTrue(state.showRedDot)
+    }
+
+    @Test
+    fun `普通构建仍然提示更新`() {
+        val feed = AppReleaseFeed(
+            versionCode = 41,
+            versionName = "0.1.41",
+            apkUrl = "https://example.com/a.apk",
+        )
+        val state = build(feed, updatesEnabled = true)
+        assertTrue(state.updateAvailable)
+        assertEquals(41, state.latestVersionCode)
     }
 }

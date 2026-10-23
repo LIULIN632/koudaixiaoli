@@ -43,6 +43,8 @@ import com.pocket.xiaoli.data.JwSystemType
 import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.ui.components.SchoolFavoriteButton
 import com.pocket.xiaoli.ui.components.PocketPasswordTransformation
+import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.SectionCaption
 import com.pocket.xiaoli.ui.profile.components.SchoolRequestDialog
 import com.pocket.xiaoli.network.CookieStore
 import com.pocket.xiaoli.ui.theme.*
@@ -59,7 +61,6 @@ fun WebImportScreen(
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val isDark = LocalDarkMode.current
     val context = LocalContext.current
     val app = context.applicationContext as PocketXiaoliApplication
     val viewModel: WebImportViewModel = viewModel(
@@ -282,8 +283,9 @@ fun WebImportScreen(
             if (selectedSchool != null || freeUrlActive) {
                 FloatingActionButton(
                     onClick = { showCredentialSheet = true; passwordVisible = true },
-                    containerColor = if (viewModel.hasSavedCredentials) Color(0xFF4CAF50) else colors.surfaceCard,
-                    contentColor = if (viewModel.hasSavedCredentials) Color.White else accentColor(),
+                    // 有已存凭据时用「成功色」提示一键登录可用；颜色跟主题的 success，不再写死 Material 绿。
+                    containerColor = if (viewModel.hasSavedCredentials) colors.success else colors.surfaceCard,
+                    contentColor = if (viewModel.hasSavedCredentials) onAccentColor() else accentColor(),
                     modifier = Modifier.size(40.dp),
                     shape = RoundedCornerShape(skin.radiusChip)
                 ) {
@@ -379,9 +381,9 @@ fun WebImportScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
-                                Icon(Icons.Outlined.Lock, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(12.dp))
+                                Icon(Icons.Outlined.Lock, null, tint = colors.success, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(skin.spaceXs))
-                                Text("Cookie 已保存", fontSize = 11.sp, color = Color(0xFF4CAF50))
+                                Text("Cookie 已保存", fontSize = 11.sp, color = colors.success)
                             }
                             Spacer(Modifier.height(skin.spaceXs))
                         }
@@ -393,9 +395,9 @@ fun WebImportScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
-                                Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Outlined.CheckCircle, null, tint = colors.success, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(skin.spaceXs))
-                                Text("已导入 $importedCount 门课程", fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Medium)
+                                Text("已导入 $importedCount 门课程", fontSize = 12.sp, color = colors.success, fontWeight = FontWeight.Medium)
                             }
                         } else {
                             Row(
@@ -423,11 +425,11 @@ fun WebImportScreen(
                             shape = RoundedCornerShape(skin.radiusChip),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = accentColor(),
-                                contentColor = Color.White
+                                contentColor = onAccentColor()
                             )
                         ) {
                             if (isImporting) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = onAccentColor(), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(skin.spaceSm))
                                 Text("解析中…", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             } else {
@@ -466,38 +468,45 @@ fun WebImportScreen(
                 // School selection screen + 通用导入 entry
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    contentPadding = PaddingValues(horizontal = skin.spaceLg, vertical = skin.spaceMd),
+                    verticalArrangement = Arrangement.spacedBy(skin.spaceSm)
                 ) {
                     item {
-                        Text("选择学校", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = colors.textPrimary)
-                        Spacer(Modifier.height(skin.spaceXs))
-                        Text("登录教务系统后进入课表页面，点击「一键导入」自动识别课程", fontSize = 13.sp, color = colors.textTertiary)
+                        Column {
+                            SectionCaption("选择学校")
+                            Spacer(Modifier.height(skin.spaceMicro))
+                            Text("登录教务系统后进入课表页面，点击「一键导入」自动识别课程", fontSize = 13.sp, color = colors.textTertiary)
+                        }
                     }
                     // 添加自己的学校入口 — 手动添加学校名称+网址
                     item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(skin.radiusChip))
-                                .background(accentColor().copy(alpha = 0.12f))
-                                .clickable {
-                                    pendingBlankSchool = null
-                                    freeNameInput = ""
-                                    freeJwType = JwSystemType.ZHENGFANG
-                                    freeUrlInput = ""
-                                    showFreeUrlDialog = true
-                                }
-                                .padding(horizontal = skin.spaceCompact, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        AppCard(
+                            onClick = {
+                                pendingBlankSchool = null
+                                freeNameInput = ""
+                                freeJwType = JwSystemType.ZHENGFANG
+                                freeUrlInput = ""
+                                showFreeUrlDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(skin.radiusChip),
+                            containerColor = accentSoftColor(),
+                            border = BorderStroke(1.dp, accentColor().copy(alpha = 0.25f)),
                         ) {
-                            Icon(Icons.Outlined.AddLink, null, tint = accentColor(), modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(skin.spaceMd))
-                            Column(Modifier.weight(1f)) {
-                                Text("添加自己的学校", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = accentColor())
-                                Text("输入学校名称和教务系统地址，自动保存到列表", fontSize = 12.sp, color = colors.textSecondary)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = skin.spaceCompact, vertical = skin.spaceMd),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.AddLink, null, tint = accentColor(), modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.width(skin.spaceMd))
+                                Column(Modifier.weight(1f)) {
+                                    Text("添加自己的学校", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = accentColor())
+                                    Text("输入学校名称和教务系统地址，自动保存到列表", fontSize = 12.sp, color = colors.textSecondary)
+                                }
+                                Icon(Icons.Outlined.Add, null, tint = accentColor(), modifier = Modifier.size(20.dp))
                             }
-                            Icon(Icons.Outlined.Add, null, tint = accentColor(), modifier = Modifier.size(20.dp))
                         }
                     }
                     item {
@@ -541,12 +550,9 @@ fun WebImportScreen(
                         // ── Favorites section ──
                         if (favSchools.isNotEmpty()) {
                             item {
-                                Text(
-                                    "⭐ 我的收藏",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textPrimary,
-                                    modifier = Modifier.padding(top = skin.spaceXs, bottom = 4.dp)
+                                SectionCaption(
+                                    "我的收藏",
+                                    Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
                                 )
                             }
                             items(favSchools, key = { it.id }) { school ->
@@ -579,12 +585,9 @@ fun WebImportScreen(
                                 )
                             }
                             item {
-                                Text(
+                                SectionCaption(
                                     "全部学校",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = colors.textPrimary,
-                                    modifier = Modifier.padding(top = skin.spaceXs, bottom = 4.dp)
+                                    Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
                                 )
                             }
                         }
@@ -634,25 +637,13 @@ fun WebImportScreen(
 
                 // Import result overlay
                 if (importedCount > 0) {
-                    Card(
-                        modifier = Modifier.align(Alignment.TopCenter).padding(skin.spaceLg),
-                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1B3B23) else Color(0xFFE8F5E9)),
-                        shape = RoundedCornerShape(skin.radiusChip)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(skin.spaceLg),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF4CAF50))
-                            Spacer(Modifier.width(skin.spaceMd))
-                            Column {
-                                Text("导入成功！", fontWeight = FontWeight.ExtraBold, color = colors.textPrimary)
-                                Text("已导入 $importedCount 门课程", fontSize = 13.sp, color = colors.textSecondary)
-                            }
-                            Spacer(Modifier.weight(1f))
-                            TextButton(onClick = onBack) { Text("返回课表", color = accentColor()) }
-                        }
-                    }
+                    WebImportSuccessOverlay(
+                        courseCount = importedCount,
+                        onBackToTimetable = onBack,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(skin.spaceLg),
+                    )
                 }
 
                 // Parsing logs overlay
@@ -1130,3 +1121,58 @@ fun WebImportScreen(
 }
 
 
+
+/**
+ * 「网页导入成功」浮层。
+ *
+ * 旧版把底色写死成 `#E8F5E9` / `#1B3B23`、勾选图标写死 Material 绿，
+ * 换配色主题后浮层仍是绿色，与页面主色割裂。现在全部走 `success` token。
+ */
+@Composable
+internal fun WebImportSuccessOverlay(
+    courseCount: Int,
+    onBackToTimetable: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    val isDark = LocalDarkMode.current
+    val tint = colors.success
+
+    AppCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(skin.radiusChip),
+        containerColor = tint.copy(alpha = if (isDark) 0.18f else 0.10f),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (isDark) 0.42f else 0.26f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = skin.spaceLg, vertical = skin.spaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(tint.copy(alpha = if (isDark) 0.26f else 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.CheckCircle,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
+            Spacer(Modifier.width(skin.spaceSm))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("导入成功", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colors.textPrimary)
+                Text("已导入 $courseCount 门课程", fontSize = 12.sp, color = colors.textSecondary)
+            }
+            TextButton(onClick = onBackToTimetable) {
+                Text("返回课表", color = accentColor(), fontSize = 13.sp)
+            }
+        }
+    }
+}

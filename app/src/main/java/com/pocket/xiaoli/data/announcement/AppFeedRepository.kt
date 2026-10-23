@@ -1,8 +1,9 @@
 package com.pocket.xiaoli.data.announcement
 
 import android.content.Context
-import com.pocket.xiaoli.network.Announcement
+import com.pocket.xiaoli.BuildConfig
 import com.pocket.xiaoli.network.AppReleaseFeed
+import com.pocket.xiaoli.network.Announcement
 import com.pocket.xiaoli.network.AppReleaseFeedParser
 import com.pocket.xiaoli.network.AppUpdateChecker
 import com.pocket.xiaoli.network.FeedFetch
@@ -281,6 +282,14 @@ internal object AppFeedView {
         rolloutId: String? = null,
         /** 本机是否加入了内测（`AppFeedStore.betaEnabled()`） */
         betaEnabled: Boolean = false,
+        /**
+         * 是否允许在应用内提示/下载新版本。
+         *
+         * F-Droid 构建（`-Pfdroid=true`）传 false：更新由 F-Droid 自己管，
+         * 应用内再挂一个「下载安装包」的入口既不符合它的分发模型，也容易被审核追问。
+         * 公告照常显示（`announcements` 不受这个开关影响）。
+         */
+        updatesEnabled: Boolean = !BuildConfig.FDROID,
     ): AppFeedRepository.State {
         if (feed == null) {
             return AppFeedRepository.State(
@@ -329,7 +338,7 @@ internal object AppFeedView {
         val unread = visible.count { it.id !in seen }
         val hasApp = gated.hasApp && ReleaseGate.isNewer(gated, currentVersionCode)
         // 「稍后提醒」只压红点，不压可见性：更新卡该在还在，只是不再催
-        val updateAvailable = hasApp && !(snoozedVersionCode == gated.versionCode && !force)
+        val updateAvailable = updatesEnabled && hasApp && !(snoozedVersionCode == gated.versionCode && !force)
 
         // 必须确认的公告：用 seen 当「已确认」的账本 —— 点过「知道了」就不再拦人。
         // 强更时不叠公告对话框（强更那张已经在挡着了）。

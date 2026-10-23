@@ -43,8 +43,10 @@ import com.pocket.xiaoli.data.JwSystemType
 import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.data.isJwSystemAvailable
 import com.pocket.xiaoli.network.ZhengfangSchool
+import com.pocket.xiaoli.ui.components.AppCard
 import com.pocket.xiaoli.ui.components.SchoolFavoriteButton
 import com.pocket.xiaoli.ui.components.PocketPasswordTransformation
+import com.pocket.xiaoli.ui.components.SectionCaption
 import com.pocket.xiaoli.ui.profile.components.SchoolRequestDialog
 import com.pocket.xiaoli.ui.theme.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,7 +61,6 @@ fun ImportScreen(
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val isDark = LocalDarkMode.current
     val context = LocalContext.current
     val app = context.applicationContext as PocketXiaoliApplication
     val viewModel: ImportViewModel = viewModel(
@@ -172,6 +173,7 @@ fun ImportScreen(
     // 与「成绩查询」那边完全一样，说明记在 `ZhengfangLoginViewModel.autoLoginIfBound` 的 KDoc。
 
     Scaffold(
+        containerColor = colors.surfaceBase,
         topBar = {
             TopAppBar(
                 title = { Text("导入本校课表", fontWeight = FontWeight.Bold) },
@@ -188,14 +190,12 @@ fun ImportScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(skin.spaceXl)
+            contentPadding = PaddingValues(horizontal = skin.spaceLg, vertical = skin.spaceMd),
+            verticalArrangement = Arrangement.spacedBy(skin.spaceMd)
         ) {
             // Step 1: Select教务 system（仅非本校锁定时出现）
             if (!campusOnly && selectedSystem == null) {
-                item {
-                    Text("选择教务系统", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-                }
+                item { SectionCaption("选择教务系统") }
                 item {
                     JwSystemGrid(
                         onSelect = { type ->
@@ -214,11 +214,9 @@ fun ImportScreen(
             if (!campusOnly && selectedSchool == null) {
                 val system = selectedSystem ?: return@LazyColumn
                 item {
-                    Text(
+                    SectionCaption(
                         "选择学校 · ${system.label}",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.textPrimary
+                        Modifier.padding(top = skin.spaceSm),
                     )
                 }
                 item {
@@ -274,12 +272,9 @@ fun ImportScreen(
                     // ── Favorites section ──
                     if (favSchools.isNotEmpty()) {
                         item {
-                            Text(
-                                "⭐ 我的收藏",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textPrimary,
-                                modifier = Modifier.padding(top = skin.spaceXs, bottom = 4.dp)
+                            SectionCaption(
+                                "我的收藏",
+                                Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
                             )
                         }
                         items(favSchools, key = { it.id }) { school ->
@@ -304,12 +299,9 @@ fun ImportScreen(
                             )
                         }
                         item {
-                            Text(
+                            SectionCaption(
                                 "全部学校",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textPrimary,
-                                modifier = Modifier.padding(top = skin.spaceXs, bottom = 4.dp)
+                                Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
                             )
                         }
                     }
@@ -351,7 +343,7 @@ fun ImportScreen(
 
             // Step 3: Login
             item {
-                Text("登录教务系统", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                SectionCaption("登录教务系统", Modifier.padding(top = skin.spaceSm))
             }
             item {
                 Card(
@@ -478,53 +470,14 @@ fun ImportScreen(
                     }
                 }
                 item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (result!!.success) (if (isDark) Color(0xFF1B3B23) else Color(0xFFE8F5E9)) else (if (isDark) Color(0xFF3B2323) else Color(0xFFFFEBEE))
-                        ),
-                        shape = RoundedCornerShape(skin.radiusMicro)
-                    ) {
-                        Column(modifier = Modifier.padding(skin.spaceLg)) {
-                            Text(
-                                if (result!!.success) "导入成功！" else "导入失败",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp
-                            )
-                            if (result!!.error != null) {
-                                Text(result!!.error!!, fontSize = 13.sp, color = colors.textSecondary)
-                            }
-                            if (result!!.success) {
-                                Text(
-                                    "已导入 ${result!!.courses?.size ?: 0} 门课程",
-                                    fontSize = 13.sp,
-                                    color = colors.textSecondary
-                                )
-                                if (onGoSettings != null) {
-                                    Text(
-                                        "上课提醒与桌面小组件默认关闭，可在「我的 → 设置」中开启",
-                                        fontSize = 12.sp,
-                                        color = colors.textTertiary,
-                                        modifier = Modifier.padding(top = skin.spaceSmall)
-                                    )
-                                    Row {
-                                        TextButton(
-                                            onClick = { viewModel.reset(); onGoSettings() },
-                                            modifier = Modifier.padding(top = skin.spaceXs)
-                                        ) { Text("开启提醒/小组件", color = accentColor()) }
-                                        TextButton(
-                                            onClick = { viewModel.reset(); onBack() },
-                                            modifier = Modifier.padding(top = skin.spaceXs)
-                                        ) { Text("返回课表", color = accentColor()) }
-                                    }
-                                } else {
-                                    TextButton(
-                                        onClick = { viewModel.reset(); onBack() },
-                                        modifier = Modifier.padding(top = skin.spaceXs)
-                                    ) { Text("返回课表", color = accentColor()) }
-                                }
-                            }
-                        }
-                    }
+                    ImportResultCard(
+                        success = result!!.success,
+                        error = result!!.error,
+                        courseCount = result!!.courses?.size ?: 0,
+                        onOpenSettings = onGoSettings?.let { go -> { viewModel.reset(); go() } },
+                        onBackToTimetable = { viewModel.reset(); onBack() },
+                        onRetry = { viewModel.reset() },
+                    )
                 }
             }
         }
@@ -749,38 +702,55 @@ fun ImportScreen(
 }
 
 @Composable
-private fun JwSystemGrid(onSelect: (JwSystemType) -> Unit) {
+internal fun JwSystemGrid(onSelect: (JwSystemType) -> Unit) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
+    val isDark = LocalDarkMode.current
     val types = JwSystemType.values().toList()
-    Column(verticalArrangement = Arrangement.spacedBy(skin.spaceMd)) {
+    Column(verticalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
         for (row in types.chunked(2)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceMd)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
                 for (type in row) {
                     val available = isJwSystemAvailable(type)
-                    val sysColors = systemCardColors(type)
-                    Card(
+                    val accent = systemAccent(type)
+                    val tint = serviceAccentColor(accent)
+                    AppCard(
+                        onClick = { onSelect(type) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(100.dp)
-                            .clickable { onSelect(type) },
-                        shape = RoundedCornerShape(skin.radiusMicro),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (available) sysColors.bg else sysColors.bg.copy(alpha = 0.5f)
+                            .height(96.dp),
+                        shape = RoundedCornerShape(skin.radiusChip),
+                        containerColor = if (available) {
+                            serviceAccentContainer(accent)
+                        } else {
+                            colors.surfaceAlt
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            if (available) {
+                                tint.copy(alpha = if (isDark) 0.42f else 0.30f)
+                            } else {
+                                colors.borderDivider
+                            },
                         ),
-                        border = BorderStroke(1.dp, if (available) sysColors.border else colors.borderDivider)
                     ) {
                         Column(
-                            modifier = Modifier.padding(skin.spaceCompact),
-                            verticalArrangement = Arrangement.Center
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = skin.spaceCompact, vertical = skin.spaceMd),
+                            verticalArrangement = Arrangement.Center,
                         ) {
-                            Text(type.label, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                                color = if (available) colors.textPrimary else colors.textTertiary)
-                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                if (available) type.description else "请用WebView方式导入",
+                                type.label,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (available) colors.textPrimary else colors.textTertiary,
+                            )
+                            Spacer(Modifier.height(skin.spaceXs))
+                            Text(
+                                if (available) type.description else "请用 Web 导入",
                                 fontSize = 11.sp,
-                                color = if (available) colors.textSecondary else colors.textTertiary
+                                color = if (available) colors.textSecondary else colors.warning,
                             )
                         }
                     }
@@ -794,15 +764,127 @@ private fun JwSystemGrid(onSelect: (JwSystemType) -> Unit) {
     }
 }
 
+/** 教务系统 → 服务分类色的映射：同一类教务在服务页里也是同一个色相，跨页面对得上。 */
+private fun systemAccent(type: JwSystemType): ServiceAccent = when (type) {
+    JwSystemType.ZHENGFANG -> ServiceAccent.ACADEMIC
+    JwSystemType.QIANGZHI -> ServiceAccent.LIFE
+    JwSystemType.QINGGUO -> ServiceAccent.QUERY
+    JwSystemType.CHAOXING -> ServiceAccent.STUDY
+    JwSystemType.URP -> ServiceAccent.PAYMENT
+}
 
-private data class SystemCardColors(val bg: Color, val border: Color)
+/**
+ * 导入结果卡。
+ *
+ * 旧版把成功/失败底色写死成 `#E8F5E9` / `#FFEBEE`（深色另写一档），标题不跟主题；
+ * 失败时**没有任何按钮**，只能按返回键退回表单。现在配色走 `success` / `danger`，
+ * 失败卡直接给「重新登录」。
+ */
+@Composable
+internal fun ImportResultCard(
+    success: Boolean,
+    error: String?,
+    courseCount: Int,
+    onOpenSettings: (() -> Unit)?,
+    onBackToTimetable: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    val isDark = LocalDarkMode.current
+    val tint = if (success) colors.success else colors.danger
 
-private fun systemCardColors(type: JwSystemType): SystemCardColors = when (type) {
-    JwSystemType.ZHENGFANG -> SystemCardColors(Color(0xFFEEF0F4), Color(0xFFCDD2DC))
-    JwSystemType.QIANGZHI -> SystemCardColors(Color(0xFFF5F0EB), Color(0xFFE0D5C8))
-    JwSystemType.QINGGUO -> SystemCardColors(Color(0xFFEBF3EE), Color(0xFFC8DCD0))
-    JwSystemType.CHAOXING -> SystemCardColors(Color(0xFFF0EBF3), Color(0xFFD0C8E0))
-    JwSystemType.URP -> SystemCardColors(Color(0xFFEBEFF5), Color(0xFFC8D0E0))
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(skin.radiusChip),
+        containerColor = tint.copy(alpha = if (isDark) 0.16f else 0.10f),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (isDark) 0.42f else 0.26f)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(skin.spaceLg),
+            verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(tint.copy(alpha = if (isDark) 0.26f else 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (success) Icons.Outlined.CheckCircle else Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Spacer(Modifier.width(skin.spaceSm))
+                Text(
+                    text = if (success) "导入成功" else "导入失败",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                )
+                Spacer(Modifier.weight(1f))
+                if (success) ImportTag(text = "已完成", tint = tint)
+            }
+
+            if (success) {
+                Text(
+                    "已导入 $courseCount 门课程",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary,
+                )
+                if (onOpenSettings != null) {
+                    Text(
+                        "上课提醒与桌面小组件默认关闭，可在「我的 → 设置」中开启",
+                        fontSize = 12.sp,
+                        color = colors.textTertiary,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
+                    if (onOpenSettings != null) {
+                        Button(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.heightIn(min = 40.dp),
+                            shape = RoundedCornerShape(skin.radiusChip),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor()),
+                        ) { Text("开启提醒/小组件", fontSize = 13.sp) }
+                        OutlinedButton(
+                            onClick = onBackToTimetable,
+                            modifier = Modifier.heightIn(min = 40.dp),
+                            shape = RoundedCornerShape(skin.radiusChip),
+                            border = BorderStroke(1.dp, accentColor().copy(alpha = 0.35f)),
+                        ) { Text("返回课表", fontSize = 13.sp) }
+                    } else {
+                        Button(
+                            onClick = onBackToTimetable,
+                            modifier = Modifier.heightIn(min = 40.dp),
+                            shape = RoundedCornerShape(skin.radiusChip),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor()),
+                        ) { Text("返回课表", fontSize = 13.sp) }
+                    }
+                }
+            } else {
+                Text(
+                    error ?: "登录没有通过，请检查学号、密码与验证码后重试。",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
+                    Button(
+                        onClick = onRetry,
+                        modifier = Modifier.heightIn(min = 40.dp),
+                        shape = RoundedCornerShape(skin.radiusChip),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor()),
+                    ) { Text("重新登录", fontSize = 13.sp) }
+                }
+            }
+        }
+    }
 }
 
 @Composable

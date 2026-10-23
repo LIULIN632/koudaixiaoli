@@ -2,6 +2,7 @@ package com.pocket.xiaoli.data.promo
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.pocket.xiaoli.BuildConfig
 import com.pocket.xiaoli.network.NetworkLogInterceptor
 import com.pocket.xiaoli.data.SelfHost
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,8 @@ class PromoRepository(
      * 不抛异常 —— 调用方永远拿到一个可展示的列表。
      */
     suspend fun load(): PromoConfig = withContext(Dispatchers.IO) {
+        // F-Droid 构建不带推广位（`-Pfdroid=true`）：上架时少一个 Ads 反特性要解释。
+        if (BuildConfig.FDROID) return@withContext EMPTY
         // 用户关掉推广 → 连请求都不发。只是"不显示"等于还在偷偷取数据
         if (!enabled) return@withContext EMPTY
 

@@ -124,6 +124,7 @@ internal fun PdfImportPage(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(colors.surfaceBase)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = skin.spaceLg, vertical = skin.spaceMd),
         verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
