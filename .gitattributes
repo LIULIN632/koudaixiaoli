@@ -1,0 +1,19 @@
+# ⚠️ shell 脚本必须是 LF：它们在 Linux 服务器上执行，
+# 一旦被 Windows 检出成 CRLF，bash 会因为 `\r` 报 "bad interpreter" 之类的怪错。
+*.sh text eol=lf
+
+# PowerShell 两种换行都能跑，统一成 CRLF 便于在 Windows 上直接编辑
+*.ps1 text eol=crlf
+
+# 图片等二进制别做任何转换
+*.png binary
+*.jpg binary
+*.apk binary
+
+# ── 公开分发数据（App 会跨镜像按字节比对同一份 JSON）──
+# ⚠️ 绝不能进 core.autocrlf 的转换：仓库根这两个文件是 App 直接下载的，
+#    2026-10-14 实测被转成 LF 后 Gitee raw 少了 2423 字节（正好等于 CRLF 行数），
+#    而 GitHub 那份是 API 上传的、保持 CRLF —— 两边就"同内容不同字节"了。
+#    -text = 原样存储，不做任何换行转换。
+/school_index.json -text
+/knowledge.json -text

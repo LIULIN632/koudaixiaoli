@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用上的疑问 / 常见问题
+    url: https://github.com/LIULIN632/koudaixiaoli/issues/new?template=bug_report.yml
+    about: 先看 App 内「我的 → 设置 → 关于与帮助 → 常见问题」，那里覆盖了导入、数据存放、分享、深色模式。
+  - name: 隐私相关问题
+    url: https://github.com/LIULIN632/koudaixiaoli/blob/main/docs/隐私政策.md
+    about: 数据存在哪里、什么会联网、怎么删干净 —— 见隐私政策。

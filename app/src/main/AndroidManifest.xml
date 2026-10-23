@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--
+      应用内更新：下载完 APK 交给系统安装器。
+      声明了这个权限，系统设置里才会出现「允许安装未知应用」的开关；
+      真正安装时仍需用户去系统设置里打开，App 自己无法代劳（见 ApkInstaller）。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!--
+      番茄钟（专注计时）的前台服务权限：
+        · FOREGROUND_SERVICE          —— 不声明连 startForegroundService 都调不了
+        · FOREGROUND_SERVICE_SPECIAL_USE —— Android 14 起前台服务必须带类型，
+          番茄钟不属于 mediaPlayback / location / health 等既有类别，
+          只能走 specialUse 并在 <service> 里用 property 说明子类型。
+          ⚠️ 只声明权限、<service> 里漏写 foregroundServiceType，14+ 上 startForeground
+             会直接抛 SecurityException 崩掉。
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+      蓝牙：发现附近的热水器（BLE 广播名 KLCXKJ-Water）。
+      ⚠️ 权限在 Android 12 是个分水岭，两套都要声明：
+        · 12+（API 31+）：BLUETOOTH_SCAN / BLUETOOTH_CONNECT 是**运行时**权限
+        · 12 以下      ：系统把 BLE 扫描归到**位置**权限 —— 没有 ACCESS_FINE_LOCATION
+                         就扫不到任何设备。这是系统硬性规定，绕不过去。
+      ACCESS_FINE_LOCATION 带 maxSdkVersion=30，是为了在 12+ 上**不再索要定位**
+      （既影响审核，也影响用户观感：能不要就不要）。
+      usesPermissionFlags=neverForLocation 向系统声明"扫描结果不用于推断位置"，
+      12+ 因此不必要求定位权限。
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!--
+      Android 11+ 包可见性：不声明这些包，getLaunchIntentForPackage / 判断「是否已安装」
+      一律返回 null，会把已安装的淘宝 / 拼多多 / 今日校园误判成未安装并跳应用商店。
+    -->
+    <queries>
+        <package android:name="com.taobao.taobao" />
+        <package android:name="com.xunmeng.pinduoduo" />
+        <package android:name="com.wisedu.cpdaily" />
+        <package android:name="com.klcxkj.zqxy" />
+        <package android:name="com.tencent.mm" />
+        <package android:name="com.eg.android.AlipayGphone" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="alipays" />
+        </intent>
+    </queries>
+
+    <!--
+      allowBackup="false"：关掉 Android 自动备份（云备份 + 换机直传 + adb backup 三条路）。
+
+      理由有二：
+      1. 本应用对外承诺「用户数据不出本机」（README「隐私」节）。开着的云备份会把整个 Room 库
+         （成绩存档、待办、树洞、课表）传进用户的云端，与承诺直接矛盾。
+      2. 凭据存在 EncryptedSharedPreferences 里，主密钥在**本机 Keystore**内、不随备份走。
+         换机直传过去只会得到一份解不开的密文，反而引入崩溃风险。
+
+      迁移路径走应用自己的「我的 → 备份与分享 → 导出完整备份」（加密备份），
+      不依赖系统备份。改动见 docs/发布门禁状态报告.md §5.6。
+    -->
+    <application
+        android:name=".PocketXiaoliApplication"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="口袋小鲤"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PocketXiaoli">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.PocketXiaoli">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pocketxiaoli" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <receiver
+            android:name=".notification.ClassReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".notification.ExamReminderReceiver"
+            android:exported="false" />
+        <!-- 通知里的「更新」：只干一件事——把下载任务丢进 WorkManager -->
+        <receiver
+            android:name=".notification.AppUpdateReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notification.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          番茄钟前台服务：计时期间挂一条常驻通知，让倒计时在通知栏/锁屏一直可见。
+          状态**不在**这里 —— 服务只是"执行 + 刷新通知"的壳，真源是 FocusStore 的快照。
+          子类型说明是 Google Play 审核要看的那句话（specialUse 必须能自证用途）。
+        -->
+        <service
+            android:name=".focus.FocusTimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="pomodoro_focus_timer" />
+        </service>
+
+        <!-- 每一段到点的精确闹钟落点（ELAPSED_REALTIME_WAKEUP）。 -->
+        <receiver
+            android:name=".focus.FocusAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".appwidget.ClassWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/class_widget_info" />
+        </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

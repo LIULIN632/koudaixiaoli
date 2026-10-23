@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  亮色窗口主题。深色在 `values-night/themes.xml`（同一个 style 名，只换底色与图标明暗）。
+
+  2026-10-19：`statusBarColor` 原先固定 #FFFFFF 且没有夜版，导致深色模式下出现「白底白图标」
+  （图标明暗由 MainActivity 按 isDark 切成浅色，底色却永远是白）。现在三处颜色都指向
+  `@color/status_bar`，亮/暗各有一份取值，且**与页面底色 surfaceBase 同值**，
+  所以系统栏和页面之间不再有一条色差线。运行期实际值由 MainActivity 的 SideEffect
+  按皮肤令牌重画（换皮肤/换强调色也能跟上），这里只负责冷启动那一帧。
+-->
+<resources>
+    <style name="Theme.PocketXiaoli" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/status_bar</item>
+        <item name="android:navigationBarColor">@color/status_bar</item>
+        <item name="android:windowBackground">@color/status_bar</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

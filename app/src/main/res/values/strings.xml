@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">口袋小鲤</string>
+    <string name="shortcut_timetable_short">课程表</string>
+    <string name="shortcut_timetable_long">打开课程表</string>
+    <string name="shortcut_import_short">导入课表</string>
+    <string name="shortcut_import_long">导入课表</string>
+    <string name="shortcut_assistant_short">校园助手</string>
+    <string name="shortcut_assistant_long">打开校园助手</string>
+    <string name="shortcut_map_short">校园地图</string>
+    <string name="shortcut_map_long">打开校园地图</string>
+</resources>

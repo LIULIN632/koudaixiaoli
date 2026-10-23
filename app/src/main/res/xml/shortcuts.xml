@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="timetable"
+        android:shortcutLongLabel="@string/shortcut_timetable_long"
+        android:shortcutShortLabel="@string/shortcut_timetable_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="pocketxiaoli://timetable"
+            android:targetClass="com.pocket.xiaoli.MainActivity"
+            android:targetPackage="com.pocket.xiaoli" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="import"
+        android:shortcutLongLabel="@string/shortcut_import_long"
+        android:shortcutShortLabel="@string/shortcut_import_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="pocketxiaoli://import"
+            android:targetClass="com.pocket.xiaoli.MainActivity"
+            android:targetPackage="com.pocket.xiaoli" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="assistant"
+        android:shortcutLongLabel="@string/shortcut_assistant_long"
+        android:shortcutShortLabel="@string/shortcut_assistant_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="pocketxiaoli://assistant"
+            android:targetClass="com.pocket.xiaoli.MainActivity"
+            android:targetPackage="com.pocket.xiaoli" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="map"
+        android:shortcutLongLabel="@string/shortcut_map_long"
+        android:shortcutShortLabel="@string/shortcut_map_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="pocketxiaoli://map"
+            android:targetClass="com.pocket.xiaoli.MainActivity"
+            android:targetPackage="com.pocket.xiaoli" />
+    </shortcut>
+
+</shortcuts>

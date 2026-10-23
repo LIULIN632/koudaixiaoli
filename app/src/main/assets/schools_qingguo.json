@@ -1,0 +1,98 @@
+[
+  {
+    "id": "HNSWZY",
+    "name": "湖南商务职业技术学院",
+    "city": "长沙",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.hnswxy.com",
+    "isV8": true
+  },
+  {
+    "id": "JYZZY",
+    "name": "济源职业技术学院",
+    "city": "济源",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.jyvtc.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "HNMMC",
+    "name": "湖南大众传媒职业技术学院",
+    "city": "长沙",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.hnmmc.cn",
+    "isV8": true
+  },
+  {
+    "id": "HNVTC",
+    "name": "湖南铁道职业技术学院",
+    "city": "株洲",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.hnrpc.com",
+    "isV8": true
+  },
+  {
+    "id": "CDATC",
+    "name": "成都航空职业技术学院",
+    "city": "成都",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.cap.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "SZPT",
+    "name": "深圳职业技术大学",
+    "city": "深圳",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.szpu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "GDCP",
+    "name": "广东交通职业技术学院",
+    "city": "广州",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.gdcp.cn",
+    "isV8": true
+  },
+  {
+    "id": "GZIT",
+    "name": "广州航海学院",
+    "city": "广州",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.gzmtu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "GZVT",
+    "name": "广州科技贸易职业学院",
+    "city": "广州",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.gzkmu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "NSXY",
+    "name": "烟台南山学院",
+    "city": "烟台",
+    "jwType": "QINGGUO",
+    "baseUrl": "https://jw.nanshan.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "HNZY",
+    "name": "河南职业技术学院",
+    "city": "",
+    "jwType": "QINGGUO",
+    "baseUrl": "http://jwgl.hnzj.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "TSU",
+    "name": "泰山学院",
+    "city": "",
+    "jwType": "QINGGUO",
+    "baseUrl": "http://jwxt.tsu.edu.cn",
+    "isV8": true
+  }
+]

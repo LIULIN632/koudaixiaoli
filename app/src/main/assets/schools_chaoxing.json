@@ -1,0 +1,98 @@
+[
+  {
+    "id": "GDST",
+    "name": "广东科技学院",
+    "city": "东莞",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.gdust.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "HNUST",
+    "name": "湖南科技大学",
+    "city": "湘潭",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.hnust.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "TARU",
+    "name": "塔里木大学",
+    "city": "阿拉尔",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.taru.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "GDUPT",
+    "name": "广东石油化工学院",
+    "city": "茂名",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.gdupt.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "HUE",
+    "name": "湖北工程学院",
+    "city": "孝感",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.hbeu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "HBUT",
+    "name": "湖北工业大学",
+    "city": "武汉",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.hbut.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "WUST",
+    "name": "武汉科技大学",
+    "city": "武汉",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.wust.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "YANGTZE",
+    "name": "长江大学",
+    "city": "荆州",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.yangtzeu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "YTHJ",
+    "name": "烟台黄金职业学院",
+    "city": "烟台",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://ytgc.jw.chaoxing.com",
+    "isV8": true
+  },
+  {
+    "id": "SXGCXY",
+    "name": "山西工程职业学院",
+    "city": "",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://sxevc.jw.chaoxing.com",
+    "isV8": true
+  },
+  {
+    "id": "SDTCM",
+    "name": "山东中医药高等专科学校",
+    "city": "烟台",
+    "jwType": "CHAOXING",
+    "baseUrl": "https://jw.sdctcm.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "YTQCVC",
+    "name": "烟台汽车工程职业学院",
+    "city": "烟台",
+    "jwType": "CHAOXING",
+    "baseUrl": "http://jwxt.ytqcvc.cn",
+    "isV8": true
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "URP_DEMO1",
+    "name": "哈尔滨商业大学",
+    "city": "哈尔滨",
+    "jwType": "URP",
+    "baseUrl": "https://jw.hrbcu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "URP_DEMO2",
+    "name": "黑龙江科技大学",
+    "city": "哈尔滨",
+    "jwType": "URP",
+    "baseUrl": "https://jw.usth.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "URP_DEMO3",
+    "name": "东北石油大学",
+    "city": "大庆",
+    "jwType": "URP",
+    "baseUrl": "https://jw.nepu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "URP_DEMO4",
+    "name": "齐齐哈尔大学",
+    "city": "齐齐哈尔",
+    "jwType": "URP",
+    "baseUrl": "https://jw.qqhru.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "URP_DEMO5",
+    "name": "佳木斯大学",
+    "city": "佳木斯",
+    "jwType": "URP",
+    "baseUrl": "https://jw.jmsu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "URP_DEMO6",
+    "name": "哈尔滨师范大学",
+    "city": "哈尔滨",
+    "jwType": "URP",
+    "baseUrl": "https://jw.hrbnu.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "URP_DEMO7",
+    "name": "黑龙江八一农垦大学",
+    "city": "大庆",
+    "jwType": "URP",
+    "baseUrl": "https://jw.byau.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "CUPK",
+    "name": "中国石油大学（北京）克拉玛依校区",
+    "city": "",
+    "jwType": "URP",
+    "baseUrl": "https://eams.cupk.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "NEUQ",
+    "name": "东北大学秦皇岛分校",
+    "city": "",
+    "jwType": "URP",
+    "baseUrl": "https://jwxt.neuq.edu.cn",
+    "isV8": true
+  },
+  {
+    "id": "TJAU",
+    "name": "天津农学院",
+    "city": "",
+    "jwType": "URP",
+    "baseUrl": "http://jwxt.tjau.edu.cn",
+    "isV8": true
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "academicYear": "2026-2027",
+  "source": "烟台理工学院教务处 2026-2027 学年校历",
+  "terms": [
+    { "name": "第一学期", "start": "2026-08-31", "teachingWeeks": 18,
+      "totalWeeks": 26, "end": "2027-02-28" },
+    { "name": "第二学期", "start": "2027-03-01", "teachingWeeks": 18,
+      "totalWeeks": 26, "end": "2027-08-29" }
+  ],
+  "events": [
+    { "title": "学生报到注册", "start": "2026-08-29", "end": "2026-08-30",
+      "kind": "milestone", "short": "报到" },
+    { "title": "新生报到", "start": "2026-09-05", "end": "2026-09-05",
+      "kind": "milestone", "short": "新生报到" },
+    { "title": "期末考试周", "start": "2027-01-04", "end": "2027-01-17",
+      "kind": "exam", "short": "期末考" },
+    { "title": "寒假", "start": "2027-01-18", "end": "2027-02-28",
+      "kind": "vacation", "short": "寒假" },
+    { "title": "春节", "start": "2027-02-06", "end": "2027-02-06",
+      "kind": "holiday", "short": "春节" },
+    { "title": "学生报到注册", "start": "2027-02-27", "end": "2027-02-28",
+      "kind": "milestone", "short": "报到" },
+    { "title": "校运动会", "start": "2027-05-13", "end": "2027-05-14",
+      "kind": "activity", "short": "运动会" },
+    { "title": "期末考试周", "start": "2027-07-05", "end": "2027-07-18",
+      "kind": "exam", "short": "期末考" },
+    { "title": "暑假", "start": "2027-07-19", "end": "2027-08-29",
+      "kind": "vacation", "short": "暑假" }
+  ]
+}

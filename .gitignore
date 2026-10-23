@@ -1,0 +1,155 @@
+# Android build
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.log
+gen/
+out/
+build/
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Gradle
+gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Codegraph / Claude
+.codegraph/
+
+# 服务端部署产物（静态数据 + APK，生成物不入库）
+tools/deploy/dist/
+
+# 面板依赖与构建缓存
+node_modules/
+.npm-cache/
+.tmp/
+
+# 面板构建产物（部署时由 `npm run build` 重新生成；dist 里的文件名带 hash，入库只会制造噪音）
+panel/dist/
+# esbuild 清 %TEMP%\esbuild-* 会被拒；tools/deploy/publish-panel.ps1 把它指到这里
+panel/.vite-tmp/
+.claude/
+
+# Impeccable 评审快照（本地工作产物，不是项目的一部分）
+# 位置：.impeccable/critique/<timestamp>__<slug>.md
+# 判据：与 `build-logs/`、`.perf-audit/` 同类 —— 跑一次就多一份，不入库。
+# ⚠️ 同类目录 `.dsh/` 与 `.agents/` 是 **skill 安装位**，本仓库刻意不挡：
+#    若真要项目级安装 skill，请先想清楚是否该提交（默认应装到 ~/.dsh/skills/）。
+.impeccable/
+
+# Reference
+参考/
+
+# 并列参考仓库（自带 .git，按 CLAUDE.md 不属于本项目）
+xjtu-toolbox-android/
+
+# 外观收敛工作留下的临时物（2026-10）
+#   ref_ext/    —— 按需求临时 clone 的参考仓库（GdeiAssistant / CourseRaptor）
+#   apk_probe/  —— 从 release APK 里解出的 classes.dex 与 assets/dexopt/baseline.prof
+#   .perf-audit/—— 性能审计的扫描脚本与输出
+# ⚠️ 三者都不是项目的一部分。加这条是为了防止 `git add -A` 时把两个第三方仓库提交进来。
+ref_ext/
+apk_probe/
+.perf-audit/
+
+# 逆向调研时按需下载的第三方源码（2026-10 起）
+#   .ref/zyxf/  —— 仲英学辅资料站的 20 个关键文件，只为写 docs/参考整理/ 那份笔记时翻阅
+.ref/
+
+# 设计期视觉伴侣的产物（brainstorming skill 的本地假图与交互记录，不是项目的一部分）
+# 位置：.superpowers/brainstorm/<sessionId>/{content,state}
+.superpowers/
+
+# 工作区临时物：源码备份副本 / 构建日志 / 解释器缓存
+_backup_*/
+build-logs/
+__pycache__/
+*.pyc
+.kotlin/
+# 构建管线的临时产物（tools/kb 的验证输出落在仓库根的 tmp/）
+/tmp/
+
+# Personal / internal files
+file_*.png
+school_*.json
+!school_index.json
+school_*.txt
+deep-research-report.md
+问题反馈/
+.reasonix/
+
+# Keystore (passwords)
+keystore.properties
+*.jks
+
+# ---- 敏感文件保护 (VibeCoding 发布前检查清单) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+config.local.*
+*.keystore
+# ── 本地构建环境（2026-10-14 补：公开仓前必须挡住）──
+# .gradle-home/ 实测 4,741 个文件 / 762 MB；.gitignore 里原有的 `.gradle/` 匹配不到它，
+# 所以 `git add -A` 会把整个 762 MB 的 Gradle 缓存推进公开仓（单个文件超 100 MB 还会被 GitHub 直接拒收）。
+.gradle-home/
+.gradle-pc/
+
+# ── 本机构建被 ACL 挡住时的输出重定向目录（2026-10-15）──
+# 本机 app\build 与项目 .gradle 带有上一次沙箱留下的拒绝(Deny)权限，Gradle 连删除
+# 中间产物都会失败（"Unable to delete file ... nestedResourcesValidationReport.txt"）。
+# 绕法是给 GRADLE_USER_HOME/init.d 放一个 Groovy init 脚本，把 buildDir 重定向到
+# `.build-out/`。⚠️ 那个目录里有**上千个 KSP 生成的 Kotlin 文件**，绝不能被提交。
+# 临时腾出的 Kotlin 持久化目录同理。
+.build-out/
+.kotlin-persist/
+
+# 根目录的临时产物：knowledge.json 的副本（真源在 app/src/main/assets/knowledge.json）
+/whatever.json
+
+# gh api 上传用的临时目录（含 APK 副本，别进版本库）
+.upload/
+
+# ── 公开仓的边界（2026-10-23）────────────────────────────────────────
+# 原则：**公开仓只放「软件源码」**。下面这些是本机/运维/调研内容，不进公开仓：
+#   · 部署与运维（服务器 IP、面板、发布脚本、后端）—— 公开等于把入口递给扫描器
+#   · 第三方系统的接口/鉴权调研（学校热水、校园卡、学习通…）—— 属于别人的安全细节
+#   · 内部笔记（memory/、CLAUDE.md、PROJECT.md）—— 写给自己看的，含取舍与踩坑记录
+#   · 素材工具链与建模数据（tools/、library/）—— 体积大且与 App 源码无关
+# ⚠️ 这些文件**仍在本地磁盘上**，只是不再被 git 跟踪；`git status` 里不会再出现。
+# 例外：`docs/用户协议.md` 与 `tools/promos.example.json` 保留（前者是产品文档，
+#      后者被 `PromoExampleConfigTest` 读取，缺了单测会红）。
+/docs/*
+!/docs/用户协议.md
+/memory/
+/server/
+/panel/
+/deploy/
+/library/
+/tools/*
+!/tools/promos.example.json
+/CLAUDE.md
+/PROJECT.md
+/reasonix.toml
+/knowledge.json
+/school_index.json
+/主题/
+
+
+# 推广素材（视频/渲染产物，150MB，进 release 也不进源码仓）
+/promo/
+

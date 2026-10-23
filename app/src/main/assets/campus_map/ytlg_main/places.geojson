@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "_meta": {
+    "empty": true,
+    "note": "等待按 docs/CampusMapDataFormat.md 实测投稿后补充；空 FeatureCollection 不伪造坐标。"
+  },
+  "features": []
+}

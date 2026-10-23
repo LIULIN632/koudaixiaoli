@@ -1,0 +1,282 @@
+{
+  "_meta": {
+    "source": "tools/campus-map-data/ytlg_main",
+    "updatedAt": "2026-09-22 19:46:38",
+    "coordinates": false,
+    "routes": false,
+    "note": "空字段表示尚未实测；不要用猜测值填坐标 / 距离。"
+  },
+  "campusId": "ytlg_main",
+  "buildings": [
+    {
+      "id": "b_teaching_1",
+      "name": "1号教学楼",
+      "aliases": [
+        "一教",
+        "1教",
+        "1号楼",
+        "第一教学楼"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_teaching_2",
+      "name": "2号教学楼",
+      "aliases": [
+        "二教",
+        "2教",
+        "2号楼",
+        "第二教学楼",
+        "二教AB区",
+        "A区",
+        "B区",
+        "二教连廊",
+        "朗读空间"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_teaching_3",
+      "name": "三教",
+      "aliases": [
+        "3教",
+        "三号教学楼",
+        "第三教学楼",
+        "S楼"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_library",
+      "name": "图书馆楼",
+      "aliases": [
+        "图书馆",
+        "借阅室",
+        "自习室"
+      ],
+      "entranceIds": [],
+      "floorIds": [
+        "f_library_1",
+        "f_library_2",
+        "f_library_3",
+        "f_library_4",
+        "f_library_5"
+      ],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_1",
+      "name": "1号宿舍楼",
+      "aliases": [
+        "1号楼",
+        "一号宿舍",
+        "1号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_2",
+      "name": "2号宿舍楼",
+      "aliases": [
+        "2号楼",
+        "二号宿舍",
+        "2号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_3",
+      "name": "3号宿舍楼",
+      "aliases": [
+        "3号楼",
+        "三号宿舍",
+        "3号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_4",
+      "name": "4号宿舍楼",
+      "aliases": [
+        "4号楼",
+        "四号宿舍",
+        "4号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_5",
+      "name": "5号宿舍楼",
+      "aliases": [
+        "5号楼",
+        "五号宿舍",
+        "5号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_6",
+      "name": "6号宿舍楼",
+      "aliases": [
+        "6号楼",
+        "六号宿舍",
+        "6号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dorm_13",
+      "name": "13号楼",
+      "aliases": [
+        "13号宿舍楼",
+        "十三号楼",
+        "13号公寓"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dining_2",
+      "name": "学院二餐",
+      "aliases": [
+        "二餐",
+        "第二餐厅",
+        "2餐"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_dining_3",
+      "name": "第三餐厅",
+      "aliases": [
+        "三餐厅",
+        "三餐",
+        "3餐",
+        "库迪咖啡"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_sports",
+      "name": "体育场",
+      "aliases": [
+        "操场",
+        "田径场",
+        "运动场",
+        "体育馆"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_office_complex",
+      "name": "综合楼",
+      "aliases": [
+        "行政楼",
+        "办公楼"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    },
+    {
+      "id": "b_art_center",
+      "name": "公共艺术教育中心",
+      "aliases": [
+        "艺术中心",
+        "公共艺术中心"
+      ],
+      "entranceIds": [],
+      "floorIds": [],
+      "lat": null,
+      "lng": null
+    }
+  ],
+  "entrances": [],
+  "floors": [
+    {
+      "id": "f_library_1",
+      "buildingId": "b_library",
+      "level": 1,
+      "name": "1F",
+      "planAsset": null,
+      "roomIds": []
+    },
+    {
+      "id": "f_library_2",
+      "buildingId": "b_library",
+      "level": 2,
+      "name": "2F",
+      "planAsset": null,
+      "roomIds": []
+    },
+    {
+      "id": "f_library_3",
+      "buildingId": "b_library",
+      "level": 3,
+      "name": "3F",
+      "planAsset": null,
+      "roomIds": []
+    },
+    {
+      "id": "f_library_4",
+      "buildingId": "b_library",
+      "level": 4,
+      "name": "4F",
+      "planAsset": null,
+      "roomIds": []
+    },
+    {
+      "id": "f_library_5",
+      "buildingId": "b_library",
+      "level": 5,
+      "name": "5F",
+      "planAsset": null,
+      "roomIds": []
+    }
+  ],
+  "rooms": [],
+  "nodes": [],
+  "edges": [],
+  "roads": [],
+  "places": []
+}

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置 —— 默认拒绝明文，只对本校域名与两处校内地址开口子。
+
+  为什么需要这个文件：
+  `AndroidManifest.xml` 原先写的是 `usesCleartextTraffic="true"`，等于**全局**允许 http。
+  实测的明文出口只有下面这几个（`grep 'http://'` 全仓主源码）：
+    · http://authserver.yitsd.edu.cn   （统一认证，ehall 门户登录会跳到这里）
+    · http://ehall.yitsd.edu.cn/new/index.html （智慧校园门户，9 项校园服务统一进这里）
+    · http://jiaowu.yitsd.edu.cn       （转专业 / 专升本）
+    · http://jy.yitsd.edu.cn           （就业）
+    · http://192.168.2.34/GGCX/readerinfo.htm （图书馆「我的借阅」，校内网 / VPN）
+  前三者都是 `*.yitsd.edu.cn`，所以按域名整体放行；图书馆那台是校内 IP，只能逐条列。
+
+  ⚠️ 210.47.245.4 是 `data/SchoolRegistry.kt:155`（烟台大学）的教务地址，属于**刻意保留的 B 轨道**
+  （产品入口下不可达）。留在这里是为了不把那套导入引擎弄坏 —— 若将来判定 B 轨道彻底废弃，
+  这条也应当一起删掉。
+
+  ⚠️ 明文被拒时的表现是 WebView 加载失败（`net::ERR_CLEARTEXT_NOT_PERMITTED`），
+  不是静默失败。如果校内某门户跳到了这里没列的 http 主机，把那个主机名加进下面的列表即可，
+  这是**唯一**需要改的地方。
+-->
+<network-security-config>
+
+    <!-- 默认：除下面点名的域，一律不许明文。 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- 本校域名整棵放行（校内系统大量仍是 http，且门户会互相跳转）。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">yitsd.edu.cn</domain>
+    </domain-config>
+
+    <!-- 烟台大学（B 轨道 registry + 南校区），同样整棵放行。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">ytu.edu.cn</domain>
+    </domain-config>
+
+    <!-- 校内网地址（图书馆借阅系统）。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.2.34</domain>
+    </domain-config>
+
+    <!-- 烟台大学教务（B 轨道），见文件头说明。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">210.47.245.4</domain>
+    </domain-config>
+
+</network-security-config>

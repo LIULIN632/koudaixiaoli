@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  仅保留**真正被引用**的色值。
+
+  2026-10 清理：删除了 accent / accent_light / accent_soft / surface /
+  card_border / today_bg 六项 —— 它们的引用数实测为 0。
+  原因：项目的颜色体系早已迁到 `ui/theme/Color.kt`（Kotlin 侧令牌），
+  这些 XML 色值是早期遗留，留着会让人误以为"改这里能改主题"。
+
+  剩下两项各有明确用途，不要删：
+  - status_bar：被 themes.xml 引用，用于系统状态栏/导航栏底色与窗口底色（须与 `PocketSoftLight.surfaceBase` 同值，#F7F8FA）
+  - ic_launcher_background：被两套自适应图标（ic_launcher / ic_launcher_round）引用
+-->
+<resources>
+    <color name="status_bar">#F7F8FA</color>
+    <color name="ic_launcher_background">#F6C84C</color>
+</resources>

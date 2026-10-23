@@ -1,0 +1,15 @@
+{
+  "_说明": [
+    "口袋小鲤 · 推广位配置（服务页顶部的轮播 banner）。",
+    "这个文件本身就是线上的那份：改完 push 到 Gitee 的 main 分支就生效，**不用发版**。",
+    "客户端取处：Gitee raw/main → GitHub raw/main（自建服务器配了的话排在最前）。",
+    "上架一条：① 把海报图放到 announce/promo/ 下（建议 16:9、≤300KB 的 webp/jpg）；② 在 slots 里加一条，slot 写「服务首页」；③ image 写图片的 Gitee raw 绝对地址；④ push。",
+    "下架：把 enabled 改成 false，或直接从 slots 里删掉。",
+    "配 1 条 = 一张静态图（无圆点、不翻页）；配 2 条以上才变成轮播。",
+    "action.url 必须是 https，且域名在 PromoValidator.ALLOWED_HOSTS（只有学校域名）；不在白名单里的会被降级成不可点的纯文字。",
+    "image 的域名白名单宽一些（Gitee / GitHub 静态域也放行），规则见 PromoValidator.IMAGE_HOSTS。",
+    "字段含义与运营口径见 memory/05-promo-ops.md。"
+  ],
+  "version": 1,
+  "slots": []
+}

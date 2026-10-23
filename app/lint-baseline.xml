@@ -1,0 +1,91 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  lint baseline —— 只冻结「已提升为 error 的安全类规则」的 7 处既有命中。
+
+  ⚠️ 这里**只放 error 级**的既有项，刻意不放 warning 级。
+  理由：baseline 会把命中的问题整体静默；若把 50 条 warning 也塞进来，
+  以后**新增的 warning 也会被一并吞掉**，等于把 warning 通道也堵死。
+  现在这样，门禁只拦「安全类新增」，warning 仍照常出现在报告里。
+
+  清账方式：TLS 那 6 处随 `docs/安全审计-TLS.md` 的方案 B（白名单兜底）一起消掉，
+  消掉后删掉对应 <issue> 块。**本文件变大 = 有人偷偷加债，要审。**
+-->
+<issues format="6" by="lint 9.4.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.4.1)" variant="all" version="9.4.1">
+<issue
+        id="TrustAllX509TrustManager"
+        message="`checkClientTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers"
+        errorLine1="        override fun checkClientTrusted(certs: Array&lt;X509Certificate>, authType: String) {}"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/pocket/xiaoli/network/QiangZhiClient.kt"
+            line="56"
+            column="22"/>
+    </issue>
+
+<issue
+        id="TrustAllX509TrustManager"
+        message="`checkServerTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers"
+        errorLine1="        override fun checkServerTrusted(certs: Array&lt;X509Certificate>, authType: String) {}"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/pocket/xiaoli/network/QiangZhiClient.kt"
+            line="57"
+            column="22"/>
+    </issue>
+
+<issue
+        id="TrustAllX509TrustManager"
+        message="`checkClientTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers"
+        errorLine1="        override fun checkClientTrusted(certs: Array&lt;X509Certificate>, authType: String) {}"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/pocket/xiaoli/network/ZhengfangClient.kt"
+            line="122"
+            column="22"/>
+    </issue>
+
+<issue
+        id="TrustAllX509TrustManager"
+        message="`checkServerTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers"
+        errorLine1="        override fun checkServerTrusted(certs: Array&lt;X509Certificate>, authType: String) {}"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/com/pocket/xiaoli/network/ZhengfangClient.kt"
+            line="123"
+            column="22"/>
+    </issue>
+
+<issue
+        id="CustomX509TrustManager"
+        message="Implementing a custom `X509TrustManager` is error-prone and likely to be insecure. It is likely to disable certificate validation altogether, and is non-trivial to implement correctly without calling Android&apos;s default implementation."
+        errorLine1="    private val trustAllManager = object : X509TrustManager {"
+        errorLine2="                                  ~~~~~~">
+        <location
+            file="src/main/java/com/pocket/xiaoli/network/QiangZhiClient.kt"
+            line="54"
+            column="35"/>
+    </issue>
+
+<issue
+        id="CustomX509TrustManager"
+        message="Implementing a custom `X509TrustManager` is error-prone and likely to be insecure. It is likely to disable certificate validation altogether, and is non-trivial to implement correctly without calling Android&apos;s default implementation."
+        errorLine1="    private val trustAllManager = object : X509TrustManager {"
+        errorLine2="                                  ~~~~~~">
+        <location
+            file="src/main/java/com/pocket/xiaoli/network/ZhengfangClient.kt"
+            line="120"
+            column="35"/>
+    </issue>
+
+<issue
+        id="StaticFieldLeak"
+        message="This field leaks a context object"
+        errorLine1="    /** WebView reference set from UI layer. Used by bridge methods. */"
+        errorLine2="    ^">
+        <location
+            file="src/main/java/com/pocket/xiaoli/ui/import_/WebImportViewModel.kt"
+            line="288"
+            column="5"/>
+    </issue>
+</issues>
+

@@ -1,0 +1,74 @@
+{
+  "_说明": [
+    "口袋小鲤 · 推广位配置。把本文件上传到 PromoRepository.CONFIG_URL 指向的地址即可生效，无需发版。",
+    "下架某条：把它的 enabled 改成 false；或直接从 slots 里删掉。",
+    "字段含义见 tools/promo-config.md。",
+    "slot 取值必须是：专升本 / 返乡大巴 / 考研 / 健身房 / 驾校",
+    "action.url 必须是 https，且域名在 PromoValidator.ALLOWED_HOSTS 白名单里，否则会被降级成不可点的纯文字。"
+  ],
+  "version": 1,
+  "slots": [
+    {
+      "id": "zsb_demo_2026",
+      "slot": "专升本",
+      "title": "示例：专升本秋季班",
+      "body": "这是一条演示配置。把 body 换成合作方提供的课程与试听信息，action.url 换成你的跳转页地址即可。",
+      "enabled": false,
+      "priority": 10,
+      "startAt": 1780000000,
+      "endAt": 1800000000,
+      "action": {
+        "kind": "external",
+        "url": "https://ehall.yitsd.edu.cn/"
+      }
+    },
+    {
+      "id": "zsb_plain_demo",
+      "slot": "专升本",
+      "title": "示例：纯文字推广（不可点）",
+      "body": "没有 action 字段时，这张卡只展示文案、不可点击。适合放「即将开放报名」这类暂无跳转目标的通知。",
+      "enabled": false,
+      "priority": 5
+    },
+    {
+      "id": "gym_demo",
+      "slot": "健身房",
+      "title": "示例：校内健身房学生优惠",
+      "body": "凭校园卡办理学期卡可享学生价；具体价格与开放时间以场馆公示为准。",
+      "enabled": false,
+      "priority": 10,
+      "action": {
+        "kind": "external",
+        "url": "https://ehall.yitsd.edu.cn/"
+      }
+    },
+    {
+      "id": "driving_demo",
+      "slot": "驾校",
+      "title": "示例：驾校学生班",
+      "body": "示例文案。建议写清：训练场位置、是否一人一车、费用包含项、补考是否另收。",
+      "enabled": false,
+      "priority": 10,
+      "action": {
+        "kind": "external",
+        "url": "https://ehall.yitsd.edu.cn/"
+      }
+    },
+    {
+      "id": "bus_demo",
+      "slot": "返乡大巴",
+      "title": "示例：寒假返乡班车",
+      "body": "示例文案。建议写清：发车日期与时间、上车点、票价、购票方式。",
+      "enabled": false,
+      "priority": 10
+    },
+    {
+      "id": "kaoyan_demo",
+      "slot": "考研",
+      "title": "示例：考研自习室",
+      "body": "示例文案。考研页适合放自习室、资料、报考咨询类合作内容。",
+      "enabled": false,
+      "priority": 10
+    }
+  ]
+}

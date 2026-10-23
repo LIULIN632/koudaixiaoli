@@ -1,0 +1,30 @@
+校园 3D 沙盘数据说明
+
+主数据：campus_3d.json
+数据来源：OpenStreetMap（https://www.openstreetmap.org）
+版权署名：地图数据 © OpenStreetMap 贡献者
+许可协议：Open Database License (ODbL) 1.0
+          https://opendatacommons.org/licenses/odbl/1-0/
+生成脚本：tools/campus-map-data/build_campus_3d.py
+生成日期：2026-10-20
+坐标系：WGS-84（原始 OSM 坐标，未做 GCJ-02 偏移）
+
+补充数据：campus_3d_traced.json
+内容：3号教学楼（三教）楼栋轮廓，6 层 / 19.8 米
+来源：Bing 正射影像 z19 人工描点（6 段），非 OpenStreetMap 数据
+处理：tools/campus-jx3/clean_footprint.py 以 0.5 m 栅格合并、6 m 连廊桥接、
+      1.5 m 简化，得到单环 33 点轮廓（约 4916 m²）；build_jx3_mesh.py
+      在 Blender 中挤出并校验闭合、法线、体积与面积。
+精度：描点与合并误差约 ±3–5 米，仅作方位与体量示意，不作为施工或测绘依据。
+生成日期：2026-10-22
+
+字段口径：
+- buildings 的楼栋轮廓、琴心湖、绿地、运动场地、步道均来自 OpenStreetMap 矢量数据。
+- 楼栋高度优先取 building:levels；缺失时按面积推算并置 levelsEstimated=true，仅用于示意。
+- 3号教学楼没有公开楼栋轮廓，App 加载时把 campus_3d_traced.json 并入主数据，
+  并按楼名去掉原来的位置标记点；选中卡片会标注「影像描点轮廓」和误差说明。
+- 2号教学楼没有公开楼栋轮廓，坐标来自公开地图标注（GCJ-02 转 WGS-84），
+  仅以悬浮标记展示，未生成楼体。
+
+使用要求：在应用内展示地图时需保留 OpenStreetMap 署名与 ODbL 链接；
+3号教学楼轮廓的影像描点来源说明需随数据一并保留。

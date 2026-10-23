@@ -1,0 +1,338 @@
+[
+    {
+        "id":  "FOSU",
+        "name":  "佛山大学",
+        "city":  "佛山",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.fosu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "YNUFE",
+        "name":  "云南财经大学",
+        "city":  "昆明",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.ynufe.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HNNU",
+        "name":  "湖南师范大学",
+        "city":  "长沙",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.hunnu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "CSUFT",
+        "name":  "中南林业科技大学",
+        "city":  "长沙",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.csuft.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HUNNU",
+        "name":  "湖南农业大学",
+        "city":  "长沙",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.hunau.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HNUC",
+        "name":  "湖南工商大学",
+        "city":  "长沙",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.hnuc.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "SDMU",
+        "name":  "山东管理学院",
+        "city":  "济南",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.sdmu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "SDFMU",
+        "name":  "山东第一医科大学",
+        "city":  "济南",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.sdfmu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "QDUST",
+        "name":  "青岛科技大学",
+        "city":  "青岛",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.qust.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "LDU",
+        "name":  "鲁东大学",
+        "city":  "烟台",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://xsjw.ldu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "SDJU2",
+        "name":  "山东交通学院",
+        "city":  "济南",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.sdjtu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "LYU",
+        "name":  "临沂大学",
+        "city":  "临沂",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.lyu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "BZU",
+        "name":  "滨州医学院",
+        "city":  "烟台",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.sdmpu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "WFU",
+        "name":  "潍坊学院",
+        "city":  "潍坊",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.wfu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "DZU",
+        "name":  "德州学院",
+        "city":  "德州",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.dzu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HZU",
+        "name":  "菏泽学院",
+        "city":  "菏泽",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.hezeu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "JYU",
+        "name":  "嘉应学院",
+        "city":  "梅州",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.jyu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HKUST",
+        "name":  "河南科技学院",
+        "city":  "新乡",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.hist.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "XXMU",
+        "name":  "新乡医学院",
+        "city":  "新乡",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.xxmu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "AYIT",
+        "name":  "安阳工学院",
+        "city":  "安阳",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.ayit.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HNUAS",
+        "name":  "湖南文理学院",
+        "city":  "常德",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.huas.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HUSE",
+        "name":  "湖南科技学院",
+        "city":  "永州",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.huse.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HUHST",
+        "name":  "湖南人文科技学院",
+        "city":  "娄底",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.huhst.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "SICNU",
+        "name":  "四川师范大学",
+        "city":  "成都",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.sicnu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "XNATC",
+        "name":  "兴义民族师范学院",
+        "city":  "兴义",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.xnnun.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "CQCST",
+        "name":  "重庆城市科技学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://jw.cqcst.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "GXDLXY",
+        "name":  "广西电力职业技术学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.gxdlxy.com",
+        "isV8":  true
+    },
+    {
+        "id":  "GZST",
+        "name":  "广州松田职业学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.educationgroup.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HBLGXY",
+        "name":  "淮北理工学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://a.hblgxy.edu.cn:5111",
+        "isV8":  true
+    },
+    {
+        "id":  "HYNU",
+        "name":  "衡阳师范学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://hysfjw.hynu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "STCNCHU",
+        "name":  "南昌航空大学科技学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://qzjwxt.stcnchu.edu.cn:800",
+        "isV8":  true
+    },
+    {
+        "id":  "XJIE",
+        "name":  "新疆工程学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jwxt.xjie.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HDXY",
+        "name":  "青岛农业大学海都学院",
+        "city":  "烟台",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.hdxy.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "YTKJ",
+        "name":  "烟台科技学院",
+        "city":  "烟台",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.educationgroup.cn/ytkjxy",
+        "isV8":  true
+    },
+    {
+        "id":  "SDTBU",
+        "name":  "山东工商学院",
+        "city":  "烟台",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://cas.sdtbu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "NJFU",
+        "name":  "南京林业大学",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://jwxt.njfu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "WBU",
+        "name":  "武汉商学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://jw.wbu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "CCIT",
+        "name":  "长春工程学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://cgcjw.ccit.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "CQRK",
+        "name":  "重庆人文科技学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://jwxt.cqrk.edu.cn:18080",
+        "isV8":  true
+    },
+    {
+        "id":  "GDIPU",
+        "name":  "广东轻工职业技术大学",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://jw.gdipu.edu.cn",
+        "isV8":  true
+    },
+    {
+        "id":  "HBGUHX",
+        "name":  "河北地质大学华信学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://61.182.88.214:8090",
+        "isV8":  true
+    },
+    {
+        "id":  "ZHKU",
+        "name":  "仲恺农业工程学院",
+        "city":  "",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "https://edu-admin.zhku.edu.cn",
+        "isV8":  true
+    }
+]

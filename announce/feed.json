@@ -1,0 +1,27 @@
+{
+  "_readme": [
+    "口袋小鲤的更新与公告数据源。改完提交即可生效，不需要发版、不需要跑 CI。",
+    "app.versionCode 必须与 gradle.properties 的 versionCode 一致（唯一真源，只增不减）。",
+    "minSupported = 低于它的客户端必须升级（不可取消）；0 表示不强制。",
+    "rollout = 灰度百分比 0..100，0 是「刹车」，100 是全量。",
+    "beta 是可选的内测通道块，字段与 app 一模一样（版本、包地址、指纹、灰度、notes），只有开了「加入内测」的设备看得到它；它不另带 announcements，公告永远只读根上那一份。发稳定版时 build.ps1 不动这一块，要发内测包请手工改它。",
+    "announcements 里每条必须有稳定的 id 与 title；id 用于已读去重，改文案不要改 id。",
+    "字段与判定规则的完整说明见 docs/更新与公告.md。"
+  ],
+  "app": {
+    "versionCode": 81,
+    "versionName": "0.1.80",
+    "minSupported": 0,
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.80/koudaixiaoli_v0.1.80.apk",
+    "sha256": "2b56882feff215cdfa39d65fea6c53595c15ba46eb0cdbdfba0ee0fdcb05ce0b",
+    "rollout": 100,
+    "publishedAt": "2026-10-19T21:36:00+08:00",
+    "notes": [
+      "底栏整体放大了一圈、也抬高了 6dp：离屏幕底边更远，选中那一格改成横向椭圆",
+      "鲤鱼那一格的形象缩到 38dp，转动时也不会顶出椭圆",
+      "首页时钟旁多了天气：现在气温与天气，点开看逐小时、未来几天和穿衣建议",
+      "鲤鱼 AI 设置页重新排版：形象、动作、表情一屏看全，点一下当场演给你看"
+    ]
+  },
+  "announcements": []
+}
