@@ -7,6 +7,8 @@ import com.pocket.xiaoli.data.JwSystemType
 import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.data.SchoolRegistry
 import com.pocket.xiaoli.data.isJwSystemAvailable
+import com.pocket.xiaoli.data.isPickerSchool
+import com.pocket.xiaoli.data.pickerRank
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.network.LoginResult
@@ -57,6 +59,11 @@ class ImportViewModel(
         campusSchool?.let { school ->
             _selectedSystem.value = school.jwType
             _selectedSchool.value = school
+        } ?: run {
+            // 产品重心已收窄到烟台（当前对接校区用正方，后续覆盖的烟台学校也都是正方），
+            // 所以进页面直接落到「正方 + 学校列表」，不再让用户在 5 个系统里先做一次选择。
+            // 强智仍可在学校列表顶部切过去（原生导入只支持这两家）。
+            _selectedSystem.value = JwSystemType.ZHENGFANG
         }
     }
 
@@ -84,10 +91,13 @@ class ImportViewModel(
                 it.jwType == system && (query.isBlank() || it.name.contains(query, ignoreCase = true))
             }
         } else emptyList()
-        (matchingCustoms + registrySchools).sortedWith(
-            compareByDescending<School> { it.id in favIds }
-                .thenBy { com.pocket.xiaoli.util.PinyinSortUtil.sortKey(it.name) }
-        )
+        (matchingCustoms + registrySchools)
+            .filter { it.isPickerSchool() }
+            .sortedWith(
+                compareByDescending<School> { it.id in favIds }
+                    .thenBy { it.pickerRank() }
+                    .thenBy { com.pocket.xiaoli.util.PinyinSortUtil.sortKey(it.name) }
+            )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _progress = MutableStateFlow("")
@@ -178,12 +188,9 @@ class ImportViewModel(
         _result.value = null
         _progress.value = ""
         if (campusOnly) return
-        if (_selectedSchool.value != null) {
-            _selectedSchool.value = null
-        } else if (_selectedSystem.value != null) {
-            _selectedSystem.value = null
-            _searchQuery.value = ""
-        }
+        // 系统选择已经收成列表顶部的一排胶囊，不再是独立的一步 —— 返回只退学校。
+        _selectedSchool.value = null
+        _searchQuery.value = ""
     }
 
     fun startLogin(username: String, password: String) {

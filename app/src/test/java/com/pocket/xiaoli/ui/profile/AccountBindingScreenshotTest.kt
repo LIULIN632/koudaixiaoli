@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
@@ -327,6 +328,38 @@ class AccountBindingScreenshotTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun `绑定进度给出还差哪几项`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                BindingHomePage(cases.first { it.name == "82-binding-home-mixed" })
+            }
+        }
+
+        composeRule.onNodeWithText("2 / 5").assertExists()
+        composeRule.onNodeWithText("还差 3 项：宿舍、校园卡、学习平台").assertExists()
+    }
+
+    @Test
+    fun `全部绑好时进度改为完成文案`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                BindingHomePage(cases.first { it.name == "80-binding-home-bound" })
+            }
+        }
+
+        composeRule.onNodeWithText("5 / 5").assertExists()
+        composeRule.onNodeWithText("五项都已绑好，校园服务都能用了").assertExists()
     }
 
     @Test

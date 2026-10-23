@@ -91,6 +91,8 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.LocalProfileRowPadding
 import com.pocket.xiaoli.ui.theme.ServiceAccent
+import com.pocket.xiaoli.ui.theme.serviceAccentColor
+import com.pocket.xiaoli.ui.theme.serviceAccentContainer
 import com.pocket.xiaoli.ui.theme.SuccessGreen
 import com.pocket.xiaoli.ui.zhengfang.ZhengfangCaptchaHost
 import com.pocket.xiaoli.util.BindingValidators
@@ -621,6 +623,7 @@ fun AccountBindingScreen(
             BindingSectionCard(
                 visible = activeSubPage == BindSubPage.TODAY_CAMPUS,
                 icon = Icons.Outlined.Today,
+                accent = ServiceAccent.INFO,
                 title = "今日校园",
                 subtitle = "智慧校园统一认证 · 校园卡（易校园）也走它",
             ) {
@@ -731,6 +734,7 @@ fun AccountBindingScreen(
             BindingSectionCard(
                 visible = activeSubPage == BindSubPage.CAMPUS_CARD,
                 icon = Icons.Outlined.CreditCard,
+                accent = ServiceAccent.PAYMENT,
                 title = "校园卡（易校园）",
                 subtitle = "易校园自己的账号，不是学号",
             ) {
@@ -819,6 +823,7 @@ fun AccountBindingScreen(
             BindingSectionCard(
                 visible = activeSubPage == BindSubPage.LEARNING,
                 icon = Icons.AutoMirrored.Outlined.MenuBook,
+                accent = ServiceAccent.STUDY,
                 title = "学习平台",
                 subtitle = "Cookie 加密保存在本机",
             ) {
@@ -935,6 +940,11 @@ fun AccountBindingScreen(
 /**
  * 顶部「绑定状态」卡 —— 用户说的"填完看不出绑没绑好"的解药。
  *
+ * 2026-10：卡内新增**绑定进度**（五段条 + `n / 5` + 还差哪几项）。
+ * 五项按"教务 → 宿舍 → 今日校园 → 校园卡 → 学习平台"的顺序与下面清单、与二级页一一对应；
+ * 每段用该项自己的 [ServiceAccent] 分类色，扫一眼长度看进度、扫一眼颜色看缺哪类。
+ * 进度只统计"绑没绑"，与「教务」行红点表示的"最近一次导入成功没"是两件事。
+ *
  * 三行对应三件事，每个状态标记都取本机已有的真实值：
  *
  * | 行 | 值从哪来 | 状态标记 |
@@ -980,6 +990,22 @@ internal fun BindingStatusCard(
     val colors = LocalPocketXiaoliColors.current
     val schoolText = savedSchool.ifBlank { campus.schoolName.orEmpty() }.ifBlank { "未设置学校" }
     val learningCount = (if (chaoxingBound) 1 else 0) + (if (zhihuishuBound) 1 else 0)
+    // 五项的「绑好了没」，顺序与下面清单、与页面卡片顺序一致 ——
+    // 它只回答"绑齐了没"，与"最近一次导入成功没"是两件事（后者归「教务」行的红点）。
+    val bindItems = listOf(
+        Triple("教务", isBound, ServiceAccent.ACADEMIC),
+        Triple("宿舍", dormLabel != null, ServiceAccent.LIFE),
+        Triple("今日校园", casBound, ServiceAccent.INFO),
+        Triple("校园卡", cardBound, ServiceAccent.PAYMENT),
+        Triple("学习平台", learningCount == 2, ServiceAccent.STUDY),
+    )
+    val boundCount = bindItems.count { it.second }
+    val missing = bindItems.filterNot { it.second }.map { it.first }
+    val progressHint = when {
+        missing.isEmpty() -> "五项都已绑好，校园服务都能用了"
+        missing.size == bindItems.size -> "五项都还没绑，点下面任意一行开始"
+        else -> "还差 ${missing.size} 项：${missing.joinToString("、")}"
+    }
     val importExtra = when {
         lastImport == null ->
             if (isBound) "还没用这个账号成功导入过课表" else "绑定学号后可用「教务直连」导入课表"
@@ -1047,6 +1073,47 @@ internal fun BindingStatusCard(
             // 两段性质不同，光靠留白分不开（卡内只有一档行距）。
             HorizontalDivider(color = colors.borderDivider, thickness = 0.5.dp)
 
+            // ── 绑定进度 ──
+            // 进这一页的第一句话就是"我还差什么"。改造前这个问题只能靠逐行读五个红/蓝点回答。
+            // 五段条与下面五项**按同一顺序一一对应**，已绑的一段用该项自己的分类色，
+            // 未绑的一段留灰 —— 看一眼长度就知道进度，扫一眼颜色就知道缺的是哪一类。
+            Column(verticalArrangement = Arrangement.spacedBy(skin.spaceSmall)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "绑定进度",
+                        modifier = Modifier.weight(1f),
+                        fontSize = 13.sp,
+                        color = colors.textSecondary,
+                    )
+                    Text(
+                        "$boundCount / ${bindItems.size}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (boundCount == bindItems.size) colors.success else colors.textPrimary,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceXs)) {
+                    bindItems.forEach { (_, done, accent) ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(percent = 50))
+                                .background(
+                                    if (done) serviceAccentColor(accent) else colors.surfaceHighlight
+                                )
+                        )
+                    }
+                }
+                Text(
+                    progressHint,
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                )
+            }
+
+            HorizontalDivider(color = colors.borderDivider, thickness = 0.5.dp)
+
             Column {
                 // ── 教务 ──
                 ChecklistRow(
@@ -1055,6 +1122,8 @@ internal fun BindingStatusCard(
                         lastImport.success -> BindState.OK
                         else -> BindState.FAILED
                     },
+                    icon = Icons.Outlined.HomeWork,
+                    accent = ServiceAccent.ACADEMIC,
                     title = "教务",
                     detail = "${campus.jwTypeLabel} · $schoolText",
                     onClick = { onNavigate(BindSubPage.ACADEMIC) },
@@ -1074,6 +1143,8 @@ internal fun BindingStatusCard(
                 // 校园卡 → 学习平台）：用户扫完清单往下滚，能逐项对上，不用来回找。
                 ChecklistRow(
                     state = if (dormLabel != null) BindState.OK else BindState.TODO,
+                    icon = Icons.Outlined.Home,
+                    accent = ServiceAccent.LIFE,
                     title = "宿舍",
                     detail = dormLabel ?: "未绑定 · 绑定后自动匹配生活服务商",
                     onClick = { onNavigate(BindSubPage.DORM) },
@@ -1090,6 +1161,8 @@ internal fun BindingStatusCard(
                         // 门户接口读不到时**不编一个状态**，如实写成"未知"
                         else -> BindState.UNKNOWN
                     },
+                    icon = Icons.Outlined.Today,
+                    accent = ServiceAccent.INFO,
                     title = "今日校园",
                     detail = if (casBound) {
                         val loginState = when {
@@ -1113,6 +1186,8 @@ internal fun BindingStatusCard(
 
                 ChecklistRow(
                     state = if (cardBound) BindState.OK else BindState.TODO,
+                    icon = Icons.Outlined.CreditCard,
+                    accent = ServiceAccent.PAYMENT,
                     title = "校园卡",
                     detail = if (cardBound) "已绑定 · 可查余额" else "未绑定（可选，不影响其它功能）",
                     onClick = { onNavigate(BindSubPage.CAMPUS_CARD) },
@@ -1128,6 +1203,8 @@ internal fun BindingStatusCard(
                     // 对用户来说"没绑齐"要做的动作是同一个（去绑另一个），所以归 TODO 是对的，
                     // 精确的差别由下面那行文字表达 —— 这正是 StateDot"点+文字"双通道的设计本意。
                     state = if (learningCount == 2) BindState.OK else BindState.TODO,
+                    icon = Icons.AutoMirrored.Outlined.MenuBook,
+                    accent = ServiceAccent.STUDY,
                     title = "学习平台",
                     // 两个平台是**平级**的，所以写成并列的两句话。
                     // 改造前把"学习通"放在 value、"智慧树"放在 extra（低一级文字），
@@ -1355,7 +1432,13 @@ internal fun ColumnScope.AcademicAccountSection(
 }
 
 /**
- * 检查清单的一行：**状态点 + 名称**占一行，**详情**另起一行（可选再跟一条补充行）。
+ * 检查清单的一行：**分类图标块（右下角带状态点） + 名称**占一行，
+ * **详情**另起一行（可选再跟一条补充行）。
+ *
+ * 2026-10（第三次）：左侧从"裸状态点"换成 **36dp 分类色图标块**，状态点缩成块右下角的小徽章
+ * （垫一圈卡片底色分隔）。五行原本只有蓝/橙/红三种点，扫读时五项长得一模一样；
+ * 有了分类图标（教务楼 / 家 / 日历 / 卡 / 书），找"校园卡"不用先读字。
+ * 状态点仍保留，语义与尺寸不变 —— 点继续是唯一的"好用 / 待办 / 失败"通道（见 [StateDot]）。
  *
  * ## 2026-10（第二次）：从"名称 + 右侧详情"改成两行式
  *
@@ -1387,6 +1470,9 @@ internal fun ColumnScope.AcademicAccountSection(
 @Composable
 private fun ChecklistRow(
     state: BindState,
+    /** 这一项属于哪类账号 —— 只用来取分类色，让五行的图标一眼能分开。 */
+    icon: ImageVector,
+    accent: ServiceAccent,
     title: String,
     detail: String,
     // 非 null 时整行可点、并在右侧画一个箭头 —— **清单行本身就是入口**：
@@ -1405,9 +1491,10 @@ private fun ChecklistRow(
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    // 详情行与**名称**左对齐（不是与状态点对齐）：缩进 = 状态点直径 + 点与名称的间距。
+    // 详情行与**名称**左对齐（不是与状态点对齐）：缩进 = 图标块宽度 + 块与名称的间距。
     // 这条缩进就是"这是上面那一条的说明"的全部视觉表达，比加个小标题便宜得多。
-    val detailIndent = 10.dp + skin.spaceSmall
+    val tileSize = 36.dp
+    val detailIndent = tileSize + skin.spaceMd
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1422,8 +1509,32 @@ private fun ChecklistRow(
             .padding(vertical = LocalProfileRowPadding.current),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StateDot(state)
-            Spacer(Modifier.width(skin.spaceSmall))
+            // 分类色图标块 + 右下角状态点：图标负责"这是哪一类账号"，
+            // 点继续承担唯一的"好用 / 待办 / 失败"语义（见 StateDot 的 KDoc）。
+            // 点压在块上时垫一圈卡片底色，橙色/红色点在绿色块上才不会糊成一片。
+            Box(
+                modifier = Modifier
+                    .size(tileSize)
+                    .clip(RoundedCornerShape(skin.radiusChip))
+                    .background(serviceAccentContainer(accent)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = serviceAccentColor(accent),
+                    modifier = Modifier.size(19.dp),
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .background(colors.surfaceCard, CircleShape)
+                        .padding(2.dp),
+                ) {
+                    StateDot(state)
+                }
+            }
+            Spacer(Modifier.width(skin.spaceMd))
             Text(
                 title,
                 modifier = Modifier.weight(1f),
@@ -1536,6 +1647,8 @@ internal fun BindingSectionCard(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    /** 与主页面清单那一行同一个分类色：进哪一项，标题块的色就接着哪一项。 */
+    accent: ServiceAccent = ServiceAccent.ACADEMIC,
     // false 时整张卡不渲染（理由见 BindingStatusCard 的同名参数）。
     //
     // ⚠️ 必须放在 `content` **之前**：尾随 lambda 只会绑定到最后一个参数，
@@ -1558,8 +1671,8 @@ internal fun BindingSectionCard(
     if (!visible) return
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val iconTint = if (danger) colors.danger else colors.accentMain
-    val iconContainer = if (danger) colors.surfaceHighlight else colors.accentMain.copy(alpha = 0.12f)
+    val iconTint = if (danger) colors.danger else serviceAccentColor(accent)
+    val iconContainer = if (danger) colors.surfaceHighlight else serviceAccentContainer(accent)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(skin.radiusCard),

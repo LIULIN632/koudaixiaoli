@@ -586,7 +586,7 @@ fun WebImportScreen(
                             }
                             item {
                                 SectionCaption(
-                                    "全部学校",
+                                    "烟台学校",
                                     Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
                                 )
                             }
@@ -613,6 +613,14 @@ fun WebImportScreen(
                                     }
                                 },
                                 onToggleFavorite = { viewModel.toggleFavorite(school) }
+                            )
+                        }
+                        item {
+                            Text(
+                                "列表只收烟台院校，外地学校可点上方「添加自己的学校」手动添加",
+                                fontSize = 11.sp,
+                                color = colors.textTertiary,
+                                modifier = Modifier.padding(top = skin.spaceSm),
                             )
                         }
                     }

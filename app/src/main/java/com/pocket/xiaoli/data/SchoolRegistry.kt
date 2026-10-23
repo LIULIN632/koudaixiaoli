@@ -28,6 +28,25 @@ data class School(
 fun isJwSystemAvailable(type: JwSystemType): Boolean =
     type == JwSystemType.ZHENGFANG || type == JwSystemType.QIANGZHI
 
+/**
+ * 本 App 的主场城市。
+ *
+ * 这个软件已从「什么学校都能接」收窄成**烟台理工学院的校园助手**：
+ * 选校列表只列烟台本地院校，用户不再面对 200+ 所全国学校的噪音。
+ * 内置数据仍保留全国名单（后续铺开烟台、或用户手动添加外地学校都用得上），
+ * 这里只控制**默认展示范围**。
+ */
+const val HOME_CITY = "烟台"
+
+/** 置顶学校：先当前对接的烟台理工学院，再下一步优先覆盖的烟台大学。 */
+private val PINNED_SCHOOL_IDS = listOf("YIT", "YTU")
+
+/** 是否进入选校列表：本地院校，或用户自己添加的学校（`custom_` 前缀）。 */
+fun School.isPickerSchool(): Boolean = city == HOME_CITY || id.startsWith("custom_")
+
+/** 选校列表的置顶位次：越小越靠前，非置顶学校统一排在后面。 */
+fun School.pickerRank(): Int = PINNED_SCHOOL_IDS.indexOf(id).let { if (it >= 0) it else PINNED_SCHOOL_IDS.size }
+
 data class SchoolJson(
     val id: String,
     val name: String,

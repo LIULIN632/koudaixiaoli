@@ -99,7 +99,7 @@ fun ImportScreen(
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val campusOnly = viewModel.campusOnly
 
-    // 逐级返回：成功卡片 → 退出；失败卡片 → 回登录表单；表单/选学校 → 选学校/选系统；初始页 → 退出
+    // 逐级返回：成功卡片 → 退出；失败卡片 → 回登录表单；登录表单 → 学校列表；列表 → 退出
     fun handleBack() {
         val res = result
         if (isLoading) viewModel.cancelCaptcha()
@@ -118,7 +118,7 @@ fun ImportScreen(
                 viewModel.reset()
                 onBack()
             }
-            selectedSystem != null || selectedSchool != null -> {
+            selectedSchool != null -> {
                 viewModel.goBack()
             }
             else -> {
@@ -193,31 +193,28 @@ fun ImportScreen(
             contentPadding = PaddingValues(horizontal = skin.spaceLg, vertical = skin.spaceMd),
             verticalArrangement = Arrangement.spacedBy(skin.spaceMd)
         ) {
-            // Step 1: Select教务 system（仅非本校锁定时出现）
-            if (!campusOnly && selectedSystem == null) {
-                item { SectionCaption("选择教务系统") }
-                item {
-                    JwSystemGrid(
-                        onSelect = { type ->
-                            if (isJwSystemAvailable(type)) {
-                                viewModel.selectSystem(type)
-                            } else {
-                                Toast.makeText(context, "该教务系统暂不支持原生导入，请使用「Web导入」方式", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    )
-                }
-                return@LazyColumn
-            }
-
-            // Step 2: Select school（仅非本校锁定时出现）
+            // 选学校（仅非本校锁定时出现）。教务系统已收成列表顶部的一排胶囊，
+            // 默认正方 —— 烟台这边的校区都是正方，不再单开一步进五宫格。
             if (!campusOnly && selectedSchool == null) {
-                val system = selectedSystem ?: return@LazyColumn
+                val system = selectedSystem ?: JwSystemType.ZHENGFANG
                 item {
-                    SectionCaption(
-                        "选择学校 · ${system.label}",
-                        Modifier.padding(top = skin.spaceSm),
-                    )
+                    Column {
+                        SectionCaption(
+                            "选择学校 · ${system.label}",
+                            Modifier.padding(top = skin.spaceSm),
+                        )
+                        Spacer(Modifier.height(skin.spaceSm))
+                        JwSystemSwitch(
+                            selected = system,
+                            onSelect = { type -> viewModel.selectSystem(type) },
+                        )
+                        Spacer(Modifier.height(skin.spaceMicro))
+                        Text(
+                            "青果 / 超星 / URP 请用「Web 导入」，本页只支持原生登录",
+                            fontSize = 11.sp,
+                            color = colors.textTertiary,
+                        )
+                    }
                 }
                 item {
                     OutlinedTextField(
@@ -300,13 +297,13 @@ fun ImportScreen(
                         }
                         item {
                             SectionCaption(
-                                "全部学校",
+                                "烟台学校",
                                 Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
                             )
                         }
                     }
 
-                    // ── All schools section ──
+                    // ── Other local schools ──
                     items(otherSchools, key = { it.id }) { school ->
                         val isSelected = selectedSchool == school
                         val isCustom = school.id.startsWith("custom_")
@@ -320,6 +317,14 @@ fun ImportScreen(
                             onDelete = if (isCustom) { { schoolToDelete = school } } else null
                         )
                         HorizontalDivider(color = colors.borderDivider, thickness = 0.5.dp)
+                    }
+                    item {
+                        Text(
+                            "列表只收烟台院校，外地学校可点上方「添加自定义学校」手动添加",
+                            fontSize = 11.sp,
+                            color = colors.textTertiary,
+                            modifier = Modifier.padding(top = skin.spaceSm),
+                        )
                     }
                 }
                 return@LazyColumn
@@ -701,63 +706,58 @@ fun ImportScreen(
     }
 }
 
+/**
+ * 原生导入支持的教务系统切换胶囊。
+ *
+ * 只列**真能原生登录**的系统（[isJwSystemAvailable]），青果 / 超星 / URP
+ * 以前在五宫格里各占一格、点了只弹一句「请用 Web 导入」——那是死路，
+ * 现在统一收进列表下方的一行提示。
+ */
 @Composable
-internal fun JwSystemGrid(onSelect: (JwSystemType) -> Unit) {
+internal fun JwSystemSwitch(
+    selected: JwSystemType,
+    onSelect: (JwSystemType) -> Unit,
+) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val isDark = LocalDarkMode.current
-    val types = JwSystemType.values().toList()
-    Column(verticalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-        for (row in types.chunked(2)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                for (type in row) {
-                    val available = isJwSystemAvailable(type)
-                    val accent = systemAccent(type)
-                    val tint = serviceAccentColor(accent)
-                    AppCard(
-                        onClick = { onSelect(type) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(96.dp),
-                        shape = RoundedCornerShape(skin.radiusChip),
-                        containerColor = if (available) {
-                            serviceAccentContainer(accent)
-                        } else {
-                            colors.surfaceAlt
-                        },
-                        border = BorderStroke(
-                            1.dp,
-                            if (available) {
-                                tint.copy(alpha = if (isDark) 0.42f else 0.30f)
-                            } else {
-                                colors.borderDivider
-                            },
-                        ),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = skin.spaceCompact, vertical = skin.spaceMd),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Text(
-                                type.label,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (available) colors.textPrimary else colors.textTertiary,
-                            )
-                            Spacer(Modifier.height(skin.spaceXs))
-                            Text(
-                                if (available) type.description else "请用 Web 导入",
-                                fontSize = 11.sp,
-                                color = if (available) colors.textSecondary else colors.warning,
-                            )
-                        }
+    val types = JwSystemType.values().filter { isJwSystemAvailable(it) }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
+        types.forEach { type ->
+            val active = type == selected
+            val accent = systemAccent(type)
+            val tint = serviceAccentColor(accent)
+            Surface(
+                shape = RoundedCornerShape(percent = 50),
+                color = if (active) serviceAccentContainer(accent) else colors.surfaceAlt,
+                border = BorderStroke(
+                    1.dp,
+                    if (active) tint.copy(alpha = if (isDark) 0.48f else 0.34f) else colors.borderDivider,
+                ),
+                modifier = Modifier
+                    .heightIn(min = 40.dp)
+                    .miuixPress(onClick = { onSelect(type) }),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = skin.spaceCompact, vertical = skin.spaceSm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (active) {
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(skin.spaceXs))
                     }
-                }
-                // Pad uneven row
-                if (row.size < 2) {
-                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        type.label,
+                        fontSize = 13.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        color = if (active) colors.textPrimary else colors.textSecondary,
+                    )
                 }
             }
         }

@@ -35,11 +35,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 「导入本校课表」页两个关键部件的判据：教务系统九宫格、导入结果卡。
+ * 「导入本校课表」页两个关键部件的判据：教务系统切换、导入结果卡。
  *
- * 旧网格给 5 个教务系统各写死一对浅色（`#EEF0F4` / `#CDD2DC`…），
- * 深色模式下白字压在浅灰卡上基本看不见；结果卡同样写死了绿色/红色底，
- * 且失败时没有「重新登录」，只能靠返回键摸回去。
+ * 产品重心已收窄到烟台（当前校区用正方，后续覆盖的烟台学校也是正方），
+ * 原先 5 个系统的整页网格收成两枚胶囊：只列原生真能登录的正方 / 强智，
+ * 青果 / 超星 / URP 统一提示走「Web 导入」。
+ * 结果卡旧版写死绿/红底色，失败时没有任何按钮 —— 这里同时守住这两条。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -52,7 +53,7 @@ class ImportScreenPartsScreenshotTest {
     private var dark by mutableStateOf(false)
 
     @Test
-    fun `教务系统网格的截图`() {
+    fun `教务系统切换的截图`() {
         composeRule.setContent {
             PocketXiaoliTheme(
                 appearanceMode = AppearanceMode.RAINBOW,
@@ -60,18 +61,18 @@ class ImportScreenPartsScreenshotTest {
                 darkTheme = dark,
             ) {
                 PageBackdrop {
-                    JwSystemGrid(onSelect = {})
+                    JwSystemSwitch(selected = JwSystemType.ZHENGFANG, onSelect = {})
                 }
             }
         }
         composeRule.waitForIdle()
         composeRule.onRoot()
-            .captureRoboImage("src/test/screenshots/295-import-system-grid-light.png")
+            .captureRoboImage("src/test/screenshots/295-import-system-switch-light.png")
 
         dark = true
         composeRule.waitForIdle()
         composeRule.onRoot()
-            .captureRoboImage("src/test/screenshots/296-import-system-grid-dark.png")
+            .captureRoboImage("src/test/screenshots/296-import-system-switch-dark.png")
     }
 
     @Test
@@ -117,22 +118,25 @@ class ImportScreenPartsScreenshotTest {
     }
 
     @Test
-    fun `点系统卡片回传对应类型，未支持的三项写明走Web导入`() {
+    fun `系统切换只列原生支持的两家并能回传`() {
         var picked: JwSystemType? = null
         composeRule.setContent {
             PocketXiaoliTheme(appearanceMode = AppearanceMode.RAINBOW, skinStyle = SkinStyle.VIVID) {
-                PageBackdrop { JwSystemGrid(onSelect = { picked = it }) }
+                PageBackdrop {
+                    JwSystemSwitch(selected = JwSystemType.ZHENGFANG, onSelect = { picked = it })
+                }
             }
         }
 
-        // 正方 / 强智可原生导入，另外三项只能走 Web
-        composeRule.onAllNodesWithText("请用 Web 导入").assertCountEquals(3)
+        // 青果 / 超星 / URP 原生登录不了，不再作为可点的死路出现在这里
+        composeRule.onAllNodesWithText("青果教务").assertCountEquals(0)
+        composeRule.onAllNodesWithText("超星学习通").assertCountEquals(0)
+
+        composeRule.onNodeWithText("强智教务").performClick()
+        assertEquals(JwSystemType.QIANGZHI, picked)
 
         composeRule.onNodeWithText("正方教务").performClick()
         assertEquals(JwSystemType.ZHENGFANG, picked)
-
-        composeRule.onNodeWithText("超星学习通").performClick()
-        assertEquals(JwSystemType.CHAOXING, picked)
     }
 
     @Test

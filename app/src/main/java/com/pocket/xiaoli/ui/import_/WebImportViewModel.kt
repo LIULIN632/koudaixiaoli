@@ -18,6 +18,8 @@ import androidx.lifecycle.viewModelScope
 import com.pocket.xiaoli.data.JwSystemType
 import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.data.SchoolRegistry
+import com.pocket.xiaoli.data.isPickerSchool
+import com.pocket.xiaoli.data.pickerRank
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.di.AppContainer
@@ -251,13 +253,14 @@ class WebImportViewModel(
             return@combine listOfNotNull(campusSchool)
         }
         val all = schoolRegistry.allSchools + customSchools
-        val base = if (query.isBlank()) all
+        val base = (if (query.isBlank()) all
         else all.filter {
             it.name.contains(query, ignoreCase = true) ||
             it.city.contains(query, ignoreCase = true)
-        }
+        }).filter { it.isPickerSchool() }
         base.sortedWith(
             compareByDescending<School> { it.id in favIds }
+                .thenBy { it.pickerRank() }
                 .thenBy { com.pocket.xiaoli.util.PinyinSortUtil.sortKey(it.name) }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
