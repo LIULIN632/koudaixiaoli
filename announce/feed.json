@@ -9,16 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 85,
-    "versionName": "0.1.84",
+    "versionCode": 86,
+    "versionName": "0.1.85",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.84/koudaixiaoli_v0.1.84.apk",
-    "sha256": "bf961a941784fca5f5160df268fd8b980f9a398582d27172c8d394d8cd4deb54",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.85/koudaixiaoli_v0.1.85.apk",
+    "sha256": "b461fb934e36bb1ebfaa201f84665fc1d805e06e027d6d128d65e912dfe85c0d",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "桌面图标换成金色锦鲤：自适应图标，圆形、方圆、圆角方三种桌面遮罩都能完整显示",
-      "旧版桌面（Android 7 及以下）也换成同一只鱼，不再和别的课程表 App 撞脸"
+      "鲤鱼聊天：长对话按「一问一答」折叠，只留最近两轮展开，点标题可展开或收起；出错的那轮永远不折",
+      "回答下方的追问按你刚问过的内容挑：用过的工具优先，问过的不再重复推荐",
+      "回答里的「来源」可以展开，看清这条答案依据的是哪几处"
     ]
   },
   "announcements": []

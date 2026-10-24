@@ -36,12 +36,12 @@ object AssistantTools {
         AssistantTool.SEARCH_KNOWLEDGE -> {
             val raw = container.knowledgeStore.ensureLoaded()
             val usable = ExpiryPolicy.apply(raw, LocalDate.now())
-            text(
-                AssistantFormatters.knowledge(
-                    hits = KeywordRetriever.search(query, usable, topK = KNOWLEDGE_TOP_K),
-                    totalDocuments = usable.size,
-                    query = query,
-                )
+            // 直接返回 ToolOutcome：来源条要的 sources 与回灌给模型的文本在这里已经配好对，
+            // 再包一层 text() 会把 sources 丢掉。
+            AssistantFormatters.knowledge(
+                hits = KeywordRetriever.search(query, usable, topK = KNOWLEDGE_TOP_K),
+                totalDocuments = usable.size,
+                query = query,
             )
         }
 

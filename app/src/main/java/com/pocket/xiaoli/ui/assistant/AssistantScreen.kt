@@ -83,6 +83,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.PocketXiaoliApplication
 import com.pocket.xiaoli.data.agent.AgentPhase
 import com.pocket.xiaoli.data.agent.ChatRole
+import com.pocket.xiaoli.data.knowledge.AssistantTool
 import com.pocket.xiaoli.ui.components.TopBarCircleButton
 import com.pocket.xiaoli.ui.glass.LocalBottomBarInset
 import com.pocket.xiaoli.ui.glass.glassSource
@@ -218,6 +219,25 @@ fun AssistantScreen(
     // 一轮 = 一个条目：连续的 assistant / tool 消息合成一个 turn，
     // 由 turn 自己决定把工具折到回答末尾的脚注区
     val turns = remember(state.messages) { state.messages.toTurns() }
+    // 折叠以「一问一答」为单位重新配对。列表项数按 rounds 算，
+    // 滚动目标与 items key 都必须跟着它走（不能再拿 turns.size）。
+    val rounds = remember(turns) { turns.toRounds() }
+
+    // 回答下方追问的候选词。本轮**成功**调过的工具决定排序；失败的不算，
+    // 否则推荐同一类问题大概率再失败一次。`asked` 用来防止同一个问题反复出现。
+    // ⚠️ 必须在 LazyColumn 之外算：`items {}` 的 lambda 不是 @Composable 上下文。
+    val followUpTools = remember(turns) {
+        turns.lastOrNull()?.tools.orEmpty()
+            .filterNot { it.toolFailed }
+            .mapNotNull { it.toolName?.let(AssistantTool::fromFunctionName) }
+            .toSet()
+    }
+    val askedQuestions = remember(state.messages) {
+        state.messages.filter { it.role == ChatRole.USER }.map { it.content }
+    }
+    val followUps = remember(followUpTools, askedQuestions) {
+        FollowUpPlanner.plan(followUpTools, askedQuestions)
+    }
 
     // 「已经贴底」= 还能往下滚时，最后一条的底部离视口底部不超过容差。
     // 用 listState.canScrollForward 而不是比较 visibleItems 的 index：
@@ -279,11 +299,11 @@ fun AssistantScreen(
         snapshotFlow { state.messages }
             .collect { messages ->
                 // 空态（还没发过话 / 历史还在读库）没什么可滚的。
-                // 判 turns.size 而不是 messages.size：两者在"只调了工具还没说话"时不同，
-                // 而列表项数是按 turns 算的，滚动目标必须以它为准。
-                if (messages.isEmpty() || turns.isEmpty()) return@collect
-                // turns.size 是脚注前一项；配合负偏移即"贴到绝对底部"
-                if (!anchored) listState.scrollToItem(turns.size, STICK_TO_BOTTOM_OFFSET)
+                // 判 rounds.size 而不是 messages.size：两者在"只调了工具还没说话"时不同，
+                // 而列表项数是按问答轮算的，滚动目标必须以它为准。
+                if (messages.isEmpty() || rounds.isEmpty()) return@collect
+                // rounds.size 是脚注前一项；配合负偏移即"贴到绝对底部"
+                if (!anchored) listState.scrollToItem(rounds.size, STICK_TO_BOTTOM_OFFSET)
             }
     }
 
@@ -443,7 +463,7 @@ fun AssistantScreen(
                             )
                         }
                     }
-                    itemsIndexed(turns, key = { _, turn -> turn.key }) { index, turn ->
+                    itemsIndexed(rounds, key = { _, round -> round.key }) { index, round ->
                         val baseDensity = LocalDensity.current
                         val fontScale = tabAppearance.assistantFontMultiplier
                         // 「外观 → 鲤鱼 → 回答字号」。只缩放**消息轮**（正文 / 行内代码 /
@@ -458,12 +478,16 @@ fun AssistantScreen(
                                 baseDensity.fontScale * fontScale,
                             )
                         ) {
-                            // 间距挂在条目自身：轮距不是常量，取决于"这一轮是不是一段新对话"
-                            Column(modifier = Modifier.padding(top = turnGapOf(index, turn).toDp())) {
-                                ChatTurn(
-                                    turn = turn,
-                                    runningTool = state.runningTool,
-                                    streaming = state.isStreaming,
+                            // 间距挂在问答轮上：段与段之间固定拉开，轮内由 FoldableRound 管
+                            Column(modifier = Modifier.padding(top = roundGapOf(index).toDp())) {
+                                FoldableRound(
+                                    index = index,
+                                    total = rounds.size,
+                                    round = round,
+                                    // 「正在查 / 正在答」只属于最后一段对话 —— 历史轮不会转圈，
+                                    // 也不会因为别处正在流式就藏起自己的复制按钮
+                                    runningTool = state.runningTool.takeIf { index == rounds.lastIndex },
+                                    streaming = state.isStreaming && index == rounds.lastIndex,
                                     onRetry = { viewModel.retryLast() },
                                     onRegenerate = { viewModel.regenerate() },
                                     showReasoning = tabAppearance.assistantShowReasoning,
@@ -486,14 +510,17 @@ fun AssistantScreen(
                         lastTurn.user == null &&
                         lastTurn.answer.isNotBlank()
                     ) {
-                        item {
-                            FollowUpChips(
-                                onPick = { text ->
-                                    query = ""
-                                    viewModel.send(text)
-                                },
-                                modifier = Modifier.padding(top = skin.spaceMd),
-                            )
+                        if (followUps.isNotEmpty()) {
+                            item {
+                                FollowUpChips(
+                                    onPick = { text ->
+                                        query = ""
+                                        viewModel.send(text)
+                                    },
+                                    modifier = Modifier.padding(top = skin.spaceMd),
+                                    prompts = followUps,
+                                )
+                            }
                         }
                     }
 
@@ -532,8 +559,8 @@ fun AssistantScreen(
                                 onClick = {
                                     stickToBottom = true
                                     scope.launch {
-                                        // turns.size 是脚注前一项；配合负偏移即"贴到绝对底部"
-                                        listState.animateScrollToItem(turns.size, STICK_TO_BOTTOM_OFFSET)
+                                        // rounds.size 是脚注前一项；配合负偏移即"贴到绝对底部"
+                                        listState.animateScrollToItem(rounds.size, STICK_TO_BOTTOM_OFFSET)
                                     }
                                 },
                             )
@@ -618,8 +645,10 @@ private fun BackToBottomButton(following: Boolean, onClick: () -> Unit) {
  *
  * ## 候选词从哪来
  *
- * 与空态欢迎页**共用** `ASSISTANT_PROMPTS`（唯一真源）。两处各写一份的后果不是
- * "多打几个字"，而是漂移：空态推荐问 A、追问推荐问 B，而且删一个问题必然漏掉一处。
+ * 与空态欢迎页**共用** `ASSISTANT_PROMPTS`（唯一真源）；具体挑哪几条由
+ * [FollowUpPlanner] 按"本轮用过哪些工具 + 本会话问过什么"决定，默认取 3 条。
+ * 两处各写一份的后果不是"多打几个字"，而是漂移：空态推荐问 A、追问推荐问 B，
+ * 而且删一个问题必然漏掉一处。
  *
  * ⚠️ 列表里的每一条都必须**今天就能真答出来**，理由见 `ASSISTANT_PROMPTS` 的 KDoc。
  *
@@ -630,6 +659,7 @@ private fun BackToBottomButton(following: Boolean, onClick: () -> Unit) {
 internal fun FollowUpChips(
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    prompts: List<AssistantPrompt> = ASSISTANT_PROMPTS,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -639,7 +669,7 @@ internal fun FollowUpChips(
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(skin.spaceSm),
     ) {
-        ASSISTANT_PROMPTS.forEach { prompt ->
+        prompts.forEach { prompt ->
             Surface(
                 shape = RoundedCornerShape(50),
                 // 和空态欢迎页的彩色建议卡呼应：主色浅底 + 同色描边 + 一颗小火花，

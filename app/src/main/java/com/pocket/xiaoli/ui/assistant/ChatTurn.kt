@@ -11,6 +11,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.Icons
@@ -66,12 +69,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.agent.AgentPhase
 import com.pocket.xiaoli.data.agent.ChatRole
 import com.pocket.xiaoli.data.knowledge.AssistantCard
+import com.pocket.xiaoli.data.knowledge.AssistantSource
 import com.pocket.xiaoli.ui.components.ErrorCard
 import com.pocket.xiaoli.ui.components.infocard.InfoCell
 import com.pocket.xiaoli.ui.components.infocard.InfoRow
+import com.pocket.xiaoli.ui.share.AppShare
 import com.pocket.xiaoli.ui.theme.AiAvatar
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
@@ -206,6 +212,197 @@ internal fun List<AssistantUiMessage>.toTurns(): List<ChatTurn> {
 }
 
 /**
+ * 一段完整的问答：用户发言 + 它的回答。
+ *
+ * 为什么要再分一层：`toTurns()` 把"用户发言"和"助手回答"拆成两条（渲染间距不同），
+ * 但**折叠的单位必须是一问一答** —— 只收起回答，问题会孤零零留在上面；
+ * 只收起问题，回答又失去上下文。
+ *
+ * [key] 优先取用户那条的 id：同一段对话在列表里始终是同一个 key，
+ * 折叠状态（`rememberSaveable`）才能跨重组、横竖屏与进程恢复保留下来。
+ */
+internal data class ConversationRound(
+    val key: String,
+    val user: ChatTurn?,
+    val reply: ChatTurn?,
+) {
+    /** 用户原话；历史里缺少提问（只有助手消息）时为空串。 */
+    val question: String get() = user?.user?.content.orEmpty().trim()
+}
+
+/** 把扁平的 turn 序列配成问答轮；没有回答的提问保留为"只有上半句"的一轮。 */
+internal fun List<ChatTurn>.toRounds(): List<ConversationRound> {
+    val rounds = mutableListOf<ConversationRound>()
+    var pendingUser: ChatTurn? = null
+    for (turn in this) {
+        if (turn.user != null) {
+            // 连续两条用户发言（异常历史）：前一条没有回答，也保留下来，不吞数据
+            pendingUser?.let { rounds += ConversationRound(it.key, it, null) }
+            pendingUser = turn
+        } else {
+            rounds += ConversationRound(
+                key = pendingUser?.key ?: turn.key,
+                user = pendingUser,
+                reply = turn,
+            )
+            pendingUser = null
+        }
+    }
+    pendingUser?.let { rounds += ConversationRound(it.key, it, null) }
+    return rounds
+}
+
+/**
+ * 长对话里自动折叠旧轮次，最近 [ROUND_KEEP_EXPANDED] 轮保持展开。
+ *
+ * 为什么要有下限 [ROUND_FOLD_MIN_TOTAL]：三四轮的短对话本来就一屏能读完，
+ * 一进来就把前两条折起来，用户会以为历史丢了。
+ *
+ * 出错的一轮**不折**：错误卡片的存在意义就是"必须被看见"，
+ * 折进摘要里等于把失败藏起来（与工具脚注"失败必须漏出来"同一条原则）。
+ */
+internal const val ROUND_FOLD_MIN_TOTAL = 4
+internal const val ROUND_KEEP_EXPANDED = 2
+
+internal fun isRoundFoldable(index: Int, total: Int, hasError: Boolean = false): Boolean =
+    !hasError && total >= ROUND_FOLD_MIN_TOTAL && index < total - ROUND_KEEP_EXPANDED
+
+/**
+ * 按轮渲染：可折叠的旧轮次先显示一行摘要，点开才铺出完整问答。
+ *
+ * 展开状态只记"用户是否亲手展开过"，与 [ReasoningBar] 同一套推导式：
+ * 用户没动过时，轮次滑出"最近两轮"就自动收起；亲手展开过的则一直保持展开。
+ */
+@Composable
+internal fun FoldableRound(
+    index: Int,
+    total: Int,
+    round: ConversationRound,
+    runningTool: String?,
+    streaming: Boolean,
+    onRetry: () -> Unit,
+    onRegenerate: () -> Unit,
+    showReasoning: Boolean,
+) {
+    val foldable = isRoundFoldable(index, total, hasError = round.reply?.error != null)
+    var expandedByHand by rememberSaveable(round.key) { mutableStateOf(false) }
+    val expanded = !foldable || expandedByHand
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (foldable) {
+            FoldedRoundHeader(
+                number = index + 1,
+                summary = if (expanded) "收起第 ${index + 1} 轮" else round.summary(),
+                expanded = expanded,
+                onToggle = { expandedByHand = it },
+            )
+            if (expanded) Spacer(Modifier.height(TurnGap.WITHIN.toDp()))
+        }
+        if (expanded) {
+            round.user?.let { userTurn ->
+                ChatTurn(
+                    turn = userTurn,
+                    runningTool = runningTool,
+                    streaming = streaming,
+                    onRetry = onRetry,
+                    onRegenerate = onRegenerate,
+                    showReasoning = showReasoning,
+                )
+            }
+            if (round.user != null && round.reply != null) {
+                Spacer(Modifier.height(TurnGap.WITHIN.toDp()))
+            }
+            round.reply?.let { replyTurn ->
+                ChatTurn(
+                    turn = replyTurn,
+                    runningTool = runningTool,
+                    streaming = streaming,
+                    onRetry = onRetry,
+                    onRegenerate = onRegenerate,
+                    showReasoning = showReasoning,
+                )
+            }
+        }
+    }
+}
+
+/** 折叠轮的摘要：优先用户原话，只有助手消息时退回回答的第一行。 */
+private fun ConversationRound.summary(): String {
+    val questionLine = question.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+    if (!questionLine.isNullOrEmpty()) return questionLine
+    val answerLine = reply?.answer.orEmpty().lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+    return answerLine ?: "这一段对话"
+}
+
+/**
+ * 折叠轮的标题条。整行可点，带 44dp 触摸下限与开合语义。
+ *
+ * 展开后标题改成"收起第 N 轮"而不是继续重复问题：下面紧跟着就是用户气泡，
+ * 同一句话在相邻两行各出现一次会显得像渲染重复。
+ */
+@Composable
+private fun FoldedRoundHeader(
+    number: Int,
+    summary: String,
+    expanded: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(skin.radiusChip))
+            .background(colors.surfaceCard)
+            .border(
+                1.dp,
+                colors.accentMain.copy(alpha = 0.16f),
+                RoundedCornerShape(skin.radiusChip),
+            )
+            // 与其它折叠栏一致用 toggleable：读屏要能说出"已展开/已收起"，
+            // 而 clickable 只会说"按钮"。
+            .toggleable(
+                value = expanded,
+                role = Role.Button,
+                onValueChange = onToggle,
+            )
+            .padding(horizontal = skin.spaceSm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(colors.accentMain.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "$number",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.accentMain,
+            )
+        }
+        Spacer(Modifier.width(skin.spaceSmall))
+        Text(
+            text = summary,
+            modifier = Modifier.weight(1f),
+            fontSize = 13.sp,
+            color = if (expanded) colors.textSecondary else colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            tint = colors.textTertiary,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/**
  * 渲染一轮。版式自上而下：思考链折叠栏 → 用户气泡 → 回答正文 → 工具脚注 → 错误卡片。
  *
  * 关于顺序：模型可能"先说一句 → 调工具 → 再答"。刻意把两段文本**拼成一段**放在
@@ -271,7 +468,8 @@ internal fun ChatTurn(
         // ⚠️ 卡片仍然挂在 TOOL 条目上（那是数据的出处，脚注的表格也从它取）。
         // 这里只是"同一份数据换个地方展示"，不是第二份数据。
         val cards = turn.tools.mapNotNull { it.card }
-        if (turn.answer.isNotBlank() || turn.answerStreaming || cards.isNotEmpty()) {
+        val hasAnswerBlock = turn.answer.isNotBlank() || turn.answerStreaming || cards.isNotEmpty()
+        if (hasAnswerBlock) {
             AssistantBubble(
                 text = turn.answer,
                 streaming = turn.answerStreaming,
@@ -285,14 +483,26 @@ internal fun ChatTurn(
             AssistantAvatar(phase = avatarPhase)
         }
 
+        // 来源只取**工具真实返回**的条目，不解析回答正文。同一轮多次查知识库时
+        // 可能出现重复的 K1，按「编号 + 标题 + 片段」去重，避免同一张出处卡列两遍。
+        val sources = turn.tools
+            .flatMap { it.sources }
+            .distinctBy { Triple(it.marker, it.title, it.snippet) }
+        if (sources.isNotEmpty()) {
+            if (hasAnswerBlock) Spacer(Modifier.height(skin.spaceSm))
+            SourceStrip(sources)
+        }
+
         val hasFootnote = turn.tools.isNotEmpty() || runningTool != null
         if (hasFootnote) {
-            if (turn.answer.isNotBlank()) Spacer(Modifier.height(skin.spaceSm))
+            if (turn.answer.isNotBlank() || sources.isNotEmpty()) Spacer(Modifier.height(skin.spaceSm))
             ToolFootnote(tools = turn.tools)
         }
 
         turn.error?.let { error ->
-            if (turn.answer.isNotBlank() || hasFootnote) Spacer(Modifier.height(skin.spaceSm))
+            if (turn.answer.isNotBlank() || hasFootnote || sources.isNotEmpty()) {
+                Spacer(Modifier.height(skin.spaceSm))
+            }
             ErrorCard(
                 title = "这次没答上来",
                 message = error.content,
@@ -957,6 +1167,195 @@ private fun ReasoningBar(
                     // 不是装饰性说明；12sp 再用弱灰就太吃力了。
                     color = colors.textSecondary,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 回答下方的**来源条**（引用来源）。
+ *
+ * ## 为什么默认收起
+ *
+ * 一次知识检索最多 5 条，每条都铺两行摘要会把刚读完的回答往上顶一屏。
+ * 收起态只留一颗「来源 N 条」药丸，想看的人再展开 —— 与思考链、工具脚注同一套
+ * "过程默认收、结论优先"的语法。
+ *
+ * ## 为什么只画工具返回的条目
+ *
+ * [AssistantSource] 来自 `ToolOutcome.sources`（`AssistantFormatters.knowledge` 同一次映射），
+ * **绝不解析模型正文里的 `[K1]`**。模型完全可能编一个不存在的编号：
+ * 从正文反推来源等于把"它能编回答"升级成"它还能编出处"。
+ *
+ * ## 为什么编号与正文一致很关键
+ *
+ * `[K1]` 同时出现在回灌给模型的文本、回答正文和这里的角标上。用户看到正文写
+ * `[K2]`、来源条却只有 `K1` 时会立刻失去信任 —— 所以三处必须来自同一个下标。
+ */
+@Composable
+private fun SourceStrip(sources: List<AssistantSource>) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    val isDark = LocalDarkMode.current
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val pillShape = RoundedCornerShape(50)
+
+    Column(modifier = Modifier.padding(start = assistantContentGutter())) {
+        Row(
+            modifier = Modifier
+                // 44dp 是触摸底线；视觉上仍靠 5dp 内边距保持紧凑
+                .heightIn(min = 44.dp)
+                .clip(pillShape)
+                .background(colors.accentMain.copy(alpha = if (isDark) 0.12f else 0.06f))
+                .border(
+                    1.dp,
+                    colors.accentMain.copy(alpha = if (isDark) 0.28f else 0.16f),
+                    pillShape,
+                )
+                .toggleable(
+                    value = expanded,
+                    role = Role.Button,
+                    onValueChange = { expanded = it },
+                )
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                contentDescription = null,
+                tint = colors.accentMain,
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(skin.spaceSmall))
+            Text(
+                text = "来源 ${sources.size} 条",
+                style = PocketTypography.caption,
+                color = colors.textSecondary,
+            )
+            Spacer(Modifier.width(skin.spaceXs))
+            Icon(
+                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (expanded) "收起来源" else "展开来源",
+                tint = colors.accentMain,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(tween(Motion.enter)) + expandVertically(tween(Motion.expand)),
+            exit = fadeOut(tween(Motion.exit)) + shrinkVertically(tween(Motion.expand)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(top = skin.spaceSm)
+                    // 与思考链 / 工具明细同一条高度纪律：来源再多也不能把回答顶出屏幕
+                    .heightIn(max = REASONING_MAX_HEIGHT)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                sources.forEachIndexed { index, source ->
+                    if (index > 0) Spacer(Modifier.height(skin.spaceSm))
+                    SourceCard(source)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 一条来源。整张卡只有 `url != null` 时才可点（点开系统浏览器）。
+ *
+ * 卡片用 `surfaceAlt` + 描边而不是主色底：来源是**证据**，不是又一个主操作，
+ * 主色只留给编号角标与「打开原文」，避免和上方的回答气泡抢注意力。
+ */
+@Composable
+private fun SourceCard(source: AssistantSource) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(skin.radiusChip)
+    val url = source.url
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (url != null) {
+                    Modifier
+                        .clip(shape)
+                        .clickable(onClickLabel = "打开原文") { AppShare.openUrl(context, url) }
+                } else {
+                    Modifier
+                }
+            ),
+        shape = shape,
+        color = colors.surfaceAlt,
+        border = BorderStroke(1.dp, colors.borderDivider),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(colors.accentMain.copy(alpha = 0.13f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = source.marker,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.accentMain,
+                    )
+                }
+                Spacer(Modifier.width(skin.spaceSm))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = source.title,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (source.meta.isNotBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = source.meta,
+                            fontSize = 11.sp,
+                            color = colors.textTertiary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (source.snippet.isNotBlank()) {
+                Spacer(Modifier.height(skin.spaceSm))
+                Text(
+                    text = source.snippet,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = colors.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (url != null) {
+                Spacer(Modifier.height(skin.spaceSm))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "打开原文",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.accentMain,
+                    )
+                    Spacer(Modifier.width(skin.spaceMicro))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = colors.accentMain,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
             }
         }
     }

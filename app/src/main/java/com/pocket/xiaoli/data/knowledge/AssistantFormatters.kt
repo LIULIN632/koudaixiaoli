@@ -273,20 +273,28 @@ object AssistantFormatters {
      * 两种退化情况**必须区分文案**：
      * - 库里为空（[totalDocuments] == 0）：告知"暂无内容"，别让用户以为是自己问错了；
      * - 有内容但没命中：告知"没查到"并给官方入口（§8 要求），而不是假装查过。
+     *
+     * 界面要的 [ToolOutcome.sources] 与 [ToolOutcome.text] 在这里**同一次映射**：
+     * `[K1]` 既是回灌给模型的编号，也是来源条上的编号。分开生成迟早会出现
+     * "正文引用 K2、来源条只有 K1"的错位。
      */
-    fun knowledge(hits: List<KnowledgeHit>, totalDocuments: Int, query: String): String {
+    fun knowledge(hits: List<KnowledgeHit>, totalDocuments: Int, query: String): ToolOutcome {
         val q = query.trim()
 
         if (totalDocuments == 0) {
-            return "知识库暂无内容（尚未发布校园知识笔记）。" +
-                "可以问我 App 怎么用，或到「服务」页找对应入口。"
+            return ToolOutcome(
+                "知识库暂无内容（尚未发布校园知识笔记）。" +
+                    "可以问我 App 怎么用，或到「服务」页找对应入口。"
+            )
         }
         if (hits.isEmpty()) {
-            return "知识库没有查到与「$q」相关的内容。可以换个说法再问，或到「服务」页找对应入口；" +
-                "制度类问题建议直接咨询教务处或图书馆。"
+            return ToolOutcome(
+                "知识库没有查到与「$q」相关的内容。可以换个说法再问，或到「服务」页找对应入口；" +
+                    "制度类问题建议直接咨询教务处或图书馆。"
+            )
         }
 
-        return hits.mapIndexed { index, hit ->
+        val text = hits.mapIndexed { index, hit ->
             buildString {
                 append("[K").append(index + 1).append("] ").append(hit.document.title)
                 hit.document.updatedAt?.let { append(" / 更新于 ").append(formatEpochDay(it)) }
@@ -295,6 +303,33 @@ object AssistantFormatters {
                 append("\n").append(hit.chunk.text)
             }
         }.joinToString("\n\n")
+
+        return ToolOutcome(
+            text = text,
+            sources = hits.mapIndexed { index, hit ->
+                val document = hit.document
+                // 分成「来源」与「时效」两行：拼成一行时手机宽度下会在
+                // 「责任人：图 / 书馆」这种词中间硬折，读起来像排版事故。
+                val freshness = listOfNotNull(
+                    document.updatedAt?.let { "更新于 ${formatEpochDay(it)}" },
+                    document.effectiveFrom?.let { "自 $it 起生效" },
+                    document.owner.takeIf { it.isNotBlank() }?.let { "责任人：$it" },
+                ).joinToString(" · ")
+                AssistantSource(
+                    marker = "K${index + 1}",
+                    title = document.title,
+                    meta = listOfNotNull(
+                        document.sourceLabel.takeIf { it.isNotBlank() }?.let { "来源：$it" },
+                        freshness.takeIf { it.isNotBlank() },
+                    ).joinToString("\n"),
+                    // 来源条只留两行，先把换行/连排空白压平；text 里的原样片段不动。
+                    snippet = hit.chunk.text.trim().replace(Regex("\\s+"), " "),
+                    url = document.sourceUrl?.trim()?.takeIf {
+                        it.startsWith("https://") || it.startsWith("http://")
+                    },
+                )
+            },
+        )
     }
 
     /** epoch 毫秒 → `YYYY-MM-DD`（按设备本地时区，与时效判断口径一致）。 */

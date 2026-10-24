@@ -10,13 +10,33 @@ package com.pocket.xiaoli.data.knowledge
  * "原样铺一句散文"或者"去正则解析那句散文"。后者是两套口径的开始：
  * 文案一改，解析就静默失效，而且没人会收到通知。
  *
- * [text] 与 [card] 因此**必须来自同一次取数**（都在 [AssistantFormatters] 里生成）：
+ * [text]、[card] 与 [sources] 因此**必须来自同一次取数**（都在 [AssistantFormatters] 里生成）：
  * - [text] 照旧回灌给模型，它的措辞是模型行为的一部分，**不要为了排版去改它**；
- * - [card] 只给界面用，不落库（与思考链同一策略：重启后旧回复只剩文字，数字仍在文字里）。
+ * - [card] 只给界面用，不落库（与思考链同一策略：重启后旧回复只剩文字，数字仍在文字里）；
+ * - [sources] 同样只给界面用，且**只能来自工具真实返回的条目** ——
+ *   绝不解析模型正文反推来源，否则模型编一个 `[K9]` 界面就会给它配一条假出处。
  */
 data class ToolOutcome(
     val text: String,
     val card: AssistantCard? = null,
+    val sources: List<AssistantSource> = emptyList(),
+)
+
+/**
+ * 一条**可核对的出处**（目前只有校园知识库产出）。
+ *
+ * 与 `docs/AssistantContract.md` §4 的 Source 对齐，但只保留界面真正会显示的五项：
+ * 编号、标题、元信息、片段、原文链接。链接可以为空（知识库允许只有来源名、没有 URL）。
+ *
+ * [marker] 就是回灌给模型的那串编号（`K1` → 模型回答里写 `[K1]`）：两处必须同源，
+ * 否则界面上会出现"正文引用 K2、来源条只有 K1"的错位。
+ */
+data class AssistantSource(
+    val marker: String,
+    val title: String,
+    val meta: String = "",
+    val snippet: String = "",
+    val url: String? = null,
 )
 
 /**

@@ -13,6 +13,7 @@ import com.pocket.xiaoli.data.agent.ERROR_MARKER_TOOL_NAME
 import com.pocket.xiaoli.data.agent.TextCoalescer
 import com.pocket.xiaoli.data.agent.withoutErrorMark
 import com.pocket.xiaoli.data.knowledge.AssistantCard
+import com.pocket.xiaoli.data.knowledge.AssistantSource
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.data.agent.AgentPhasePolicy
 import kotlinx.coroutines.Job
@@ -101,6 +102,15 @@ data class AssistantUiMessage(
      * 而卡片的价值主要在"刚查完那一眼"，不值得为它动表结构。
      */
     val card: AssistantCard? = null,
+    /**
+     * 仅 TOOL：该工具真实返回的**出处**（当前只有校园知识库）。
+     *
+     * ⚠️ 与 [card] 一样**刻意不落库**：`assistant_messages` 没有来源列，
+     * 为它加一列要动 Room 表结构。来源条的价值在"刚查完能核对"，
+     * 历史回复重新打开时正文里的 `[K1]` 仍在，说明文字没有丢。
+     * 将来若要持久化，先加迁移再改这里，不要反过来。
+     */
+    val sources: List<AssistantSource> = emptyList(),
     /**
      * 稳定标识，用作 LazyColumn 的 item key。
      *
@@ -321,6 +331,7 @@ class AssistantChatViewModel(
                                     toolName = event.displayName,
                                     toolFailed = event.failed,
                                     card = event.card,
+                                    sources = event.sources,
                                 )
                                 pushUi(localMessages, runningTool = null)
                             }

@@ -85,7 +85,7 @@ class KnowledgePipelineEndToEndTest {
             hits = KeywordRetriever.search(query, usable, topK = 5),
             totalDocuments = usable.size,
             query = query,
-        )
+        ).text
     }
 
     @Test
@@ -133,8 +133,24 @@ class KnowledgePipelineEndToEndTest {
 
     @Test
     fun `空知识库给出暂无内容文案`() {
-        val output = AssistantFormatters.knowledge(emptyList(), 0, "图书馆几点开门")
+        val output = AssistantFormatters.knowledge(emptyList(), 0, "图书馆几点开门").text
         assertTrue(output.contains("暂无内容"))
+    }
+
+    @Test
+    fun `检索结果同时产出来源条`() {
+        val usable = ExpiryPolicy.apply(documents(), today)
+        val outcome = AssistantFormatters.knowledge(
+            hits = KeywordRetriever.search("图书馆开放时间", usable, topK = 5),
+            totalDocuments = usable.size,
+            query = "图书馆开放时间",
+        )
+
+        assertTrue(outcome.sources.isNotEmpty())
+        assertTrue(outcome.sources.first().marker == "K1")
+        assertTrue(outcome.sources.first().title == "图书馆开放时间")
+        assertTrue(outcome.sources.first().meta.contains("图书馆官网"))
+        assertTrue(outcome.sources.first().meta.contains("2025-09-20"))
     }
 
     @Test

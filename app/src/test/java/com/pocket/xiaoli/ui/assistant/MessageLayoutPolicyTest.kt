@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.ui.assistant
 
-import com.pocket.xiaoli.data.agent.ChatRole
+import com.pocket.xiaoli.ui.theme.MinimalSkin
+import com.pocket.xiaoli.ui.theme.VividSkin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -19,60 +20,33 @@ class MessageLayoutPolicyTest {
 
     // ────────────────────────── 轮距 ──────────────────────────
 
-    private fun userTurn() = ChatTurn(
-        key = "u",
-        user = AssistantUiMessage(ChatRole.USER, "问"),
-        reasoning = "", reasoningSeconds = 0, reasoningStreaming = false,
-        answer = "", answerStreaming = false, tools = emptyList(), error = null,
-    )
-
-    private fun answerTurn() = ChatTurn(
-        key = "a",
-        user = null,
-        reasoning = "", reasoningSeconds = 0, reasoningStreaming = false,
-        answer = "答", answerStreaming = false, tools = emptyList(), error = null,
-    )
-
     @Test
-    fun `列表第一项上方不加间距`() {
-        assertEquals(TurnGap.NONE, turnGapOf(index = 0, turn = userTurn()))
-        assertEquals(TurnGap.NONE, turnGapOf(index = 0, turn = answerTurn()))
+    fun `列表第一轮上方不加间距`() {
+        assertEquals(TurnGap.NONE, roundGapOf(index = 0))
     }
 
     @Test
-    fun `用户发言是新对话的开头，上方拉开`() {
-        assertEquals(TurnGap.BETWEEN, turnGapOf(index = 3, turn = userTurn()))
-    }
-
-    @Test
-    fun `回答紧跟在提问之后，上方贴紧`() {
-        assertEquals(TurnGap.WITHIN, turnGapOf(index = 3, turn = answerTurn()))
+    fun `两段问答之间一律拉开`() {
+        assertEquals(TurnGap.BETWEEN, roundGapOf(index = 1))
+        assertEquals(TurnGap.BETWEEN, roundGapOf(index = 9))
     }
 
     /**
-     * 这条是**核心不变量**：提问与回答之间的间距必须**小于**两段对话之间的间距。
+     * 这条是**核心不变量**：一轮内部（提问与它的回答之间）必须比两段对话之间更紧。
      *
      * 改造前两者共用同一个值 —— 后果不是"不好看"，而是**一问一答读起来不像一组**。
-     * 谁将来"为了整齐"把它们调成同一个值，这里会红。
+     * 轮内走 [TurnGap.WITHIN]（`spaceSm`）、轮间走 [TurnGap.BETWEEN]（`spaceXl`），
+     * 而各皮肤可以自由调刻度，所以这条要在**每套皮肤**上都成立。
      */
     @Test
-    fun `一问一答的间距必须小于两段对话之间的间距`() {
-        val within = answerTurn().let { turnGapOf(1, it) }
-        val between = userTurn().let { turnGapOf(1, it) }
-        assertTrue(
-            "WITHIN($within) 应当比 BETWEEN($between) 更紧 —— 否则提问和回答会被推得一样远",
-            within != between,
-        )
-    }
-
-    @Test
-    fun `轮距档位没有死枚举`() {
-        val produced = setOf(
-            turnGapOf(0, userTurn()),
-            turnGapOf(1, userTurn()),
-            turnGapOf(1, answerTurn()),
-        )
-        assertEquals(TurnGap.entries.toSet(), produced)
+    fun `轮内间距必须小于轮间距 两套皮肤都成立`() {
+        listOf("Minimal" to MinimalSkin, "Vivid" to VividSkin).forEach { (name, skin) ->
+            assertTrue(
+                "$name：轮内 ${skin.spaceSm} 应比轮间 ${skin.spaceXl} 更紧 —— " +
+                    "否则提问和回答会被推得一样远",
+                skin.spaceSm < skin.spaceXl,
+            )
+        }
     }
 
     // ────────────────────────── Markdown 块距 ──────────────────────────

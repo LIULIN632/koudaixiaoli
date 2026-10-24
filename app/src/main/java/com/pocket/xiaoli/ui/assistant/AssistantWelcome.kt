@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.agent.AgentPhase
+import com.pocket.xiaoli.data.knowledge.AssistantTool
 import com.pocket.xiaoli.ui.components.SectionCaption
 import com.pocket.xiaoli.ui.theme.AiAvatar
 import com.pocket.xiaoli.ui.theme.CourseColors
@@ -111,12 +112,22 @@ internal data class AssistantPrompt(
      * 插在中间会让 5 条 prompt 的实参整体错位。
      */
     val iconFilled: ImageVector = icon,
+
+    /**
+     * 这条问题依赖哪些工具。
+     *
+     * 追问 chips 用它做**上下文排序**：本轮刚查过课表，就优先推荐与课表相关的问题；
+     * 空态欢迎页不看这个字段。刻意空集合也合法 —— 表示"与具体工具无关"，
+     * 排序时落到兜底位。
+     */
+    val relatedTools: Set<AssistantTool> = emptySet(),
 )
 
 /**
  * 建议问题的**唯一真源**。
  *
- * 两个消费方：空态欢迎页（前四条做大卡、其余收成小胶囊）与回答下方的追问 chips（只用 [title]）。
+ * 两个消费方：空态欢迎页（前四条做大卡、其余收成小胶囊）与回答下方的追问 chips
+ *（读 [AssistantPrompt.title] 与 [AssistantPrompt.relatedTools]）。
  * 刻意**不各写一份**：两处一旦漂移，用户会看到"空态推荐问 A、追问推荐问 B"，
  * 而且删掉某个问题时必然漏掉一处。
  *
@@ -131,20 +142,23 @@ internal data class AssistantPrompt(
  * 「我还差多少学分？」（2026-10 新增）满足这条：它读的是「服务 → 修课情况」留下的
  * **本地快照**，与「我绩点多少？」同构（都需要用户先查过一次）—— 没查过时会得到
  * 一句"先去修课情况查一次"，那是**可操作的指引**，不是"答不上来"。
+ *
+ * 新增一条时**必须同时填 [AssistantPrompt.relatedTools]**：追问排序靠它判断
+ * "这条问题与本轮刚查的数据相不相关"，留空会让它永远只能当兜底项。
  */
 internal val ASSISTANT_PROMPTS: List<AssistantPrompt> = listOf(
     // 副标题压在 8 个字以内：360dp 的双列卡内容宽约 130dp，12sp 下 11 个字会折成两行，
     // 同一行的两张卡就一高一低。短一句反而更有力。
-    AssistantPrompt(Icons.Outlined.CalendarMonth, "今天有什么课？", "列出今天全部课程", 0, iconFilled = Icons.Filled.CalendarMonth),
-    AssistantPrompt(Icons.Outlined.Schedule, "下节课在哪？", "含楼栋、楼层和教室", 3, iconFilled = Icons.Filled.Schedule),
-    AssistantPrompt(Icons.Outlined.TaskAlt, "还有什么作业没做？", "按截止日期排好", 6, iconFilled = Icons.Filled.TaskAlt),
-    AssistantPrompt(Icons.Outlined.Grade, "我绩点多少？", "读的是本机存档的成绩", 9, iconFilled = Icons.Filled.Grade),
-    AssistantPrompt(Icons.Outlined.School, "我还差多少学分？", "读修课情况留下的数据", 12, iconFilled = Icons.Filled.School),
-    AssistantPrompt(Icons.Outlined.MeetingRoom, "A101 在哪？", "在教室分布图里定位", 15, iconFilled = Icons.Filled.MeetingRoom),
+    AssistantPrompt(Icons.Outlined.CalendarMonth, "今天有什么课？", "列出今天全部课程", 0, iconFilled = Icons.Filled.CalendarMonth, relatedTools = setOf(AssistantTool.TODAY_COURSES)),
+    AssistantPrompt(Icons.Outlined.Schedule, "下节课在哪？", "含楼栋、楼层和教室", 3, iconFilled = Icons.Filled.Schedule, relatedTools = setOf(AssistantTool.NEXT_COURSE)),
+    AssistantPrompt(Icons.Outlined.TaskAlt, "还有什么作业没做？", "按截止日期排好", 6, iconFilled = Icons.Filled.TaskAlt, relatedTools = setOf(AssistantTool.TODOS)),
+    AssistantPrompt(Icons.Outlined.Grade, "我绩点多少？", "读的是本机存档的成绩", 9, iconFilled = Icons.Filled.Grade, relatedTools = setOf(AssistantTool.MY_GRADES)),
+    AssistantPrompt(Icons.Outlined.School, "我还差多少学分？", "读修课情况留下的数据", 12, iconFilled = Icons.Filled.School, relatedTools = setOf(AssistantTool.ACADEMIC_PROGRESS)),
+    AssistantPrompt(Icons.Outlined.MeetingRoom, "A101 在哪？", "在教室分布图里定位", 15, iconFilled = Icons.Filled.MeetingRoom, relatedTools = setOf(AssistantTool.CAMPUS_LOCATION)),
     // 天气两问：都落在 `get_weather` 的报告范围内（未来 12 小时 + 今明两天），
     // 不多不少 —— 「这周末下雨吗」这类问题工具答不了，所以不放。
-    AssistantPrompt(Icons.Outlined.Umbrella, "今天要带伞吗？", "看未来 12 小时降水", 1, iconFilled = Icons.Filled.Umbrella),
-    AssistantPrompt(Icons.Outlined.Thermostat, "明天穿什么？", "按明天的温度给建议", 4, iconFilled = Icons.Filled.Thermostat),
+    AssistantPrompt(Icons.Outlined.Umbrella, "今天要带伞吗？", "看未来 12 小时降水", 1, iconFilled = Icons.Filled.Umbrella, relatedTools = setOf(AssistantTool.WEATHER)),
+    AssistantPrompt(Icons.Outlined.Thermostat, "明天穿什么？", "按明天的温度给建议", 4, iconFilled = Icons.Filled.Thermostat, relatedTools = setOf(AssistantTool.WEATHER)),
 )
 
 /**

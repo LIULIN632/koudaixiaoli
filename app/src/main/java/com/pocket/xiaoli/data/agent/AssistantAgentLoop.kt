@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.data.agent
 
 import com.pocket.xiaoli.data.knowledge.AssistantCard
+import com.pocket.xiaoli.data.knowledge.AssistantSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -42,6 +43,13 @@ sealed interface AgentEvent {
          * 从它反解数字等于两套口径。详见 `AssistantCard`。
          */
         val card: AssistantCard? = null,
+        /**
+         * 该工具真实返回的**出处**（目前只有校园知识库有）。
+         *
+         * 与 [card] 同一纪律：只给界面、不落库、不进上下文。界面据此渲染来源条，
+         * **不解析模型正文** —— 否则模型编一个 `[K9]` 就会被配一条假出处。
+         */
+        val sources: List<AssistantSource> = emptyList(),
     ) : AgentEvent
 
     /** 本轮结束的最终回答（纯文本，已含模型对工具结果的解读）。 */
@@ -236,6 +244,7 @@ class AssistantAgentLoop(
                         preview = previewOf(result.text),
                         failed = isToolFailure(result.text),
                         card = result.card,
+                        sources = result.sources,
                     )
                 )
                 turn += ChatMessage(

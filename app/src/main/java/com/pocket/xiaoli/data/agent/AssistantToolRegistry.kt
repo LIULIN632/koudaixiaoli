@@ -128,28 +128,24 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.TODAY_COURSES,
-                name = "get_today_courses",
                 description = "查询今天（当前星期几、当前教学周）的全部课程，含节次、起止时间、教室与楼栋位置。" +
                     "用户问「今天有什么课」「今天几节课」「今天要不要上课」时调用。无参数。",
             ),
             legacySpec(
                 container = container,
                 tool = AssistantTool.NEXT_COURSE,
-                name = "get_next_course",
                 description = "查询从今天起的下一节课（会往后找最多 7 天），含是今天/明天/几天后、节次、时间、教室。" +
                     "用户问「下节课是什么」「下一节课在哪」「接下来有课吗」时调用。无参数。",
             ),
             legacySpec(
                 container = container,
                 tool = AssistantTool.TODOS,
-                name = "get_pending_todos",
                 description = "查询当前未完成的作业与待办事项，含课程名、内容、截止日期。" +
                     "用户问「有什么作业」「还有哪些待办」「作业截止到什么时候」时调用。无参数。",
             ),
             legacySpec(
                 container = container,
                 tool = AssistantTool.MY_GRADES,
-                name = "get_grades",
                 description = "查询本地已存档的成绩。传入课名会返回该课成绩，不传或传空则返回整体统计（门数、平均分、平均绩点、不及格门数）。" +
                     "用户问「高数多少分」「我绩点多少」「有没有挂科」时调用。" +
                     "注意：数据来自用户本地存档，若为空需提示用户先去「服务 → 成绩查询」存档。",
@@ -159,7 +155,6 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.EXAMS,
-                name = "get_exams",
                 description = "查询已录入的考试安排（日期、时间、考场、座位号）。传入课程名只答那一门，不传则列出全部未完成的考试。" +
                     "用户问「我什么时候考试」「考试安排」「高数在哪考」「还有几门没考」时调用。" +
                     "数据来自用户从教务通知录入的本地记录；若为空，需提示用户去「服务 → 考试安排」粘贴通知录入。",
@@ -169,7 +164,6 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.WEATHER,
-                name = "get_weather",
                 description = "查询烟台当前天气、未来 12 小时与今明两天的预报：现象、温度、体感、降水概率、风、紫外线。" +
                     "用户问「今天天气怎么样」「现在多少度」「要带伞吗」「明天冷不冷」「明天穿什么」时调用。无参数。" +
                     "数据来自 Open-Meteo 的**烟台市**坐标，不是校区实测 —— 回答时不要把它说成教学楼或校园里的实测数据。",
@@ -177,7 +171,6 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.ACADEMIC_PROGRESS,
-                name = "get_academic_progress",
                 description = "查询培养方案（毕业学分）进度：总要求/已获/还差多少学分、哪些课程类型还缺学分、" +
                     "哪些课还没修、某门课修了没（含成绩与建议修读学年学期）。" +
                     "用户问「我还差多少学分」「哪些课没修」「学分修够了吗」「形势与政策修了没」「离毕业还差什么」时调用。" +
@@ -189,7 +182,6 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.CAMPUS_LOCATION,
-                name = "find_classroom",
                 description = "用房间号反查教室位置，返回楼栋、楼层、教室类型与容量。" +
                     "用户问「A101 在哪」「3104 怎么走」「XX 教室在几楼」时调用。",
                 paramName = "room",
@@ -198,7 +190,6 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.CAMPUS_SERVICE,
-                name = "find_campus_service",
                 description = "在校园服务目录里查找服务入口（校园卡、电费、洗衣、热水、图书馆、空教室、选课、评教等），" +
                     "返回服务名、服务商与打开渠道。" +
                     "用户问「电费在哪交」「校园卡怎么绑定」「洗衣用什么 App」「图书馆入口」时调用。",
@@ -208,7 +199,6 @@ object AssistantToolBindings {
             legacySpec(
                 container = container,
                 tool = AssistantTool.SEARCH_KNOWLEDGE,
-                name = "search_knowledge",
                 description = "查询校园知识库：学校规章制度（补考重修、学分绩点、请假规定）、" +
                     "场馆开放时间（图书馆、食堂、体育馆）、办事流程（奖学金申请、医保报销、转专业）、" +
                     "以及近期通知（放假安排、临时闭馆）。" +
@@ -229,13 +219,12 @@ object AssistantToolBindings {
     private fun legacySpec(
         container: AppContainer,
         tool: AssistantTool,
-        name: String,
         description: String,
         paramName: String? = null,
         paramDescription: String? = null,
     ): AssistantToolSpec = AssistantToolSpec(
         tool = tool,
-        name = name,
+        name = tool.functionName,
         description = description,
         parameters = if (paramName == null) {
             emptyParameters()

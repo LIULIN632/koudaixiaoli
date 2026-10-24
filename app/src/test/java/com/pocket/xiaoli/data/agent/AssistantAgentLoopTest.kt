@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.data.agent
 
 import com.google.gson.JsonObject
+import com.pocket.xiaoli.data.knowledge.AssistantSource
 import com.pocket.xiaoli.data.knowledge.AssistantTool
 import com.pocket.xiaoli.data.knowledge.ToolOutcome
 import kotlinx.coroutines.flow.Flow
@@ -123,6 +124,41 @@ class AssistantAgentLoopTest {
         val requested = persisted.flatMap { it.toolCalls }.map { it.id }.toSet()
         val responded = persisted.filter { it.role == ChatRole.TOOL }.mapNotNull { it.toolCallId }.toSet()
         assertEquals(requested, responded)
+    }
+
+    @Test
+    fun `工具返回的来源随 ToolFinished 透传给界面`() = runBlocking {
+        val source = AssistantSource(
+            marker = "K1",
+            title = "图书馆开放时间",
+            meta = "更新于 2025-09-20",
+            snippet = "平时 07:00-22:00",
+        )
+        val registry = AssistantToolRegistry(
+            listOf(
+                AssistantToolSpec(
+                    tool = AssistantTool.SEARCH_KNOWLEDGE,
+                    name = "search_knowledge",
+                    description = "知识库",
+                    parameters = JsonObject().apply { addProperty("type", "object") },
+                    handler = { ToolOutcome("命中一条", sources = listOf(source)) },
+                )
+            )
+        )
+        val scripted = ScriptedSource(
+            listOf(
+                { toolCallRound(ToolCall("c1", "search_knowledge", "{}")) },
+                { reply("平时 07:00-22:00 开放[K1]。") },
+            )
+        )
+
+        val finished = AssistantAgentLoop(scripted, registry)
+            .run("图书馆几点开门", emptyList())
+            .toList()
+            .filterIsInstance<AgentEvent.ToolFinished>()
+            .single()
+
+        assertEquals(listOf(source), finished.sources)
     }
 
     // ── 熔断降级 ──

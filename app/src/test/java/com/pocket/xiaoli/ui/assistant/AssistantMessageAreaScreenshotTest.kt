@@ -12,14 +12,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.pocket.xiaoli.data.agent.ChatRole
 import com.pocket.xiaoli.data.knowledge.AssistantCard
+import com.pocket.xiaoli.data.knowledge.AssistantSource
+import com.pocket.xiaoli.data.knowledge.AssistantTool
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
@@ -111,6 +117,7 @@ class AssistantMessageAreaScreenshotTest {
         failed: Boolean = false,
         running: Boolean = false,
         card: AssistantCard? = null,
+        sources: List<AssistantSource> = emptyList(),
     ) =
         AssistantUiMessage(
             role = ChatRole.TOOL,
@@ -118,8 +125,21 @@ class AssistantMessageAreaScreenshotTest {
             toolName = name,
             toolFailed = failed,
             card = card,
+            sources = sources,
             id = if (running) RUNNING_TOOL_ID else java.util.UUID.randomUUID().toString(),
         )
+
+    /** 四轮对话：前两轮会被折起来，后两轮保持展开。 */
+    private val longConversation = listOf(
+        user("明天第一节在哪上课？"),
+        answer("第一节在 **A-302**，08:00 开始，别迟到。"),
+        user("图书馆几点开门？"),
+        answer("平时 **07:00-22:00**，考试周延长到 23:30。"),
+        user("我绩点多少？"),
+        answer("你的平均绩点是 **3.42**。"),
+        user("今天有什么课？"),
+        answer("今天 3 节课：高数、大物、线代。"),
+    )
 
     private val cases = listOf(
         // ① 正常一轮：用户气泡 + 无气泡正文（含加粗/列表/代码块）+ 轮末操作条
@@ -254,7 +274,59 @@ class AssistantMessageAreaScreenshotTest {
                 answer("你还差 **75.0 学分**。缺得最多的是「学科专业教育平台」（还差 40.0 学分）。"),
             ),
         ),
+        // ⑨ 引用来源：回答正文保留 [K1]/[K2]，下方来源条默认收起
+        //
+        // 这一格盯的是"正文编号与来源条编号是否对得上"，以及来源条会不会把回答顶得太远。
+        // 展开态见单独的 `引用来源展开截图`（折叠栏是用户手点的 rememberSaveable，
+        // 展开态只能靠真实点击取得，与思考链/工具脚注同一理由）。
+        Case(
+            name = "52-turn-sources",
+            messages = listOf(
+                user("图书馆几点开门？"),
+                tool(
+                    name = "校园知识库",
+                    preview = "[K1] 图书馆开放时间 / 更新于 2025-09-20 / 责任人：图书馆",
+                    sources = listOf(
+                        AssistantSource(
+                            marker = "K1",
+                            title = "图书馆开放时间",
+                            meta = "来源：图书馆官网\n更新于 2025-09-20 · 责任人：图书馆",
+                            snippet = "平时开放时间：周一至周五 07:00-22:00；考试周延长至 23:30。",
+                        ),
+                        AssistantSource(
+                            marker = "K2",
+                            title = "考试周延长开放通知",
+                            meta = "来源：图书馆通知 · 更新于 2025-12-15",
+                            snippet = "期末考试周期间，图书馆闭馆时间由 22:00 延长至 23:30。",
+                            url = "https://www.example.edu.cn/library-hours",
+                        ),
+                    ),
+                ),
+                answer(
+                    "图书馆平时 **07:00-22:00** 开放，考试周延长到 23:30[K1][K2]。\n\n" +
+                        "建议考试周去之前再看一眼当天的通知。"
+                ),
+            ),
+        ),
+        // ⑩ 长对话折叠：4 轮时前两轮自动收成一行摘要，最近两轮保持展开
+        //
+        // 这一格盯的是「折叠后还认不认得出聊过什么」：摘要必须是用户原话，
+        // 而且折叠条与展开轮之间的节奏不能被压平（否则看起来像一条分隔线）。
+        Case(
+            name = "55-turn-folded",
+            messages = longConversation,
+        ),
+        // 暗色：折叠条用的是 surfaceCard + 主色浅描边，必须确认它在深底上仍有边界，
+        // 而不是糊成一条与背景同色的横带
+        Case(
+            name = "57-turn-folded-dark",
+            dark = true,
+            messages = longConversation,
+        ),
     )
+
+    /** 与 `52-turn-sources` 同一份内容，只用于点开后的展开态基线。 */
+    private val sourcesExpandedCase = cases.first { it.name == "52-turn-sources" }
 
     @Test
     fun `消息区各状态截图`() {
@@ -295,28 +367,60 @@ class AssistantMessageAreaScreenshotTest {
     private fun MessageArea(case: Case) {
         val skin = LocalSkin.current
         val colors = LocalPocketXiaoliColors.current
-        val turns = case.messages.toTurns()
+        val rounds = case.messages.toTurns().toRounds()
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colors.surfaceBase),
             contentPadding = PaddingValues(horizontal = skin.spaceLg, vertical = skin.spaceWide),
-            // 轮距逐项算，与生产同一份策略（turnGapOf）—— 不在这里另写一套间距
+            // 轮距逐项算，与生产同一份策略（roundGapOf）—— 不在这里另写一套间距
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            itemsIndexed(items = turns, key = { _, turn -> turn.key }) { index, turn ->
-                Column(modifier = Modifier.padding(top = turnGapOf(index, turn).toDp())) {
-                    ChatTurn(
-                        turn = turn,
-                        // 与生产一致：runningTool 只挂在最后一个 turn 上
-                        runningTool = case.runningTool.takeIf { turn.key == turns.last().key },
-                        streaming = case.streaming,
+            itemsIndexed(items = rounds, key = { _, round -> round.key }) { index, round ->
+                Column(modifier = Modifier.padding(top = roundGapOf(index).toDp())) {
+                    FoldableRound(
+                        index = index,
+                        total = rounds.size,
+                        round = round,
+                        // 与生产一致：「正在查 / 正在答」只挂在最后一段对话上
+                        runningTool = case.runningTool.takeIf { index == rounds.lastIndex },
+                        streaming = case.streaming && index == rounds.lastIndex,
                         onRetry = {},
                         onRegenerate = {},
+                        showReasoning = true,
                     )
                 }
             }
         }
+    }
+
+    /**
+     * 引用来源的**展开态**。
+     *
+     * 与 `47` / `48` 同一理由单独渲：折叠状态是 `rememberSaveable`，没法从外部注入，
+     * 只能用真实点击把它打开 —— 顺便把"读屏能不能说出开合状态"与触摸高度一起守住。
+     */
+    @Test
+    fun `引用来源展开截图`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                MessageArea(sourcesExpandedCase)
+            }
+        }
+
+        val pill = composeRule.onNodeWithText("来源 2 条")
+        pill.assertIsToggleable()
+        pill.assertIsOff()
+        pill.assertHeightIsAtLeast(44.dp)
+        pill.performClick()
+        pill.assertIsOn()
+
+        composeRule.onNodeWithText("图书馆开放时间").assertExists()
+        composeRule.onNodeWithText("打开原文").assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/53-turn-sources-expanded.png")
     }
 
     /**
@@ -385,5 +489,83 @@ class AssistantMessageAreaScreenshotTest {
         // ⚠️ 顺带守触摸高度：chip 天然长得矮，而 44dp 是本项目的无障碍底线。
         // 这一层在截图上**完全看不出来**（12dp 与 14dp 的差别目测不出来）。
         composeRule.onNodeWithText("今天有什么课？").assertHeightIsAtLeast(44.dp)
+    }
+
+    /**
+     * 上下文追问：本轮查过课表、且用户已经问过「今天有什么课？」之后，下方剩哪几条。
+     *
+     * 与 `48` 的差别是**数量与顺序都由 [FollowUpPlanner] 现算**：
+     * 问过的那条被剔除，剩下的按候选词原顺序补足三条。
+     * 单独留一张图，是为了让"推荐会随上下文变"这件事有视觉证据 ——
+     * 只看 UI 代码看不出 5 条是怎么变成 3 条的。
+     */
+    @Test
+    fun `上下文推荐追问截图`() {
+        val prompts = FollowUpPlanner.plan(
+            tools = setOf(AssistantTool.TODAY_COURSES),
+            asked = listOf("今天有什么课？"),
+        )
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                val colors = LocalPocketXiaoliColors.current
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.surfaceBase)
+                        .padding(vertical = 24.dp),
+                ) {
+                    FollowUpChips(onPick = {}, prompts = prompts)
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/54-followup-context.png")
+
+        composeRule.onNodeWithText("下节课在哪？").assertHeightIsAtLeast(44.dp)
+        composeRule.onNodeWithText("今天有什么课？").assertDoesNotExist()
+    }
+
+    /**
+     * 旧轮次折叠：**折叠不是"删掉历史"**，而是收成一行可点开的摘要。
+     *
+     * 这条断言守的是四件事，全都没法只靠看图确认：
+     * ① 折叠条带开合语义（读屏要能说出"已收起"）；
+     * ② 触摸高度 ≥44dp；
+     * ③ 收起时正文**真的不渲染**（不是透明度 0，否则读屏仍会念出来）；
+     * ④ 点一下之后原文回来 —— 摘要条与正文能互换，而不是单向消失。
+     *
+     * 最近两轮不折：这里的第三、四轮在任何时刻都得是展开的。
+     */
+    @Test
+    fun `旧轮次折叠展开截图`() {
+        val folded = cases.first { it.name == "55-turn-folded" }
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                MessageArea(folded)
+            }
+        }
+
+        val header = composeRule.onNodeWithText("明天第一节在哪上课？")
+        header.assertIsToggleable()
+        header.assertIsOff()
+        header.assertHeightIsAtLeast(44.dp)
+        // 收起的轮次正文不在组合树里 —— 历史仍可从摘要条点开
+        composeRule.onNodeWithText("第一节在 A-302", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("平时 07:00-22:00", substring = true).assertDoesNotExist()
+        // 最近两轮保持展开，否则用户一进来只看到两行标题，会以为回答没了
+        composeRule.onNodeWithText("3.42", substring = true).assertExists()
+        composeRule.onNodeWithText("今天 3 节课", substring = true).assertExists()
+
+        header.performClick()
+        // 展开后标题改成"收起第 N 轮"，所以要用新文案重新找那个开合节点
+        composeRule.onNodeWithText("收起第 1 轮").assertIsOn()
+        composeRule.onNodeWithText("第一节在 A-302", substring = true).assertExists()
+
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/56-turn-folded-expanded.png")
     }
 }

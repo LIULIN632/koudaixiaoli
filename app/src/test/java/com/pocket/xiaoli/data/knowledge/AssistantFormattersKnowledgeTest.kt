@@ -25,12 +25,15 @@ class AssistantFormattersKnowledgeTest {
         updatedAt: Long? = null,
         effectiveFrom: LocalDate? = null,
         owner: String = "",
+        sourceLabel: String = "图书馆官网",
+        sourceUrl: String? = null,
     ): KnowledgeHit {
         val document = KnowledgeDocument(
             id = "场馆信息/图书馆开放时间",
             title = title,
             body = snippet,
-            sourceLabel = "图书馆官网",
+            sourceLabel = sourceLabel,
+            sourceUrl = sourceUrl,
             updatedAt = updatedAt,
             effectiveFrom = effectiveFrom,
             owner = owner,
@@ -56,7 +59,7 @@ class AssistantFormattersKnowledgeTest {
             ),
             totalDocuments = 3,
             query = "图书馆几点开门",
-        )
+        ).text
 
         assertTrue(output.startsWith("[K1] 图书馆开放时间"))
         assertTrue(output.contains("更新于 2025-09-20"))
@@ -70,7 +73,7 @@ class AssistantFormattersKnowledgeTest {
             hits = listOf(hit()),
             totalDocuments = 1,
             query = "图书馆",
-        )
+        ).text
 
         assertEquals("[K1] 图书馆开放时间\n平时开放时间：07:00-22:00", output)
     }
@@ -81,7 +84,7 @@ class AssistantFormattersKnowledgeTest {
             hits = listOf(hit(effectiveFrom = LocalDate.of(2025, 9, 1))),
             totalDocuments = 1,
             query = "图书馆",
-        )
+        ).text
 
         assertTrue(output.contains("自 2025-09-01 起生效"))
     }
@@ -92,7 +95,7 @@ class AssistantFormattersKnowledgeTest {
             hits = listOf(hit(title = "甲"), hit(title = "乙"), hit(title = "丙")),
             totalDocuments = 3,
             query = "问题",
-        )
+        ).text
 
         assertTrue(output.contains("[K1] 甲"))
         assertTrue(output.contains("[K2] 乙"))
@@ -106,7 +109,7 @@ class AssistantFormattersKnowledgeTest {
             hits = emptyList(),
             totalDocuments = 0,
             query = "图书馆几点开门",
-        )
+        ).text
 
         assertTrue(output.contains("暂无内容"))
         assertFalse("库里没内容时不该说「没查到」，那会让用户以为自己问错了", output.contains("没有查到"))
@@ -118,7 +121,7 @@ class AssistantFormattersKnowledgeTest {
             hits = emptyList(),
             totalDocuments = 12,
             query = "量子纠缠",
-        )
+        ).text
 
         assertTrue(output.contains("没有查到"))
         assertTrue(output.contains("量子纠缠"))
@@ -131,9 +134,63 @@ class AssistantFormattersKnowledgeTest {
             hits = emptyList(),
             totalDocuments = 1,
             query = "  补考  ",
-        )
+        ).text
 
         assertTrue(output.contains("「补考」"))
         assertFalse(output.contains("「  补考  」"))
+    }
+
+    @Test
+    fun `命中时来源条与正文编号同源`() {
+        val outcome = AssistantFormatters.knowledge(
+            hits = listOf(
+                hit(
+                    title = "甲",
+                    updatedAt = epochOf(LocalDate.of(2025, 9, 20)),
+                    owner = "图书馆",
+                    sourceLabel = "图书馆官网",
+                    sourceUrl = "https://lib.example.edu.cn/hours",
+                ),
+                hit(title = "乙", snippet = "另一段\n带换行的正文"),
+            ),
+            totalDocuments = 2,
+            query = "开放时间",
+        )
+
+        assertEquals(2, outcome.sources.size)
+        assertEquals("K1", outcome.sources[0].marker)
+        assertEquals("K2", outcome.sources[1].marker)
+        assertEquals("甲", outcome.sources[0].title)
+        assertTrue(outcome.sources[0].meta.contains("来源：图书馆官网"))
+        assertTrue(outcome.sources[0].meta.contains("更新于 2025-09-20"))
+        assertTrue(outcome.sources[0].meta.contains("责任人：图书馆"))
+        assertEquals("https://lib.example.edu.cn/hours", outcome.sources[0].url)
+        // 来源条只留两行，换行要压平；回灌给模型的 text 仍保持原样
+        assertEquals("另一段 带换行的正文", outcome.sources[1].snippet)
+        assertTrue(outcome.text.contains("另一段\n带换行的正文"))
+    }
+
+    @Test
+    fun `来源链接只接受 http 与 https`() {
+        val outcome = AssistantFormatters.knowledge(
+            hits = listOf(
+                hit(sourceUrl = "javascript:alert(1)"),
+                hit(title = "乙", sourceUrl = "http://example.edu.cn/a"),
+            ),
+            totalDocuments = 2,
+            query = "图书馆",
+        )
+
+        assertEquals(null, outcome.sources[0].url)
+        assertEquals("http://example.edu.cn/a", outcome.sources[1].url)
+    }
+
+    @Test
+    fun `空库与未命中都不产出来源`() {
+        val empty = AssistantFormatters.knowledge(emptyList(), 0, "图书馆")
+        val miss = AssistantFormatters.knowledge(emptyList(), 5, "量子纠缠")
+
+        assertTrue(empty.sources.isEmpty())
+        assertTrue(miss.sources.isEmpty())
     }
 }

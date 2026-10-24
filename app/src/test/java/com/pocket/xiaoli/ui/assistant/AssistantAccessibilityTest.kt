@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import com.pocket.xiaoli.data.agent.ChatRole
+import com.pocket.xiaoli.data.knowledge.AssistantSource
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
 import com.pocket.xiaoli.ui.theme.SkinStyle
@@ -71,10 +72,14 @@ class AssistantAccessibilityTest {
         streaming = streaming,
     )
 
-    private fun tool(name: String) = AssistantUiMessage(
+    private fun tool(
+        name: String,
+        sources: List<AssistantSource> = emptyList(),
+    ) = AssistantUiMessage(
         role = ChatRole.TOOL,
         content = "查到 3 条",
         toolName = name,
+        sources = sources,
     )
 
     private fun user(text: String) = AssistantUiMessage(ChatRole.USER, text)
@@ -158,6 +163,44 @@ class AssistantAccessibilityTest {
         pill.performClick()
         pill.assertIsOn()
         composeRule.onNodeWithText("我的成绩").assertExists()
+    }
+
+    /**
+     * 来源条：与两个过程药丸同一条规矩 —— 可展开、能说出开合状态、触摸高度达标。
+     *
+     * 来源是"回答凭什么这么说"的唯一入口，读屏用户如果打不开它，
+     * 就等于只能相信正文里那句没有出处的结论。
+     */
+    @Test
+    fun `来源条带展开收起状态语义且可点开`() {
+        composeRule.setContent {
+            Turn(
+                messages = listOf(
+                    user("图书馆几点开门"),
+                    tool(
+                        name = "校园知识库",
+                        sources = listOf(
+                            AssistantSource(
+                                marker = "K1",
+                                title = "图书馆开放时间",
+                                meta = "更新于 2025-09-20",
+                                snippet = "平时 07:00-22:00",
+                            )
+                        ),
+                    ),
+                    answer("平时 07:00-22:00 开放[K1]。"),
+                ),
+            )
+        }
+
+        val pill = composeRule.onNodeWithText("来源 1 条")
+        pill.assertIsToggleable()
+        pill.assertIsOff()
+        pill.assertHeightIsAtLeast(44.dp)
+
+        pill.performClick()
+        pill.assertIsOn()
+        composeRule.onNodeWithText("图书馆开放时间").assertExists()
     }
 
     /**
