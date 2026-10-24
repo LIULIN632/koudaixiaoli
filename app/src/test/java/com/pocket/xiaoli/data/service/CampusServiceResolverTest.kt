@@ -46,6 +46,22 @@ class CampusServiceResolverTest {
     }
 
     @Test
+    fun southCampusRepairUsesWeChatMiniProgramLink() {
+        val south = CampusConfig.byId("ytu_south")
+        val resolved = CampusServiceResolver.resolve(CampusServiceKeys.REPAIR, "报修", south)
+
+        // 南校区没有网页报修入口：必须是小程序渠道，且链接原样带过去
+        assertEquals(CampusServiceType.MINIPROGRAM, resolved?.spec?.type)
+        assertEquals(ServiceChannel.WECHAT_MP, resolved?.service?.channel)
+        assertEquals("#小程序://一键报修/jeZk5Y93kfAVRkJ", resolved?.service?.target)
+        assertEquals("一键报修", resolved?.service?.provider)
+        assertEquals(
+            CampusServiceCapability.WEB,
+            CampusServiceResolver.capabilityOf(CampusServiceKeys.REPAIR, south),
+        )
+    }
+
+    @Test
     fun todayCampusIsRegisteredAsExternalApp() {
         val main = CampusConfig.byId("ytlg_main")
         val resolved = CampusServiceResolver.resolve(

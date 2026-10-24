@@ -217,6 +217,35 @@ class AssistantWelcomeAndListScreenshotTest {
     }
 
     /**
+     * 深色模式下的欢迎页。
+     *
+     * 鲜艳卡的渐变对深浅两套主题用**不同的混合比例**（暗底要再深一档才压得住），
+     * 只录浅色图等于那一半没验过 —— 而暗色下最容易出的问题是卡色发灰、副标题糊进渐变里。
+     */
+    @Test
+    fun `深色模式欢迎页截图`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = true,
+            ) {
+                val colors = LocalPocketXiaoliColors.current
+                val skin = LocalSkin.current
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.surfaceBase)
+                        .padding(horizontal = skin.spaceLg),
+                ) {
+                    AssistantWelcome(phase = AgentPhase.IDLE, onPick = {})
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/58-welcome-dark.png")
+    }
+
+    /**
      * 建议问题卡的 **360dp 窄屏**版（2026-10 布局修复轮第④阶段）。
      *
      * 卡片右下角那枚淡水印此前是写死的 `size(76.dp) + offset(16,12)`。这组卡是双列

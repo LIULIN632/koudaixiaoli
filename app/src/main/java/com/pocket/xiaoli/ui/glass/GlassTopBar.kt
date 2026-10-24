@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
@@ -45,15 +46,34 @@ fun Modifier.glassTopBarSurface(
     backdrop: Backdrop?,
     surfaceColor: Color,
     dividerColor: Color,
-    blurRadius: Dp = 8.dp,
+    blurRadius: Dp = 12.dp,
 ): Modifier {
     val capability = GlassCapability.current
+    // 深浅由底色自己判：调用方传的是各主题的 surfaceBase，不另外引入一个 isDark 参数，
+    // 否则迟早出现"参数说亮、底色是暗"的错配。
+    val dark = surfaceColor.luminance() < 0.4f
+
+    // 没有采样源时**不能**半透明：底下那层 drawBackdrop 不存在，半透明只会让滚过的内容
+    // 生硬地透出来，读起来比实心还糟。所以"能不能磨砂"要连 backdrop 一起判，不能只看档位。
+    val hasGlass = backdrop != null && capability.canBlur
+
+    // ① 底色垫在最底下。
+    //
+    // 下面那层 drawBackdrop 采的是**内容区录下来的图层**；图层还没画出来（进页面第一帧）、
+    // 或者背后根本空无一物（空态欢迎页、短列表、滚到顶）时，模糊没有任何像素可采。
+    // 没有这层垫底，顶栏会变成一条半透明缝，看着就是"这次没开磨砂"。
+    //
+    // 但垫底只能薄薄一层：垫厚了玻璃就退化成一条不透明色带，背后内容糊得再动也透不上来。
+    // 0.40 是"淡色页面上仍能兜住标题"与"模糊还看得见"之间的折中。
+    val base = this.drawBehind {
+        drawRect(surfaceColor.copy(alpha = if (hasGlass) 0.40f else 1f))
+    }
 
     val body = if (backdrop == null || !capability.canBlur) {
-        // 磨砂档 / 没有采样源：不透明底（不能留半透明，否则内容上滚时标题读不清）
-        this.drawBehind { drawRect(surfaceColor) }
+        // 磨砂档 / 没有采样源：不描边、不加模糊，只靠底色与下面那道高光渐变表意
+        base
     } else {
-        this.drawBackdrop(
+        base.drawBackdrop(
             backdrop = backdrop,
             shape = { RectangleShape },
             effects = {
@@ -63,12 +83,13 @@ fun Modifier.glassTopBarSurface(
             highlight = null,
             shadow = null,
             onDrawSurface = {
-                // 上浓下淡：顶部保证标题可读，往下逐步透出内容
+                // 上浓下淡：顶部保证标题可读，往下逐步透出内容。
+                // 与垫底叠加后顶部约 0.75、底部约 0.60 的不透明度 —— 再实就看不见模糊了。
                 drawRect(
                     Brush.verticalGradient(
                         listOf(
-                            surfaceColor.copy(alpha = 0.72f),
-                            surfaceColor.copy(alpha = 0.55f),
+                            surfaceColor.copy(alpha = 0.58f),
+                            surfaceColor.copy(alpha = 0.34f),
                         )
                     )
                 )
@@ -77,6 +98,19 @@ fun Modifier.glassTopBarSurface(
     }
 
     return body.drawBehind {
+        // ② 上缘到中部的一道白色高光。
+        //
+        // 这是"不依赖背后内容"的那半边玻璃：即便背后是纯色、模糊看不出任何差别，
+        // 顶亮下暗的落差也会让这块材质读成"一块有厚度的玻璃"，而不是一条平色带。
+        // 深色主题下压到 0.10 —— 白高光在暗底上过于扎眼会显得脏。
+        drawRect(
+            Brush.verticalGradient(
+                0f to Color.White.copy(alpha = if (dark) 0.10f else 0.26f),
+                0.55f to Color.Transparent,
+                1f to Color.Transparent,
+            )
+        )
+        // ③ 底边发丝线：没有它，滚上来的内容会直接贴到标题上，两者糊成一片。
         val stroke = 1.dp.toPx()
         val y = size.height - stroke / 2f
         drawLine(
@@ -116,7 +150,7 @@ fun Modifier.glassChipSurface(
     backdrop: Backdrop?,
     surfaceColor: Color,
     shape: Shape = CircleShape,
-    blurRadius: Dp = 6.dp,
+    blurRadius: Dp = 8.dp,
 ): Modifier {
     val capability = GlassCapability.current
 

@@ -58,7 +58,7 @@ import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.ServiceAccent
-import com.pocket.xiaoli.ui.theme.onAccentColor
+import com.pocket.xiaoli.ui.theme.onAccentFor
 import com.pocket.xiaoli.ui.theme.serviceAccentColor
 
 /**
@@ -117,9 +117,10 @@ internal fun ElectricityContent(
                     } else {
                         "当前是「${state.campusName}」，这个校区暂时没有原生余额接口，打开校园门户一样能查。"
                     },
-                    accent = ServiceAccent.PAYMENT,
+                    accent = ServiceAccent.ENERGY,
                     actionLabel = "打开电费入口",
                     onAction = onOpenPortal,
+                    actionFollowsAccent = true,
                 )
             } else {
                 BalanceHero(state)
@@ -131,7 +132,7 @@ internal fun ElectricityContent(
                 ActionRow(state = state, onRefresh = onRefresh, onPayment = onPayment)
                 PaymentGuideCard(weChatInstalled = state.weChatInstalled, onCopyLink = onCopyLink)
                 Spacer(Modifier.height(skin.spaceXs))
-                ServiceSectionLabel(title = "账户信息", accent = ServiceAccent.PAYMENT)
+                ServiceSectionLabel(title = "账户信息", accent = ServiceAccent.ENERGY)
                 AccountCard(state)
             }
 
@@ -198,7 +199,7 @@ private fun BalanceHero(state: ElectricityViewState) {
         matchSourceLabel(detail),
     ).joinToString(" · ")
 
-    ServiceHeroCard(accent = ServiceAccent.PAYMENT) {
+    ServiceHeroCard(accent = ServiceAccent.ENERGY) {
         Row(verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -259,7 +260,7 @@ private fun BalanceHero(state: ElectricityViewState) {
 @Composable
 private fun UnsupportedHero(state: ElectricityViewState) {
     val skin = LocalSkin.current
-    ServiceHeroCard(accent = ServiceAccent.PAYMENT) {
+    ServiceHeroCard(accent = ServiceAccent.ENERGY) {
         Row(verticalAlignment = Alignment.Top) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -298,7 +299,7 @@ private fun LoadingBar() {
                 .weight(1f)
                 .height(3.dp)
                 .clip(RoundedCornerShape(50)),
-            color = colors.accentMain,
+            color = serviceAccentColor(ServiceAccent.ENERGY),
             trackColor = colors.surfaceAlt,
         )
         Spacer(Modifier.width(skin.spaceSm))
@@ -380,6 +381,8 @@ private fun ActionRow(
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val shape = RoundedCornerShape(skin.radiusCard)
+    // 主按钮跟随电费的能源色：hero 是暖金、按钮还是主题蓝的话，一屏里像两套配色
+    val accent = serviceAccentColor(ServiceAccent.ENERGY)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -406,8 +409,8 @@ private fun ActionRow(
             modifier = Modifier.weight(1.35f),
             contentPadding = PaddingValues(horizontal = skin.spaceMd, vertical = skin.spaceSm),
             colors = ButtonDefaults.buttonColors(
-                containerColor = colors.accentMain,
-                contentColor = onAccentColor(),
+                containerColor = accent,
+                contentColor = onAccentFor(accent),
             ),
         ) {
             // 文案如实说明"要去哪"：缴费只会在微信里完成，写"去缴费"会让人以为在应用内完成
@@ -479,7 +482,7 @@ private fun PaymentGuideCard(weChatInstalled: Boolean, onCopyLink: () -> Unit) {
 private fun GuideStep(index: Int, text: String) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val accent = serviceAccentColor(ServiceAccent.PAYMENT)
+    val accent = serviceAccentColor(ServiceAccent.ENERGY)
     Row(
         modifier = Modifier
             .fillMaxWidth()

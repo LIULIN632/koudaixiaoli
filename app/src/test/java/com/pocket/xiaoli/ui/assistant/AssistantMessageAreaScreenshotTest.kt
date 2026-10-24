@@ -129,6 +129,25 @@ class AssistantMessageAreaScreenshotTest {
             id = if (running) RUNNING_TOOL_ID else java.util.UUID.randomUUID().toString(),
         )
 
+    /**
+     * 一段被整段粘进来的通知：远超 6 行。
+     *
+     * 用真实的通知口吻而不是重复字：截图里要能看出"这确实是被折叠的正文"，
+     * 而不是一堆 `测试测试测试`（那种图看不出截断位置是否自然）。
+     */
+    private val longUserMessage = """
+        关于 2026 年秋季学期选课工作的通知
+
+        各学院、各位同学：
+        本学期选课将于 10 月 28 日 12:00 开放，11 月 3 日 23:59 截止。
+        请同学们登录教务系统，在「选课」页面完成操作。
+        必修课已预置，无需重复选择；选修课先到先得，额满即止。
+        选课期间如遇系统繁忙，请稍后重试，不要重复提交。
+        需要退课的同学，请在截止时间前完成，逾期不再受理。
+        重修、补修报名另行通知，请关注学院群消息。
+        如有疑问，请联系所在学院教学办公室。
+    """.trimIndent()
+
     /** 四轮对话：前两轮会被折起来，后两轮保持展开。 */
     private val longConversation = listOf(
         user("明天第一节在哪上课？"),
@@ -322,6 +341,17 @@ class AssistantMessageAreaScreenshotTest {
             name = "57-turn-folded-dark",
             dark = true,
             messages = longConversation,
+        ),
+        // ⑪ 长输入：用户整段粘贴的通知超过 6 行，气泡自动折起并给「展开全文」
+        //
+        // 这一格要同时看三件事：气泡没有被撑成半屏、底部那枚药丸有边界（不是一行裸字）、
+        // 以及"展开全文"没有把回答挤出视野。
+        Case(
+            name = "59-long-user-collapsed",
+            messages = listOf(
+                user(longUserMessage),
+                answer("选课 **10 月 28 日 12:00** 开放，**11 月 3 日 23:59** 截止；必修已预置，选修先到先得。"),
+            ),
         ),
     )
 
@@ -567,5 +597,37 @@ class AssistantMessageAreaScreenshotTest {
         composeRule.onNodeWithText("第一节在 A-302", substring = true).assertExists()
 
         composeRule.onRoot().captureRoboImage("src/test/screenshots/56-turn-folded-expanded.png")
+    }
+
+    /**
+     * 长输入自动折叠：**只折显示，不折内容**。
+     *
+     * 与旧轮次折叠同一套无障碍要求（开合语义 + 44dp 触摸区），但有两处必须单独守：
+     * ① 折叠判定来自真实排版（`onTextLayout`），所以这条用例本身就是"阈值真的会触发"的证明；
+     * ② 收起后完整原文仍在语义树里 —— 读屏用户不该因为视觉截断而丢掉用户自己发的话。
+     *    展开后再拍一张，确认"展开全文"与"收起"能互换。
+     */
+    @Test
+    fun `长输入自动折叠与展开截图`() {
+        val longUser = cases.first { it.name == "59-long-user-collapsed" }
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                MessageArea(longUser)
+            }
+        }
+
+        val toggle = composeRule.onNodeWithText("展开全文")
+        toggle.assertIsToggleable()
+        toggle.assertIsOff()
+        toggle.assertHeightIsAtLeast(44.dp)
+        // 视觉上截断，但语义里还是完整原文
+        composeRule.onNodeWithText("逾期不再受理", substring = true).assertExists()
+
+        toggle.performClick()
+        composeRule.onNodeWithText("收起").assertIsOn()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/60-long-user-expanded.png")
     }
 }

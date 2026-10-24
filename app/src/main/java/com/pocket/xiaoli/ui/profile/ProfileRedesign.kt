@@ -2,6 +2,7 @@ package com.pocket.xiaoli.ui.profile
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -175,7 +177,7 @@ fun ProfileStatsGrid(
                 iconFilled = Icons.Filled.FlashOn,
                 title = "宿舍电费",
                 hint = electricityHint(electricityBalance, electricityLoading),
-                serviceAccent = ServiceAccent.PAYMENT,
+                serviceAccent = ServiceAccent.ENERGY,
                 onClick = onElectricity
             )
             // 这一格 2026-10 从「校园余额」换成「专注计时」（用户要求）。
@@ -245,10 +247,10 @@ private fun ServiceTile(
     val cardAccent = if (colorful) serviceAccentColor(serviceAccent) else colors.accentMain
 
     // 同色渐变而不是整块平涂：上浓下淡，让四个格子有"浮起来"的层次。
-    // 下沿仍保留足够色量（0.15 / 0.20），否则卡底会褪成灰白，整页又变"灰蒙蒙"。
+    // 下沿仍保留足够色量（0.17 / 0.24），否则卡底会褪成灰白，整页又变"灰蒙蒙"。
     val fillModifier = if (colorful) {
-        val top = lerp(colors.surfaceCard, cardAccent, if (isDark) 0.36f else 0.30f)
-        val bottom = lerp(colors.surfaceCard, cardAccent, if (isDark) 0.20f else 0.15f)
+        val top = lerp(colors.surfaceCard, cardAccent, if (isDark) 0.44f else 0.36f)
+        val bottom = lerp(colors.surfaceCard, cardAccent, if (isDark) 0.24f else 0.17f)
         Modifier.background(Brush.verticalGradient(listOf(top, bottom)))
     } else {
         Modifier.background(colors.surfaceCard)
@@ -267,56 +269,103 @@ private fun ServiceTile(
     } else {
         Modifier
     }
+    // 1dp 描边：淡彩底与页底都是浅色，没有边界时卡片右缘会"化"进背景。
+    // 极简皮肤改用分隔线色 —— 它靠灰底白卡分层，彩色描边会破坏克制感。
+    val edge = if (colorful) {
+        cardAccent.copy(alpha = if (isDark) 0.34f else 0.22f)
+    } else {
+        colors.borderDivider.copy(alpha = 0.7f)
+    }
+    val chipShape = RoundedCornerShape(skin.radiusChip)
 
-    Column(
+    Box(
         modifier = modifier
             .then(shadowModifier)
             .clip(shape)
             .then(fillModifier)
+            .border(1.dp, edge, shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = rememberSinkIndication(), onClick = onClick)
-            .padding(skin.spaceLg)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // 图标从"裸线条"改成实心色块：给每格一个视觉锚点，也让点按目标更明确
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(skin.radiusChip))
-                    .background(if (colorful) cardAccent else colors.surfaceHighlight),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (iconPresentation.filled) iconFilled else icon,
-                    contentDescription = null,
-                    // 压在实心色块上，用对比度更高的前景，而不是一律写死白色
-                    tint = if (colorful) onAccentFor(cardAccent) else colors.accentMain,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.weight(1f))
+        if (colorful) {
+            // 右下角一枚放大的半透明图标：纯渐变之外再给一层"底纹"，卡片不再是一块色板。
+            // 不承载信息、不进语义树（contentDescription = null），只在视觉上增加纵深。
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = if (iconPresentation.filled) iconFilled else icon,
                 contentDescription = null,
-                tint = if (colorful) cardAccent.copy(alpha = 0.55f) else colors.textTertiary,
-                modifier = Modifier.size(18.dp),
+                tint = cardAccent.copy(alpha = if (isDark) 0.18f else 0.12f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 16.dp, y = 18.dp)
+                    .size(76.dp),
             )
         }
-        Spacer(Modifier.height(skin.spaceSm))
-        Text(
-            text = title,
-            color = colors.textPrimary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(skin.spaceMicro))
-        Text(
-            text = hint,
-            color = colors.textSecondary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+
+        Column(modifier = Modifier.padding(skin.spaceLg)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 图标从"裸线条"改成实心色块：给每格一个视觉锚点，也让点按目标更明确。
+                // 彩色态补一圈白色内描边，让 38dp 的色块也有"被光扫过"的厚度。
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(chipShape)
+                        .background(if (colorful) cardAccent else colors.surfaceHighlight)
+                        .then(
+                            if (colorful) {
+                                Modifier.border(1.dp, Color.White.copy(alpha = 0.22f), chipShape)
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (iconPresentation.filled) iconFilled else icon,
+                        contentDescription = null,
+                        // 压在实心色块上，用对比度更高的前景，而不是一律写死白色
+                        tint = if (colorful) onAccentFor(cardAccent) else colors.accentMain,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                // 箭头收进一枚 26dp 的同色圆：既画出"这里能点"的边界，又不和标题抢色。
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (colorful) {
+                                cardAccent.copy(alpha = if (isDark) 0.22f else 0.13f)
+                            } else {
+                                colors.surfaceHighlight
+                            }
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = if (colorful) cardAccent else colors.textTertiary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(skin.spaceSm))
+            Text(
+                text = title,
+                color = colors.textPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(skin.spaceMicro))
+            Text(
+                text = hint,
+                color = colors.textSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

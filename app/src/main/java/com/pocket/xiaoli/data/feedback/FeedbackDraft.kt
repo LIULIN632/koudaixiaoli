@@ -31,8 +31,51 @@ data class FeedbackDraft(
     /** 是否附带版本 / 机型 / 系统。**默认关**：不勾就一个字节设备信息都不带。 */
     val includeDiagnostics: Boolean = false,
 ) {
-    /** 正文至少几个字才算一条能看的反馈。 */
-    val isSendable: Boolean get() = content.trim().length >= FeedbackFormatter.MIN_CONTENT_LENGTH
+    /** 正文在可发送区间内：太短定位不了问题，太长会把表格和本地队列撑爆。 */
+    val isSendable: Boolean
+        get() = content.trim().length in FeedbackFormatter.MIN_CONTENT_LENGTH..FeedbackLimits.MAX_CONTENT_LENGTH
+}
+
+/**
+ * 提交侧的闸门。没有服务端验证，客户端限流是唯一能挡住「拿这个包刷表」的东西。
+ *
+ * 常量集中在这里，UI 只引用不另写数值 —— 两处各写一份，改了一处就等于没改。
+ */
+object FeedbackLimits {
+
+    const val MAX_CONTENT_LENGTH = 2000
+
+    const val MAX_CONTACT_LENGTH = 120
+
+    /** 两条「直接发送」之间至少隔一分钟。复制/邮件/GitHub 不受这条限制。 */
+    const val COOLDOWN_MILLIS = 60_000L
+
+    const val DAILY_MAX = 5
+
+    /** 本地待发队列上限。满了就让用户先手动发，不再往队列里塞。 */
+    const val MAX_PENDING = 5
+
+    /**
+     * 提交闸门的纯函数部分。日期切分（今天提了几条）由 [FeedbackStore] 负责，
+     * 这里只判断「现在这次能不能提」，便于单测。
+     */
+    fun gate(nowMillis: Long, lastSubmitAt: Long, todayCount: Int): SubmitGate {
+        if (lastSubmitAt > 0L) {
+            val elapsed = nowMillis - lastSubmitAt
+            if (elapsed < COOLDOWN_MILLIS) {
+                val left = (COOLDOWN_MILLIS - elapsed).coerceIn(1_000L, COOLDOWN_MILLIS)
+                return SubmitGate.Cooling(left / 1000L)
+            }
+        }
+        if (todayCount >= DAILY_MAX) return SubmitGate.DailyLimit
+        return SubmitGate.Ok
+    }
+}
+
+sealed interface SubmitGate {
+    data object Ok : SubmitGate
+    data class Cooling(val secondsLeft: Long) : SubmitGate
+    data object DailyLimit : SubmitGate
 }
 
 /**
@@ -48,11 +91,19 @@ object FeedbackFormatter {
     const val MIN_CONTENT_LENGTH = 5
     const val SUBJECT = "口袋小鲤 · 意见反馈"
 
-    /** 工单号：`FB + 日期 + 4 位十六进制`。同日多条靠 [salt] 区分。 */
-    fun ticketId(nowMillis: Long, salt: Int): String {
-        val day = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date(nowMillis))
-        val mixed = ((nowMillis / 1000L) xor (salt.toLong() * 2654435761L)).toInt()
-        return "FB$day-" + String.format(Locale.US, "%04X", mixed and 0xFFFF)
+    /**
+     * 工单号：`T` + 年月日（yyMMdd）+ 6 位十六进制随机。
+     *
+     * 旧格式 `FB20261018-00FF` 只有 16 位尾号，且由「时间秒 xor 内容哈希」推出：
+     * 同一天提两条一样的话就是同一个号，而撞号意味着两个人的回复串门。
+     * 现在日期只负责可读，唯一性交给 24 位随机（约 1600 万/天），
+     * 叠加 60 秒冷却后，同一台设备实际不会撞。
+     *
+     * @param random 24 位随机数。UI 传随机值，测试传固定值。
+     */
+    fun ticketId(nowMillis: Long, random: Int): String {
+        val day = SimpleDateFormat("yyMMdd", Locale.US).format(Date(nowMillis))
+        return "T$day" + String.format(Locale.US, "%06X", random and 0xFFFFFF)
     }
 
     /** 设备信息。只在用户勾了「附带设备信息」时才拼进正文。 */

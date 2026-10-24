@@ -26,6 +26,10 @@ object CampusServiceRegistry {
     private const val YTU_SOUTH_WATER_ALIPAY = ALIPAY_PREFIX + "https://ur.alipay.com/_6ieUaYIW8aFebTkPEcIUw"
     private const val YTU_SOUTH_ELECTRICITY_URL = "https://ydny.ytu.edu.cn/pms/wechat/ytdx/payItemAdd"
 
+    /** 烟大南校区「一键报修」微信小程序。微信不允许第三方 App 直接拉起小程序，
+     * [SchoolServiceLauncher] 的做法是复制这段文本到剪贴板再拉起微信，由微信识别成小程序卡片。 */
+    private const val YTU_SOUTH_REPAIR_MP = "#小程序://一键报修/jeZk5Y93kfAVRkJ"
+
     private val COMMON_SPECS: Map<String, CampusServiceSpec> = mapOf(
         KEY_TODAY_CAMPUS to CampusServiceSpec(
             id = KEY_TODAY_CAMPUS,
@@ -114,6 +118,18 @@ object CampusServiceRegistry {
                 target = YTU_SOUTH_ELECTRICITY_URL,
                 requiresAuth = true,
                 dormZoneAware = true,
+            ),
+            // 南校区的报修没有网页入口，只有后勤的微信小程序。这里不能登记成 WEBVIEW
+            //（那会打开一个打不开的链接），必须走 MINIPROGRAM 渠道：
+            // 复制小程序路径 → 拉起微信 → 用户粘贴进入。
+            CampusServiceKeys.REPAIR to CampusServiceSpec(
+                id = CampusServiceKeys.REPAIR,
+                name = "报修",
+                category = "life",
+                type = CampusServiceType.MINIPROGRAM,
+                priority = 10,
+                provider = "一键报修",
+                target = YTU_SOUTH_REPAIR_MP,
             ),
         ),
     )

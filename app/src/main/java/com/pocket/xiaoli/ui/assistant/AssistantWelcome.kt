@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -255,8 +256,8 @@ internal fun AssistantWelcome(
         val heroBrush = if (colorful) {
             Brush.linearGradient(
                 listOf(
-                    colors.accentMain.copy(alpha = if (isDark) 0.26f else 0.16f),
-                    colors.accentMain.copy(alpha = if (isDark) 0.10f else 0.05f),
+                    colors.accentMain.copy(alpha = if (isDark) 0.34f else 0.22f),
+                    colors.accentMain.copy(alpha = if (isDark) 0.14f else 0.07f),
                     colors.surfaceCard,
                 )
             )
@@ -267,7 +268,7 @@ internal fun AssistantWelcome(
                 shadow = Shadow(
                     radius = skin.shadowBlur,
                     spread = 0.dp,
-                    color = colors.accentMain.copy(alpha = if (isDark) 0.28f else 0.14f),
+                    color = colors.accentMain.copy(alpha = if (isDark) 0.34f else 0.20f),
                     offset = DpOffset(0.dp, skin.shadowOffsetY),
                 ),
             )
@@ -283,7 +284,7 @@ internal fun AssistantWelcome(
                 .border(
                     width = 1.dp,
                     color = if (colorful) {
-                        colors.accentMain.copy(alpha = if (isDark) 0.28f else 0.16f)
+                        colors.accentMain.copy(alpha = if (isDark) 0.36f else 0.22f)
                     } else {
                         colors.borderDivider
                     },
@@ -418,10 +419,10 @@ private fun WelcomeChip(icon: ImageVector, text: String) {
         modifier = Modifier
             .clip(shape)
             .background(
-                color = colors.accentMain.copy(alpha = 0.10f),
+                color = colors.accentMain.copy(alpha = 0.16f),
                 shape = shape,
             )
-            .border(1.dp, colors.accentMain.copy(alpha = 0.16f), shape)
+            .border(1.dp, colors.accentMain.copy(alpha = 0.24f), shape)
             .padding(horizontal = skin.spaceMd, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -480,14 +481,24 @@ private fun QuickPromptChip(
     val iconPresentation = currentIconPresentation()
     val tint = promptTint(prompt.tintIndex)
     val shape = RoundedCornerShape(50)
+    // 与大卡同一套"加深"取法：一头压深一档再回到原色，一排胶囊才不是一片扁色。
+    // 中性模式（纯净 / 极简）仍是一块纯卡面，不能因为这里把灰调也染上色。
+    val chipBrush = if (iconPresentation.colorful) {
+        Brush.linearGradient(
+            0f to lerp(tint.background, tint.foreground, 0.30f),
+            1f to tint.background,
+        )
+    } else {
+        SolidColor(tint.background)
+    }
     Row(
         modifier = Modifier
             .clip(shape)
-            .background(tint.background)
+            .background(brush = chipBrush, shape = shape)
             .border(
                 width = 1.dp,
                 color = if (iconPresentation.colorful) {
-                    tint.foreground.copy(alpha = 0.24f)
+                    tint.foreground.copy(alpha = 0.30f)
                 } else {
                     colors.borderDivider
                 },
@@ -598,11 +609,14 @@ private fun WelcomeCard(
     // 渐变让卡片从"一块单纯的浅色"变成有方向的色面；同色光晕把它从页面上托起来。
     // 纯净 / 极简仍是中性卡，必须补一圈描边 —— 否则白卡压在纯白页底上等于隐形。
     val cardBrush = if (colorful) {
+        // 三停渐变：深色铺满大部分面积，只在右下角淡回卡面。
+        // 早先的两停（原色 → 卡面）在浅色主题下深色只占一角，整张卡仍读成"白卡染了点色"——
+        // 用户要的是"鲜艳"，那就得让色相占到主体。加深用的仍是同一套文字色，
+        // 所以只是更浓，不会变灰变脏。
         Brush.linearGradient(
-            listOf(
-                tint.background,
-                lerp(tint.background, colors.surfaceCard, if (isDark) 0.30f else 0.55f),
-            )
+            0f to lerp(tint.background, tint.foreground, if (isDark) 0.34f else 0.30f),
+            0.6f to lerp(tint.background, tint.foreground, if (isDark) 0.18f else 0.14f),
+            1f to lerp(tint.background, colors.surfaceCard, if (isDark) 0.45f else 0.18f),
         )
     } else null
     val cardShadow = if (colorful && skin.shadowBlur > 0.dp) {
@@ -611,7 +625,7 @@ private fun WelcomeCard(
             shadow = Shadow(
                 radius = skin.shadowBlur,
                 spread = 0.dp,
-                color = tint.foreground.copy(alpha = if (isDark) 0.30f else 0.16f),
+                color = tint.foreground.copy(alpha = if (isDark) 0.36f else 0.22f),
                 offset = DpOffset(0.dp, skin.shadowOffsetY),
             ),
         )
@@ -622,7 +636,17 @@ private fun WelcomeCard(
             .then(cardShadow)
             .clip(shape)
             .then(if (cardBrush != null) Modifier.background(cardBrush) else Modifier.background(tint.background))
-            .then(if (!colorful) Modifier.border(1.dp, colors.borderDivider, shape) else Modifier)
+            // 彩色卡也给一圈同色描边：加深后的渐变与页底更接近，没有边界会"化"开；
+            // 中性卡继续用分隔线描边，否则白卡压在纯白页底上等于隐形。
+            .border(
+                width = 1.dp,
+                color = if (colorful) {
+                    tint.foreground.copy(alpha = if (isDark) 0.34f else 0.22f)
+                } else {
+                    colors.borderDivider
+                },
+                shape = shape,
+            )
             .miuixPress(onClick = onClick),
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {

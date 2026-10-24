@@ -541,6 +541,15 @@ internal fun copyToClipboard(context: android.content.Context, text: String) {
 }
 
 /**
+ * 用户发言折叠后保留的行数。
+ *
+ * 6 行 ≈ 两屏宽的短段落，能看清"我当时问了什么"，又不至于把上面的上下文顶走。
+ * 参考 Cherry Studio 的 `USER_MESSAGE_PREVIEW_EFFECTIVE_LINE_COUNT`（5 行）：
+ * 它按"有效行数"截断，这里直接按行数 —— 中文长段落的行高与它接近。
+ */
+private const val USER_BUBBLE_COLLAPSED_LINES = 6
+
+/**
  * 用户发言。
  *
  * 版式抄 DeepSeek：**靠右的小胶囊**，用主色的**柔和底**（`accentMain` 低透明度）
@@ -552,6 +561,17 @@ internal fun copyToClipboard(context: android.content.Context, text: String) {
  *
  * 用 `accentMain` 而不是固定的浅蓝：8 套主题下主色不同（抹茶绿、樱花粉……），
  * 用户气泡跟着主色走才不会在换主题后变成一个突兀的色块。
+ *
+ * ## 长输入自动折叠
+ *
+ * 用户粘一整段课表/通知进来时，气泡会占掉好几屏，把助手刚给的结论顶出去。
+ * 超过 [USER_BUBBLE_COLLAPSED_LINES] 行就折起，底部给一枚"展开全文"。
+ * 折叠**只影响显示**：发送给模型和落库的仍是完整原文。
+ *
+ * 是否"真的溢出"由 `onTextLayout` 的实际排版结果决定，而不是按字数估算 ——
+ * 中英文、换行、不同字号下同一段字的行数差别很大，估算必然在一部分设备上判错。
+ * 展开后不再刷新这个标志：展开态的排版一定不溢出，若跟着刷新，按钮会立刻消失，
+ * 用户就没有"收起"的入口了。
  */
 @Composable
 private fun UserBubble(message: AssistantUiMessage) {
@@ -588,9 +608,15 @@ private fun UserBubble(message: AssistantUiMessage) {
             ),
         )
     } else Modifier
-    Row(
+
+    // 用消息 id 做 key：同一条消息在会话切换 / 进程恢复后仍记得自己是展开还是收起，
+    // 而不同消息之间不会串状态（LazyColumn 会复用 item 槽位）。
+    var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
+    var overflows by rememberSaveable(message.id) { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        horizontalAlignment = Alignment.End,
     ) {
         Box(
             modifier = Modifier
@@ -613,8 +639,58 @@ private fun UserBubble(message: AssistantUiMessage) {
                 text = message.content,
                 style = PocketTypography.body,
                 color = colors.textPrimary,
+                maxLines = if (expanded) Int.MAX_VALUE else USER_BUBBLE_COLLAPSED_LINES,
+                overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis,
+                onTextLayout = { layout ->
+                    // 展开态不刷新：它一定"不溢出"，跟着刷新会让按钮立刻消失，
+                    // 用户就没有收回长文的路了。收起态每次重新排版都重算 ——
+                    // 旋转 / 改字号 / 分屏后气泡宽度变了，旧的判定可能不再成立。
+                    if (!expanded) overflows = layout.hasVisualOverflow
+                },
             )
         }
+
+        if (overflows) {
+            UserBubbleToggle(expanded = expanded, onToggle = { expanded = it })
+        }
+    }
+}
+
+/**
+ * 用户气泡下方的"展开全文 / 收起"。
+ *
+ * 触摸区仍是 44dp（与 [ActionIcon] 同一条无障碍底线），但视觉上只是一枚
+ * 12sp 的浅色药丸 —— 它属于"读完之后才需要的次要动作"，不该和正文抢注意力。
+ */
+@Composable
+private fun UserBubbleToggle(expanded: Boolean, onToggle: (Boolean) -> Unit) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier = Modifier
+            .padding(top = skin.spaceXs)
+            .heightIn(min = AssistantIconTouchSize)
+            .clip(shape)
+            .background(colors.surfaceAlt)
+            .border(1.dp, colors.borderDivider.copy(alpha = 0.7f), shape)
+            .toggleable(value = expanded, role = Role.Button, onValueChange = onToggle)
+            .padding(horizontal = skin.spaceCompact),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(skin.spaceXs),
+    ) {
+        Text(
+            text = if (expanded) "收起" else "展开全文",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = colors.textSecondary,
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = null,
+            tint = colors.textSecondary,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 

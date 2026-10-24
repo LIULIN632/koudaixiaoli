@@ -25,28 +25,28 @@ class FeedbackFormatterTest {
     private val baseMillis = 1_792_262_400_000L // 2026-10-18 前后，固定值便于断言
 
     @Test
-    fun `工单号是 FB 加日期加四位尾号`() {
-        val id = FeedbackFormatter.ticketId(baseMillis, salt = 7)
-        assertTrue("实际：$id", Regex("^FB\\d{8}-[0-9A-F]{4}$").matches(id))
+    fun `工单号是 T 加日期加六位随机`() {
+        val id = FeedbackFormatter.ticketId(baseMillis, random = 0x00A1B2)
+        assertTrue("实际：$id", Regex("^T\\d{6}[0-9A-F]{6}$").matches(id))
+        assertTrue("实际：$id", id.endsWith("00A1B2"))
     }
 
     @Test
-    fun `同一个输入稳定 同一秒同一盐给同一个号`() {
+    fun `同一个输入稳定 同一时间同一随机数给同一个号`() {
         val a = FeedbackFormatter.ticketId(baseMillis, 7)
         val b = FeedbackFormatter.ticketId(baseMillis, 7)
         assertEquals(a, b)
     }
 
     @Test
-    fun `不同盐给出不同尾号`() {
+    fun `六位随机决定尾号`() {
         val ids = (1..8).map { FeedbackFormatter.ticketId(baseMillis, it) }.toSet()
-        // 8 个盐里允许偶发碰撞，但不可能全部撞在同一个号上
-        assertTrue("只得到 $ids", ids.size >= 7)
+        assertEquals(8, ids.size)
     }
 
     @Test
     fun `没勾设备信息时正文里一个字都不带`() {
-        val body = FeedbackFormatter.buildBody(draft, "FB20261018-00FF", baseMillis, diagnostics)
+        val body = FeedbackFormatter.buildBody(draft, "T26101800A1B2", baseMillis, diagnostics)
         assertFalse(body.contains("Xiaomi"))
         assertFalse(body.contains("Android 14"))
         assertTrue(body.contains("【功能坏了】"))
@@ -57,7 +57,7 @@ class FeedbackFormatterTest {
     fun `勾了设备信息才带上环境`() {
         val body = FeedbackFormatter.buildBody(
             draft.copy(includeDiagnostics = true),
-            "FB20261018-00FF",
+            "T26101800A1B2",
             baseMillis,
             diagnostics,
         )
@@ -67,8 +67,8 @@ class FeedbackFormatterTest {
 
     @Test
     fun `正文末尾写工单号 方便对照`() {
-        val body = FeedbackFormatter.buildBody(draft, "FB20261018-ABCD", baseMillis, diagnostics)
-        assertTrue(body.contains("工单 FB20261018-ABCD"))
+        val body = FeedbackFormatter.buildBody(draft, "T261018ABCDEF", baseMillis, diagnostics)
+        assertTrue(body.contains("工单 T261018ABCDEF"))
     }
 
     @Test
@@ -80,7 +80,7 @@ class FeedbackFormatterTest {
 
     @Test
     fun `issue 链接把换行与中文都编码掉`() {
-        val url = FeedbackFormatter.issueUrl("LIULIN632/koudaixiaoli", draft, "FB20261018-00FF", baseMillis, diagnostics)
+        val url = FeedbackFormatter.issueUrl("LIULIN632/koudaixiaoli", draft, "T26101800A1B2", baseMillis, diagnostics)
         assertTrue(url.startsWith("https://github.com/LIULIN632/koudaixiaoli/issues/new?title="))
         assertTrue(url.contains("labels=feedback"))
         assertFalse("裸空格会把链接截断", url.contains(" "))
@@ -90,7 +90,7 @@ class FeedbackFormatterTest {
 
     @Test
     fun `邮件链接的主题与正文都编码`() {
-        val url = FeedbackFormatter.mailtoUrl("a@b.com", draft, "FB20261018-00FF", baseMillis, diagnostics)
+        val url = FeedbackFormatter.mailtoUrl("a@b.com", draft, "T26101800A1B2", baseMillis, diagnostics)
         assertTrue(url.startsWith("mailto:a@b.com?subject="))
         assertTrue(url.contains("&body="))
         assertFalse(url.contains("\n"))

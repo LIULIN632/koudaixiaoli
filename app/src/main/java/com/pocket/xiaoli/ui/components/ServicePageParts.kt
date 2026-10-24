@@ -54,6 +54,7 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.ServiceAccent
 import com.pocket.xiaoli.ui.theme.onAccentColor
+import com.pocket.xiaoli.ui.theme.onAccentFor
 import com.pocket.xiaoli.ui.theme.serviceAccentColor
 
 /**
@@ -337,6 +338,12 @@ fun ServiceEmptyCard(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    /**
+     * 主按钮是否跟随分类色。默认 `false`（用主题主色）——绝大多数页面的空态按钮
+     * 与页面顶部的主题色一致即可；电费这类**整页只有一种分类色**的页面传 `true`，
+     * 否则 hero 是电力蓝、按钮还是主题紫蓝，一屏里又变成两套配色。
+     */
+    actionFollowsAccent: Boolean = false,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -390,8 +397,8 @@ fun ServiceEmptyCard(
                         vertical = skin.spaceSm,
                     ),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.accentMain,
-                        contentColor = onAccentColor(),
+                        containerColor = if (actionFollowsAccent) tint else colors.accentMain,
+                        contentColor = if (actionFollowsAccent) onAccentFor(tint) else onAccentColor(),
                     ),
                 ) {
                     Text(actionLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold)

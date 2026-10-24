@@ -64,7 +64,7 @@ internal data class ServiceEntry(
      *
      * ## 为什么必须放在 [background] **之后**
      *
-     * 上面 5 个字段是**位置传参**的（42 条入口都写
+     * 上面 5 个字段是**位置传参**的（40 多个入口都写
      * `ServiceEntry(名, 副标题, 图标, 色, 色, accent = …)`）。
      * 插在它们中间会让位置实参整体错位到新字段上，变成一堆类型不匹配 ——
      * 放这里则既不破坏既有位置传参，也允许 `iconFilled = …` 具名传入。
@@ -104,8 +104,8 @@ internal data class ServiceEntry(
      *
      * 默认值必须让**既有行为完全不变**：`ServiceGridScreenshotTest` 等基线用位置/具名
      * 参数直接构造条目且不传本字段，若默认成"仅信息"就会给每一格凭空加角标、全量基线变红。
-     * 生产代码里 42 条入口**全部显式传入**（见 `TreasureBoxScreen` 的 `capabilityOfEntry`），
-     * 所以这里不是"猜一个默认值"，而是"给测试构造留一个不产生副作用的默认值"。
+     * ⚠️ 生产条目的档位**不从这个字段读**：`withSummary` → `serviceEntryCapability`
+     * 按 `serviceRegistryKey` + 当前校区/宿舍现算。这里只是给测试构造留的默认值。
      */
     val capability: CampusServiceCapability = CampusServiceCapability.NATIVE,
 
@@ -148,7 +148,7 @@ internal val ServiceEntry.serviceRegistryKey: String?
  *
  * [CampusServiceCapability.NATIVE] / [WEB] **刻意不画**：它们的副标题本来就写着
  * "原生入口 · 正选/补退选" / "网课 · 作业 · 考试"，再加一个"能打开"的角标只是噪音 ——
- * 42 张卡里 40 张挂角标，角标就退化成装饰，反而把真正需要注意的两档淹掉。
+ * 绝大多数卡都挂角标，角标就退化成装饰，反而把真正需要注意的两档淹掉。
  *
  * 色调刻意用 [BadgeTone.NEUTRAL]：这两档都不是"出错"，是**事实**。
  * 用 WARNING 会让"健身房有介绍可看"看起来像故障（与 `withSummary` 里

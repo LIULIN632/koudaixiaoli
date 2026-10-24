@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -137,18 +138,22 @@ import kotlinx.coroutines.launch
 private const val BOTTOM_SLACK_PX = 72
 
 /**
- * `scrollToItem` 的负偏移魔法值。
+ * 滚到列表**绝对底部**：把**最后一项**贴到视口顶部。
  *
- * LazyColumn 的 `scrollOffset` 是"从条目起点再往前滚多少"，
- * 给一个远超内容高度的值就能把列表顶到**绝对底部** ——
- * 这比 `animateScrollToItem(lastIndex)` 更可靠：后者在"最后一条已经部分可见"
- * 时**不会滚动**，而流式正文恰恰一直在让最后一条变长，于是表现为"长回答不跟随"。
- * （岱宗盒子只用 `scrollToItem(lastIndex)`，它的自动滚动就是这么漏的。）
+ * 最后一项后面已经没有内容，LazyColumn 无处可滚，会自然把它夹到底部 ——
+ * 这既不依赖内容高度，也不需要魔法偏移值。
  *
- * 为什么用 `scrollToItem` 而不是 `animateScrollToItem`：这里是逐帧跟随，
- * 每帧再叠一段动画只会互相打断、越跟越糊；瞬间贴底反而更跟手。
+ * ⚠️ **不要用负的 `scrollOffset` 去"顶到底"**。负偏移的语义是"往回滚"，
+ * 越负越靠上，给大了会一路顶回列表开头。2026-10-24 的「回到底部」点了跳到顶部，
+ * 就是 `animateScrollToItem(rounds.size, -100_000)` 造成的（实测：
+ * `scrollToItem(15, -100_000)` 落在 index 0，而 `scrollToItem(15, +100_000)` 落在底部）。
+ *
+ * @param lastItemIndex 列表最后一项的序号（0 基）。页脚说明永远是最后一项，
+ *   它前面可能还有一排追问 chips，所以不能直接用 `rounds.size`。
  */
-private val STICK_TO_BOTTOM_OFFSET = -100_000
+internal suspend fun LazyListState.scrollToLatest(lastItemIndex: Int, animate: Boolean) {
+    if (animate) animateScrollToItem(lastItemIndex) else scrollToItem(lastItemIndex)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -239,6 +244,23 @@ fun AssistantScreen(
         FollowUpPlanner.plan(followUpTools, askedQuestions)
     }
 
+    // 追问 chips 什么时候出现。四个条件缺一不可：
+    // - **最后一轮是助手在说话**（`user == null` 且有正文）：用户刚打完字、
+    //   回答还没来时推荐"你还可以问…"是答非所问；
+    // - **不在流式中**：它正吐字时摆一排问题，等于诱惑用户打断它；
+    // - **列表非空**：空态由欢迎页那 5 张大卡负责，两处不要同时出现；
+    // - **真的有候选**：本轮没调过工具时 planner 可能一条都不给。
+    val lastTurn = turns.lastOrNull()
+    val showFollowUps = !state.isStreaming &&
+        lastTurn != null &&
+        lastTurn.user == null &&
+        lastTurn.answer.isNotBlank() &&
+        followUps.isNotEmpty()
+
+    // 列表项顺序：rounds… → 追问 chips（可能没有）→ 页脚说明。
+    // 页脚永远是最后一项，滚动目标必须以它为准，不能想当然用 rounds.size。
+    val lastItemIndex = rounds.size + if (showFollowUps) 1 else 0
+
     // 「已经贴底」= 还能往下滚时，最后一条的底部离视口底部不超过容差。
     // 用 listState.canScrollForward 而不是比较 visibleItems 的 index：
     // 后者在"最后一条高于一屏"时会把"读者正停在长回复的开头"误判成贴底。
@@ -294,7 +316,7 @@ fun AssistantScreen(
      * 收集时才判断 [anchored]，已经不落后就彻底 no-op ——
      * 这一句才是"用户上滑不被硬拽"、"长回答开头不被跳过"的共同保证。
      */
-    LaunchedEffect(listState, stickToBottom) {
+    LaunchedEffect(listState, stickToBottom, lastItemIndex) {
         if (!stickToBottom) return@LaunchedEffect
         snapshotFlow { state.messages }
             .collect { messages ->
@@ -302,8 +324,7 @@ fun AssistantScreen(
                 // 判 rounds.size 而不是 messages.size：两者在"只调了工具还没说话"时不同，
                 // 而列表项数是按问答轮算的，滚动目标必须以它为准。
                 if (messages.isEmpty() || rounds.isEmpty()) return@collect
-                // rounds.size 是脚注前一项；配合负偏移即"贴到绝对底部"
-                if (!anchored) listState.scrollToItem(rounds.size, STICK_TO_BOTTOM_OFFSET)
+                if (!anchored) listState.scrollToLatest(lastItemIndex, animate = false)
             }
     }
 
@@ -497,30 +518,18 @@ fun AssistantScreen(
                     }
 
                     // ── 追问 chips ──
-                    //
-                    // 三个条件缺一不可：
-                    // - **最后一轮是助手在说话**（`user == null` 且有正文）：用户刚打完字、
-                    //   回答还没来时推荐"你还可以问…"是答非所问；
-                    // - **不在流式中**：它正吐字时摆一排问题，等于诱惑用户打断它；
-                    // - **列表非空**：空态由欢迎页那 5 张大卡负责，两处不要同时出现。
-                    val lastTurn = turns.lastOrNull()
-                    if (
-                        !state.isStreaming &&
-                        lastTurn != null &&
-                        lastTurn.user == null &&
-                        lastTurn.answer.isNotBlank()
-                    ) {
-                        if (followUps.isNotEmpty()) {
-                            item {
-                                FollowUpChips(
-                                    onPick = { text ->
-                                        query = ""
-                                        viewModel.send(text)
-                                    },
-                                    modifier = Modifier.padding(top = skin.spaceMd),
-                                    prompts = followUps,
-                                )
-                            }
+                    // 出现条件见 [showFollowUps]（要在 LazyColumn 外算：`items {}` 的
+                    // lambda 不是 @Composable 上下文）。
+                    if (showFollowUps) {
+                        item {
+                            FollowUpChips(
+                                onPick = { text ->
+                                    query = ""
+                                    viewModel.send(text)
+                                },
+                                modifier = Modifier.padding(top = skin.spaceMd),
+                                prompts = followUps,
+                            )
                         }
                     }
 
@@ -557,10 +566,13 @@ fun AssistantScreen(
                             BackToBottomButton(
                                 following = stickToBottom,
                                 onClick = {
-                                    stickToBottom = true
                                     scope.launch {
-                                        // rounds.size 是脚注前一项；配合负偏移即"贴到绝对底部"
-                                        listState.animateScrollToItem(rounds.size, STICK_TO_BOTTOM_OFFSET)
+                                        listState.scrollToLatest(lastItemIndex, animate = true)
+                                        // 等动画走完再恢复跟随：一上来就置 true 的话，
+                                        // 跟随的瞬间贴底会立刻打断这段动画（点了直接跳，没有滑动过程）。
+                                        // 只在真的落到底部时才恢复 —— 动画途中用户又上手滑动的话，
+                                        // 不该把他拽回底部。
+                                        if (isAtBottom) stickToBottom = true
                                     }
                                 },
                             )
@@ -674,8 +686,8 @@ internal fun FollowUpChips(
                 shape = RoundedCornerShape(50),
                 // 和空态欢迎页的彩色建议卡呼应：主色浅底 + 同色描边 + 一颗小火花，
                 // 让"这是一条可以直接问的问题"比白底灰字更明确。
-                color = colors.accentMain.copy(alpha = 0.08f),
-                border = BorderStroke(1.dp, colors.accentMain.copy(alpha = 0.18f)),
+                color = colors.accentMain.copy(alpha = 0.14f),
+                border = BorderStroke(1.dp, colors.accentMain.copy(alpha = 0.26f)),
                 modifier = Modifier
                     // ⚠️ 触摸高度**写死下限**而不是靠内边距估：chip 天然长得矮，
                     // 而 44dp 是本项目的无障碍底线（见 `UI验收手册`）。

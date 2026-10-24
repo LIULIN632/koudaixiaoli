@@ -685,6 +685,37 @@ fun TreasureBoxScreen(
         ServiceSection(
             title = "学习",
             entries = listOf(
+                // 2026-10：学期限定的高频动作排在最前 —— 查成绩、选课、看学分/绩点、评教
+                // 是每学期都要走一遍的四件事，原先散在第 10~18 位，得滑两屏才找得到。
+                // 这四项都能落到原生页/教务入口，能力档位同为 rank 0，`sortedBy` 是稳定排序，
+                // 所以这里的先后顺序就是页面上的先后顺序。
+                //
+                // ⚠️ 「考试成绩」与「成绩查询」原本是**两张点了完全一样的卡**
+                //（都执行 subPage = ServiceSubPage.GradeQuery），副标题也只差几个字。
+                // 用户面对两个入口会犹豫"点哪个"，而正确回答是"没有区别"。
+                //
+                // 合并时留的是「考试成绩」，而**页面标题与助手文案全叫「成绩查询」**
+                //（`GradeQueryScreen` 的 TopAppBar、`AssistantFormatters.grades` 的
+                // 「到「服务 → 成绩查询」查询后点「全部存档」」、FAQ 里的同一句话）。
+                // 于是用户点「考试成绩」进去看到「成绩查询」，以为进错了地方 —— 2026-10 报上来。
+                // 现在统一成「成绩查询」：改这里一处，比改散在助手/FAQ 里的五处划算。
+                ServiceEntry("成绩查询", "在线查询 · 可存档", Icons.AutoMirrored.Outlined.TrendingUp, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.TrendingUp, accent = ServiceAccent.ACADEMIC) {
+                    subPage = ServiceSubPage.GradeQuery
+                },
+                ServiceEntry("选课", "原生入口 · 正选/补退选/校公选", Icons.Outlined.Checklist, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Checklist, accent = ServiceAccent.ACADEMIC) {
+                    // 2026-10：这里原先直接 `openCampusService(COURSE_SELECT)` 走网页 ——
+                    // 于是原生 `CourseSelectScreen` 虽然写好了、也接进了 dispatcher，
+                    // **却没有任何入口能进得去**（sealed 路由改造时的新守卫抓到的）。
+                    // 现已改为进原生页；网页/外部出口由该页自己的 `onOpenWeb` 提供，
+                    // 所以外部路径没有丢失。
+                    subPage = ServiceSubPage.CourseSelect
+                },
+                ServiceEntry("修课情况", "学分 · 绩点 · 培养方案", Icons.Outlined.Info, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Info, accent = ServiceAccent.ACADEMIC) {
+                    subPage = ServiceSubPage.AcademicQuery
+                },
+                ServiceEntry("评教", "教学评价 · 问卷", Icons.Outlined.RateReview, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.RateReview, accent = ServiceAccent.ACADEMIC) {
+                    openCampusService(CampusServiceKeys.EVALUATION, "评教")
+                },
                 ServiceEntry("到梦空间", "第二课堂 · 活动报名", Icons.Outlined.EmojiEvents, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.EmojiEvents, accent = ServiceAccent.STUDY) {
                     openCampusService(CampusServiceKeys.SECOND_CLASS, "到梦空间")
                 },
@@ -718,23 +749,11 @@ fun TreasureBoxScreen(
                 ServiceEntry("专注计时", "番茄钟 · 25 分钟专注", Icons.Outlined.Timer, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Timer, accent = ServiceAccent.STUDY) {
                     onOpenFocus?.invoke()
                 },
-                ServiceEntry("图书馆座位", "预约 · 签到 · 暂离", Icons.Outlined.EventSeat, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.EventSeat, accent = ServiceAccent.QUERY) {
-                    subPage = ServiceSubPage.LibrarySeat
-                },
+                // ⚠️ 座位**不再单独占一格**：座位入口在「图书馆」页内（`LibraryScreen` 的原生
+                // 座位动作）。这里曾经并列一张「图书馆座位」卡，与图书馆页里那条动作指向同一个
+                // `ServiceSubPage.LibrarySeat`，用户看到两张卡会犹豫点哪个 —— 2026-10 反馈。
                 ServiceEntry("空教室查询", "找自习室 · 空闲教室", Icons.Outlined.MeetingRoom, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.MeetingRoom, accent = ServiceAccent.QUERY) {
                     openCampusService(CampusServiceKeys.CLASSROOM, "空教室查询")
-                },
-                // 「考试成绩」与「成绩查询」原本是**两张点了完全一样的卡**
-                // （都执行 subPage = ServiceSubPage.GradeQuery），副标题也只差几个字。
-                // 用户面对两个入口会犹豫"点哪个"，而正确回答是"没有区别"。
-                //
-                // ⚠️ 合并时留的是「考试成绩」，而**页面标题与助手文案全叫「成绩查询」**
-                // （`GradeQueryScreen` 的 TopAppBar、`AssistantFormatters.grades` 的
-                // 「到「服务 → 成绩查询」查询后点「全部存档」」、FAQ 里的同一句话）。
-                // 于是用户点「考试成绩」进去看到「成绩查询」，以为进错了地方 —— 2026-10 报上来。
-                // 现在统一成「成绩查询」：改这里一处，比改散在助手/FAQ 里的五处划算。
-                ServiceEntry("成绩查询", "在线查询 · 可存档", Icons.AutoMirrored.Outlined.TrendingUp, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.TrendingUp, accent = ServiceAccent.ACADEMIC) {
-                    subPage = ServiceSubPage.GradeQuery
                 },
                 ServiceEntry("考试安排", "粘贴通知 · 自动识别 · 加入待办", Icons.AutoMirrored.Outlined.EventNote, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.EventNote, accent = ServiceAccent.ACADEMIC) {
                     onOpenExamSchedule?.invoke()
@@ -745,25 +764,11 @@ fun TreasureBoxScreen(
                 ServiceEntry("我的课程", "已修课程 · 成绩存档 · 离线可看", Icons.Outlined.Bookmarks, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Bookmarks, accent = ServiceAccent.ACADEMIC) {
                     subPage = ServiceSubPage.SavedGrades
                 },
-                ServiceEntry("修课情况", "学分 · 绩点 · 培养方案", Icons.Outlined.Info, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Info, accent = ServiceAccent.ACADEMIC) {
-                    subPage = ServiceSubPage.AcademicQuery
-                },
                 ServiceEntry("四级六级", "CET 报名与成绩", Icons.Outlined.Translate, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Translate, accent = ServiceAccent.ACADEMIC) {
                     openUrl(context, "https://cet.neea.edu.cn/")
                 },
                 ServiceEntry("普通话考试", "报名 · 成绩查询", Icons.Outlined.RecordVoiceOver, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.RecordVoiceOver, accent = ServiceAccent.ACADEMIC) {
                     openUrl(context, "https://bm.cltt.org/")
-                },
-                ServiceEntry("选课", "原生入口 · 正选/补退选/校公选", Icons.Outlined.Checklist, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Checklist, accent = ServiceAccent.ACADEMIC) {
-                    // 2026-10：这里原先直接 `openCampusService(COURSE_SELECT)` 走网页 ——
-                    // 于是原生 `CourseSelectScreen` 虽然写好了、也接进了 dispatcher，
-                    // **却没有任何入口能进得去**（sealed 路由改造时的新守卫抓到的）。
-                    // 现已改为进原生页；网页/外部出口由该页自己的 `onOpenWeb` 提供，
-                    // 所以外部路径没有丢失。
-                    subPage = ServiceSubPage.CourseSelect
-                },
-                ServiceEntry("评教", "教学评价 · 问卷", Icons.Outlined.RateReview, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.RateReview, accent = ServiceAccent.ACADEMIC) {
-                    openCampusService(CampusServiceKeys.EVALUATION, "评教")
                 },
                 ServiceEntry("转专业", "政策 · 申请 · 结果", Icons.Outlined.SwapHoriz, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.SwapHoriz, accent = ServiceAccent.ACADEMIC) {
                     openCampusService(CampusServiceKeys.TRANSFER_MAJOR, "转专业")
@@ -814,7 +819,7 @@ fun TreasureBoxScreen(
                 ServiceEntry("通知公告", "学校通知 · 学院公告", Icons.Outlined.Campaign, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Campaign, accent = ServiceAccent.INFO) {
                     openCampusService(CampusServiceKeys.NOTICE, "通知公告")
                 },
-                ServiceEntry("宿舍电费", dormInfo?.label?.let { "已绑定 $it" } ?: "余额 · 充值 · 用电", Icons.Outlined.FlashOn, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.FlashOn, accent = ServiceAccent.PAYMENT) {
+                ServiceEntry("宿舍电费", dormInfo?.label?.let { "已绑定 $it" } ?: "余额 · 充值 · 用电", Icons.Outlined.FlashOn, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.FlashOn, accent = ServiceAccent.ENERGY) {
                     openCampusService(CampusServiceKeys.ELECTRICITY, "宿舍电费")
                 },
                 // ⚠️ 副标题**不要写「预约」**。趣智校园的公开接口里没有预约能力
@@ -924,14 +929,14 @@ fun TreasureBoxScreen(
 
     // ── 能力档位（2026-10）──
     //
-    // 服务页有 42 个入口，但"点下去会发生什么"分四档，而界面上四档长得一模一样：
-    // 用户点「校园网」才知道它只是个说明页，于是对另外 41 个也不再信任。
+    // 服务页有 40 多个入口，但"点下去会发生什么"分四档，而界面上四档长得一模一样：
+    // 用户点「校园网」才知道它只是个说明页，于是对另外几十个也不再信任。
     //
     // 这里做两件事，都只改"信息呈现"，不改任何点击行为：
     // 1. **分区内**按能力重排：能用得上的排前面，"仅介绍 / 未接入"沉到该区末尾；
     //    ⚠️ **刻意不重排分区本身** ——「学习 / 生活 / 其他」是作者的分区意图，
     //    按能力重排分区会让"其他"插到"学习"前面，那是另一件事，不该夹带在这次修改里。
-    // 2. 给"仅介绍 / 未接入"挂角标（能用原生/网页的**不挂** —— 40/42 都挂就等于装饰）。
+    // 2. 给"仅介绍 / 未接入"挂角标（能用原生/网页的**不挂** —— 绝大多数都挂就等于装饰）。
     //
     // 判定全部委托 `CampusServiceResolver.capabilityOf`，与真正打开服务时走同一套
     // spec 查找与宿舍路由，所以不会出现"界面标着能用、点下去弹预留"。
@@ -1109,8 +1114,10 @@ internal fun ServiceSectionHeader(
             text = title,
             style = PocketTypography.sectionTitle,
             color = colors.textPrimary,
+            // 条数胶囊靠右：标题左、计数右，长列表里扫视分区时视线不用在标题后面
+            // 捡一个紧贴的小胶囊；也与「常用服务 → 编辑」的左右结构保持一致。
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(8.dp))
         // 条数胶囊跟「用色强度」走：彩色态用强调色浅底，单色态保持中性，不抢标题。
         val colorful = currentIconPresentation().colorful
         val isDark = LocalDarkMode.current
@@ -1468,8 +1475,8 @@ private fun ServiceEntry.matchesQuery(query: String): Boolean {
 
 /** 服务搜索别名：不改变 UI，只提高搜索命中率。 */
 private fun serviceAliases(title: String): List<String> = when (title) {
-    "图书馆" -> listOf("借书", "借阅", "座位", "自习", "图书")
-    "图书馆座位" -> listOf("预约", "选座", "自习", "座位")
+    // 座位并入图书馆后，搜「选座 / 预约」也要能命中这一格 —— 否则用户按旧入口名搜不到。
+    "图书馆" -> listOf("借书", "借阅", "座位", "选座", "预约", "自习", "图书")
     "空教室查询" -> listOf("自习", "空闲教室", "教室")
     "考试成绩", "成绩查询", "我的课程" -> listOf("成绩", "分数", "gpa", "绩点", "课程")
     "修课情况" -> listOf("学分", "绩点", "培养方案")
@@ -1685,14 +1692,25 @@ internal fun ServiceCard(
             )
             // 彩色卡本身有色相区分；中性卡补一条极淡描边把边界找回来，否则白卡/深卡
             // 贴在底色上像一块没有轮廓的色块。
-            .then(if (neutralCard) Modifier.border(1.dp, colors.borderDivider, shape) else Modifier)
+            // 2026-10：彩色卡也补同色描边（20%）—— 渐变上浓下淡，下缘色量只有 16%，
+            // 卡片右缘与浅色页底之间看不到边界，一张张卡像"晕"在背景里。
+            .then(
+                when {
+                    neutralCard -> Modifier.border(1.dp, colors.borderDivider, shape)
+                    colorfulCard -> Modifier.border(1.dp, accentTint.copy(alpha = 0.20f), shape)
+                    else -> Modifier
+                }
+            )
             .miuixPress(onClick = onClick)
-            .padding(horizontal = if (compact) 10.dp else 12.dp, vertical = if (compact) 6.dp else 8.dp),
+            // 2026-10 排版：横向内边距 12→10、图标 36→34、图标与文字间距 spaceMd→spaceSm，
+            // 三处一共把文字列让宽约 12dp（≈12%）。二列卡的文字列原本只有 ~99dp，
+            // 副标题「绑定宿舍后自动匹…」这类被截断就是宽度不够，不是字号问题。
+            .padding(horizontal = if (compact) 9.dp else 10.dp, vertical = if (compact) 6.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(if (compact) 30.dp else 36.dp)
+                .size(if (compact) 30.dp else 34.dp)
                 .clip(RoundedCornerShape(skin.radiusChip))
                 .background(iconBackground),
             contentAlignment = Alignment.Center
@@ -1704,7 +1722,7 @@ internal fun ServiceCard(
                 modifier = Modifier.size(if (compact) 17.dp else 19.dp)
             )
         }
-        Spacer(Modifier.width(skin.spaceMd))
+        Spacer(Modifier.width(skin.spaceSm))
         Column(modifier = Modifier.weight(1f)) {
             // 标题**独占一行**，不与角标共享宽度 —— 理由见下方那段实测记录。
             Text(

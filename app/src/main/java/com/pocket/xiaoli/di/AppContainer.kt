@@ -451,7 +451,13 @@ class AppContainer(context: Context) {
        val raw = prefs.getString("quick_service_keys", null) ?: return DEFAULT_QUICK_SERVICE_KEYS
        return try {
            val parsed: List<String>? = gson.fromJson(raw, object : TypeToken<List<String>>() {}.type)
-           parsed?.filter { it.isNotBlank() } ?: DEFAULT_QUICK_SERVICE_KEYS
+           // 2026-10：「图书馆座位」并入「图书馆」页，独立入口已删。
+           // 旧用户钉在常用格里的那一项迁移到「图书馆」，而不是因为找不到同名入口静默消失
+           //（`quickEntries` 用 mapNotNull 匹配标题，匹配不上就不显示）。
+           parsed?.map { if (it == "图书馆座位") "图书馆" else it }
+               ?.filter { it.isNotBlank() }
+               ?.distinct()
+               ?: DEFAULT_QUICK_SERVICE_KEYS
        } catch (_: Exception) {
            DEFAULT_QUICK_SERVICE_KEYS
        }
