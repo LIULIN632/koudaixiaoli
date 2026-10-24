@@ -92,11 +92,12 @@ object AppFeedNotifier {
                     update.apkUrl,
                     update.sha256,
                 ),
+                icon = NotificationVisuals.UPDATE,
                 actionLabel = "查看说明",
                 actionIntent = openApp(context),
             )
         } else {
-            build(context, title, listOf(text))
+            build(context, title, listOf(text), icon = NotificationVisuals.UPDATE)
         }
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
     }
@@ -105,12 +106,14 @@ object AppFeedNotifier {
         context: Context,
         title: String,
         lines: List<String>,
+        icon: Int = NotificationVisuals.ANNOUNCE,
         contentIntent: PendingIntent = openApp(context),
         actionLabel: String? = null,
         actionIntent: PendingIntent? = null,
     ) =
         NotificationCompat.Builder(context, AppFeedScheduler.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(icon)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
             .setContentTitle(title)
             .setContentText(lines.firstOrNull().orEmpty())
             .apply {

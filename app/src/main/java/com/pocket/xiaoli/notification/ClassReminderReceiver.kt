@@ -51,7 +51,8 @@ class ClassReminderReceiver : BroadcastReceiver() {
                         }
                     }
                     val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setSmallIcon(NotificationVisuals.SCHEDULE)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
                         .setContentTitle("即将上课:${name}")
                         .setContentText(text.ifBlank { "该去上课了" })
                         .setPriority(NotificationCompat.PRIORITY_HIGH)

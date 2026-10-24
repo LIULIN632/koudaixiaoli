@@ -155,3 +155,6 @@ config.local.*
 # 推广素材（视频/渲染产物，150MB，进 release 也不进源码仓）
 /promo/
 
+
+# 服务端部署包（server/gradlew installDist 的产物，18MB，不进仓）
+pocket-server*.tar.gz

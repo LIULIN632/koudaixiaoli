@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  状态栏小图标（通知栏左侧那枚）。
+
+  形状：鲤鱼剪影（椭圆鱼身 + 三角尾 + evenOdd 挖空的眼睛），实心不靠线稿 ——
+  锦鲤原图的金线只占体高 1%，缩到 24dp 后线宽 0.24px，会糊成一团。
+
+  颜色：金色渐变（与桌面图标的金鱼同色）。**为什么给颜色**：
+  - 原生 Android（Pixel 等）只取 alpha、再涂单色 → 渲染成干净的白色剪影；
+  - MIUI / 鸿蒙 / ColorOS 等国产 ROM 不做二次着色，会原样画出这层金色 → 显示为金鱼。
+  两条路都好看，所以这里给渐变而不是纯白。
+
+  ⚠️ 不要再把 `mipmap/ic_launcher` 塞进 setSmallIcon：那张图 alpha 是整块圆角盘，
+  原生 Android 上会显示成一个白色方块（鱼在 alpha 里几乎不存在）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M10.2,7.1C6.9,7.1 4.2,9.3 4.2,12C4.2,14.7 6.9,16.9 10.2,16.9C12.9,16.9 15.2,15.5 15.9,13.4L20.6,16.6L20.6,7.4L15.9,10.6C15.2,8.5 12.9,7.1 10.2,7.1ZM10.2,12.9C9.4,12.9 8.8,12.4 8.8,11.8C8.8,11.2 9.4,10.7 10.2,10.7C11,10.7 11.6,11.2 11.6,11.8C11.6,12.4 11,12.9 10.2,12.9Z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient
+                android:startX="4.2"
+                android:startY="7.1"
+                android:endX="20.6"
+                android:endY="16.9"
+                android:type="linear">
+                <item android:color="#FFF0B8" android:offset="0" />
+                <item android:color="#F7C86A" android:offset="0.45" />
+                <item android:color="#E09B3D" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- 眼睛挖空：单独一条白色透明路径不行，用 evenOdd 在同一条路径里已经处理 -->
+</vector>

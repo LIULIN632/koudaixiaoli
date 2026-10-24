@@ -59,7 +59,8 @@ class ExamReminderReceiver : BroadcastReceiver() {
                     ).describe()
 
                     val notification = NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setSmallIcon(NotificationVisuals.EXAM)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
                         .setContentTitle("明天考试：$name")
                         .setContentText(detail)
                         .setStyle(NotificationCompat.BigTextStyle().bigText(detail))

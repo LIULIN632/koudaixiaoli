@@ -110,7 +110,8 @@ class ApkUpdateWorker(
 
     private fun postProgress(context: Context, request: AppUpdateRequest, text: String, percent: Int?) {
         val notification = NotificationCompat.Builder(context, AppFeedScheduler.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(NotificationVisuals.UPDATE)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
             .setContentTitle("正在下载 v${request.versionName}")
             .setContentText(text)
             .setProgress(100, percent ?: 0, percent == null)
@@ -134,7 +135,8 @@ class ApkUpdateWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(context, AppFeedScheduler.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setSmallIcon(NotificationVisuals.DONE)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
             .setContentTitle("v${request.versionName} 已下载")
             .setContentText("点一下完成安装")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -148,7 +150,8 @@ class ApkUpdateWorker(
     private fun postFailure(context: Context, request: AppUpdateRequest, reason: String) {
         val retry = AppUpdateReceiver.pending(context, request.versionName, request.apkUrl, request.sha256)
         val notification = NotificationCompat.Builder(context, AppFeedScheduler.CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setSmallIcon(NotificationVisuals.ERROR)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
             .setContentTitle("v${request.versionName} 下载失败")
             .setContentText(reason)
             .setStyle(NotificationCompat.BigTextStyle().bigText(reason))
@@ -200,7 +203,8 @@ class ApkUpdateWorker(
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             val notification = NotificationCompat.Builder(context, AppFeedScheduler.CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.stat_sys_warning)
+                .setSmallIcon(NotificationVisuals.UPDATE)
+                .setLargeIcon(NotificationVisuals.largeIcon(context))
                 .setContentTitle("还需要一步：允许安装应用")
                 .setContentText("允许后点这里继续更新到 v${request.versionName}")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

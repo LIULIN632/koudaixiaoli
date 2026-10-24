@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.pocket.xiaoli.MainActivity
+import com.pocket.xiaoli.notification.NotificationVisuals
 import com.pocket.xiaoli.util.DeepLinkDebug
 
 /**
@@ -110,7 +111,8 @@ object FocusNotifier {
     ): Notification {
         val paused = runtime.isPaused
         val builder = NotificationCompat.Builder(context, CHANNEL_TIMER)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(NotificationVisuals.TIMER)
+                .setLargeIcon(NotificationVisuals.largeIcon(context))
             .setContentIntent(openIntent(context))
             .setOngoing(true)
             .setSilent(true)
@@ -172,7 +174,8 @@ object FocusNotifier {
         if (!canPost(context)) return
         ensureChannels(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_RESULT)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(NotificationVisuals.DONE)
+            .setLargeIcon(NotificationVisuals.largeIcon(context))
             .setContentTitle(title)
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

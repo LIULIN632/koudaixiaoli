@@ -146,7 +146,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -1410,23 +1409,16 @@ internal fun QuickServiceRow(
                 val tint = if (icon.colorful) (accentTint ?: display.tint) else colors.accentMain
                 val tileShape = RoundedCornerShape(skin.radiusCard)
                 val colorTile = icon.colorful && accentTint != null
-                val tileBrush = if (colorTile) {
-                    Brush.linearGradient(
-                        listOf(
-                            accentTint!!.copy(alpha = 0.30f),
-                            accentTint.copy(alpha = 0.10f),
-                        )
-                    )
-                } else {
-                    null
-                }
+                // 与富卡片同一套三层（类目色三档渐变 + 顶部高光 + 同色描边），
+                // 只把小面积的顶端浓度收到 0.40：54dp 宽的格子上 0.46 会显脏。
+                val tileBrush = if (colorTile) serviceSurfaceBrush(accentTint!!, topAlpha = 0.40f) else null
                 val tileShadow = if (colorTile && skin.shadowBlur > 0.dp) {
                     Modifier.dropShadow(
                         shape = tileShape,
                         shadow = Shadow(
                             radius = skin.shadowBlur,
                             spread = 0.dp,
-                            color = accentTint!!.copy(alpha = 0.18f),
+                            color = accentTint!!.copy(alpha = 0.22f),
                             offset = DpOffset(skin.shadowOffsetX, skin.shadowOffsetY),
                         ),
                     )
@@ -1442,16 +1434,42 @@ internal fun QuickServiceRow(
                             if (tileBrush != null) Modifier.background(tileBrush)
                             else Modifier.background(background)
                         )
+                        .then(if (colorTile) Modifier.serviceTopGloss(dark = isDark, strength = 0.7f) else Modifier)
+                        .then(
+                            if (colorTile) Modifier.border(1.dp, accentTint!!.copy(alpha = 0.26f), tileShape)
+                            else Modifier
+                        )
                         .miuixPress { onServiceClick(entry) }
-                        .padding(vertical = if (compact) 8.dp else 12.dp),
+                        .padding(vertical = if (compact) 8.dp else 10.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = if (icon.filled) display.iconFilled else display.icon,
-                        contentDescription = display.title,
-                        tint = tint,
-                        modifier = Modifier.size(if (compact) 18.dp else 22.dp)
-                    )
+                    // 图标从"裸 glyph 摆在色块上"改成"白底小芯片"：
+                    // 格子里没有标题以外的任何边界，裸图标会读成一颗漂浮的彩色符号；
+                    // 白芯片把它按在格面上，也就和富卡片的图标衬底变成同一套语言。
+                    // 单色态不加芯片 —— 极简皮肤下白块反而比裸图标更重。
+                    if (colorTile) {
+                        Box(
+                            modifier = Modifier
+                                .size(if (compact) 22.dp else 26.dp)
+                                .clip(RoundedCornerShape(skin.radiusChip))
+                                .background(ServiceIconTileBrush),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (icon.filled) display.iconFilled else display.icon,
+                                contentDescription = display.title,
+                                tint = tint,
+                                modifier = Modifier.size(if (compact) 13.dp else 15.dp)
+                            )
+                        }
+                    } else {
+                        Icon(
+                            imageVector = if (icon.filled) display.iconFilled else display.icon,
+                            contentDescription = display.title,
+                            tint = tint,
+                            modifier = Modifier.size(if (compact) 18.dp else 22.dp)
+                        )
+                    }
                     Spacer(Modifier.height(skin.spaceSmall))
                     Text(
                         text = display.title,
@@ -1622,20 +1640,14 @@ internal fun ServiceCard(
     //
     // 2026-10-22：0.30/0.10 → 0.42/0.16。服务页一次铺 20 多张卡，大半是同一个色相，
     // 30% 的浓度远看就是「同一张卡复制了 20 遍」；类目色是这页唯一能一眼分堆的线索。
-    // 只加这一层、不整卡铺满：副标题落在渐变的下半段（≈28%），
+    // 2026-10-24：两档 → 三档（0.46/0.20/0.12，见 [serviceSurfaceBrush]）——
+    // 两档在中段直接线性过渡，卡面像平涂色纸；补一个中间色阶才有受光层次。
+    // 只加这一层、不整卡铺满：副标题落在渐变的下半段（≤12% 类目色 + 一层白），
     // 与 `textSecondary #4B5563` 的对比度仍在 4.5:1 以上。
-    val cardBrush = if (colorfulCard) {
-        Brush.linearGradient(
-            listOf(
-                accentTint!!.copy(alpha = 0.42f),
-                accentTint.copy(alpha = 0.16f),
-            )
-        )
-    } else {
-        null
-    }
+    val cardBrush = if (colorfulCard) serviceSurfaceBrush(accentTint!!) else null
     val iconTint = if (icon.colorful) (accentTint ?: entry.tint) else colors.accentMain
-    // 彩色卡上的图标底改成白色：卡本身有色，白底能把浓色 glyph 衬出来，不再是"同色叠同色"。
+    // 彩色卡上的图标底改成白色渐变（见下方 Box）：卡本身有色，白底能把浓色 glyph 衬出来，
+    // 不再是"同色叠同色"。
     val iconBackground = when {
         !icon.showContainer -> colors.surfaceHighlight
         !neutralCard -> colors.surfaceCard
@@ -1644,7 +1656,8 @@ internal fun ServiceCard(
     val shape = RoundedCornerShape(skin.radiusCard)
     // 阴影也跟类目色走：白底上的黑投影会显灰，彩色光晕才是这页该有的"浮起"。
     val shadowColor = if (colorfulCard) {
-        accentTint!!.copy(alpha = 0.20f)
+        // 0.20 → 0.24：卡面加深后原来的光晕被吃掉一截，投影要跟着抬一点才还在。
+        accentTint!!.copy(alpha = 0.24f)
     } else if (isDark) {
         skin.shadowColorDark
     } else {
@@ -1682,24 +1695,28 @@ internal fun ServiceCard(
                 if (cardBrush != null) Modifier.background(cardBrush)
                 else Modifier.background(cardBackground)
             )
-            // 类目色左竖条：2dp 贴在圆角内缘，和卡面同一色相。
-            // 整卡铺浓色会吵，但「一条边」不会 —— 扫描时先按竖条分堆，再读标题。
-            // `drawBehind` 排在 `background` 之后：先铺底、再画条、最后是文字。
-            .then(
-                if (colorfulCard) Modifier.drawBehind {
-                    drawRect(color = accentTint!!, size = size.copy(width = 2.dp.toPx()))
-                } else Modifier
-            )
+            // 顶部高光：只给彩色卡。白卡/深色卡本来就是中性面，加一层白只会显灰。
+            .then(if (colorfulCard) Modifier.serviceTopGloss(dark = isDark) else Modifier)
             // 彩色卡本身有色相区分；中性卡补一条极淡描边把边界找回来，否则白卡/深卡
             // 贴在底色上像一块没有轮廓的色块。
-            // 2026-10：彩色卡也补同色描边（20%）—— 渐变上浓下淡，下缘色量只有 16%，
+            // 2026-10：彩色卡也补同色描边（0.20 → 0.28）—— 渐变上浓下淡，下缘色量只有 12%，
             // 卡片右缘与浅色页底之间看不到边界，一张张卡像"晕"在背景里。
+            // 0.28 是"看得见但不框死"的位置：再深会变成描边卡，和皮肤的软边承诺冲突。
             .then(
                 when {
                     neutralCard -> Modifier.border(1.dp, colors.borderDivider, shape)
-                    colorfulCard -> Modifier.border(1.dp, accentTint.copy(alpha = 0.20f), shape)
+                    colorfulCard -> Modifier.border(1.dp, accentTint.copy(alpha = 0.28f), shape)
                     else -> Modifier
                 }
+            )
+            // 左侧类目色竖条：贴左缘、长度 = 卡片直边（高 − 2×圆角），见 [serviceAccentRail]。
+            // 只有彩色卡有 —— 中性卡（极简皮肤 / 深色主题）连卡面都没上色，
+            // 单独长出一条彩色线会变成"这一页唯一不能解释的颜色"。
+            // 排在描边之后画：3dp 的竖条要盖住左缘那 1dp 描边，否则圆头两端会被描边切开。
+            .then(
+                if (colorfulCard) {
+                    Modifier.serviceAccentRail(accentTint!!, insetY = skin.radiusCard)
+                } else Modifier
             )
             .miuixPress(onClick = onClick)
             // 2026-10 排版：横向内边距 12→10、图标 36→34、图标与文字间距 spaceMd→spaceSm，
@@ -1712,7 +1729,13 @@ internal fun ServiceCard(
             modifier = Modifier
                 .size(if (compact) 30.dp else 34.dp)
                 .clip(RoundedCornerShape(skin.radiusChip))
-                .background(iconBackground),
+                .then(
+                    // 彩色卡：白色**渐变**衬底（见 [ServiceIconTileBrush]）。
+                    // 纯白平涂像贴了块白纸，顶端留一点灰才有厚度；白底同时把类目色
+                    // 图标衬到最高对比 —— 同色衬底会让图标和卡面只差一个色阶。
+                    if (colorfulCard) Modifier.background(ServiceIconTileBrush)
+                    else Modifier.background(iconBackground)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(

@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.ui.treasurebox
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,11 +15,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.currentIconPresentation
@@ -65,6 +66,7 @@ internal fun ServiceGridCell(
     val colors = LocalPocketXiaoliColors.current
     val icon = currentIconPresentation()
     val skin = LocalSkin.current
+    val isDark = LocalDarkMode.current
 
     // 取色逻辑与 `ServiceCard` **逐条对齐**（有语义分类 → 从主题派生；否则回退旧色对），
     // 否则同一套配色下"卡片是彩色、格子里是单色"会破相。
@@ -77,17 +79,14 @@ internal fun ServiceGridCell(
     } else {
         colors.surfaceHighlight
     }
-    // 彩色态给格子底加一道类目色渐变，和富卡片同一套光照方向。
-    val iconBrush = if (icon.colorful && accentTint != null) {
-        Brush.linearGradient(
-            listOf(
-                accentTint.copy(alpha = 0.32f),
-                accentTint.copy(alpha = 0.12f),
-            )
-        )
+    // 彩色态给格子底加一道类目色渐变，和富卡片同一套三层（见 ServiceCardVisuals.kt）。
+    // 44dp 的方块面积小，顶端浓度取 0.40 与常用服务格一致。
+    val tileBrush = if (icon.showContainer && accentTint != null) {
+        serviceSurfaceBrush(accentTint, topAlpha = 0.40f)
     } else {
         null
     }
+    val tileShape = RoundedCornerShape(skin.radiusChip)
 
     Column(
         modifier = modifier
@@ -99,10 +98,18 @@ internal fun ServiceGridCell(
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .clip(RoundedCornerShape(skin.radiusChip))
+                .clip(tileShape)
                 .then(
-                    if (iconBrush != null) Modifier.background(iconBrush)
+                    if (tileBrush != null) Modifier.background(tileBrush)
                     else Modifier.background(iconBackground)
+                )
+                // 顶部高光只给彩色态：中性底是 `surfaceHighlight`，加白会彻底融进页底。
+                .then(if (tileBrush != null) Modifier.serviceTopGloss(dark = isDark, strength = 0.7f) else Modifier)
+                // 1dp 发丝描边：金刚格里格子本身没有底色，图标块不描边就只是一团色，
+                // 四列排下来找不到"这一格到哪为止"。中性态用 `borderDivider` 补轮廓。
+                .then(
+                    if (tileBrush != null) Modifier.border(1.dp, accentTint!!.copy(alpha = 0.26f), tileShape)
+                    else Modifier.border(1.dp, colors.borderDivider, tileShape)
                 ),
             contentAlignment = Alignment.Center,
         ) {
