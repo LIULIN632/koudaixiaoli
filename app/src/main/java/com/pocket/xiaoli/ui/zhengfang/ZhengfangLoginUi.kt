@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,9 +19,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -353,6 +357,12 @@ fun ZhengfangCaptchaDialog(
     val colors = LocalPocketXiaoliColors.current
     var code by remember { mutableStateOf("") }
     val bitmap = remember(captchaBase64) { decodeBase64Bitmap(captchaBase64) }
+    // 弹出来就把焦点交给输入框：验证码这一步本来就是"看一眼、马上敲"，
+    // 再让用户点一下输入框纯属多余（慢网下尤其明显）。
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(captchaBase64) {
+        runCatching { focusRequester.requestFocus() }
+    }
 
     AlertDialog(
         onDismissRequest = onCancel,
@@ -375,9 +385,19 @@ fun ZhengfangCaptchaDialog(
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it },
-                        placeholder = { Text("请输入验证码") },
+                        label = { Text("验证码") },
+                        placeholder = { Text("输入图中的字符") },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        // 验证码是字母 + 数字：Ascii 键盘不会弹中文候选条，
+                        // 否则打一个字母要走候选、还可能被自动纠错改掉。
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { if (code.isNotBlank()) onConfirm(code.trim()) },
+                        ),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = accentColor(),
                             cursorColor = accentColor()
@@ -389,6 +409,12 @@ fun ZhengfangCaptchaDialog(
                         Icon(Icons.Outlined.Refresh, "刷新验证码", tint = colors.textSecondary)
                     }
                 }
+                Spacer(Modifier.height(skin.spaceXs))
+                Text(
+                    "看不清就点右边的刷新按钮换一张。",
+                    fontSize = 11.sp,
+                    color = colors.textTertiary,
+                )
             }
         },
         confirmButton = {

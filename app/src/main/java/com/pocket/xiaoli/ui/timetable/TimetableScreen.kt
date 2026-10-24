@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -271,6 +272,11 @@ fun TimetableScreen(
         )
     }
 
+    // 学期设置是整页 `return`，课表会整体离开组合。滚动状态提到分流之前，
+    // 返回时才停在原来那一屏（课程很多时尤其明显）。
+    val gridScrollState = rememberScrollState()
+    val agendaListState = rememberLazyListState()
+
     // Full-screen semester settings overlay
     if (showSemesterSettings) {
         SemesterSettingsPage(
@@ -526,6 +532,7 @@ fun TimetableScreen(
                         courses = displayCourses,
                         timeSlots = timeSlots,
                         startOfWeek = startOfWeek,
+                        state = agendaListState,
                         today = today,
                     )
                 } else if (courses.isEmpty()) {
@@ -578,6 +585,7 @@ fun TimetableScreen(
                                     }
                             }
                         },
+                        scrollState = gridScrollState,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

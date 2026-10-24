@@ -46,6 +46,28 @@ class DormInfoSerializationTest {
     }
 
     @Test
+    fun balanceIdentityKeepsCampusAndCode() {
+        // 主动气泡与首页提醒共用这个键：少一个字段，换宿舍 / 改编号后就会读到旧余额
+        val dorm = DormInfo(
+            building = "10号宿舍楼",
+            room = "602",
+            serviceCampusId = "ytu_south",
+            dormCode = "BS10S0602",
+        )
+        assertEquals("ytu_south|10号宿舍楼|602|BS10S0602", dorm.balanceIdentity)
+    }
+
+    @Test
+    fun balanceIdentitySurvivesLegacyNullFields() {
+        // 老存档反射赋值后的 null 不能在这里 NPE（与 sanitized 同一道边界）
+        val allNull = Gson().fromJson(
+            """{"building":null,"room":null,"serviceCampusId":null,"dormCode":null}""",
+            DormInfo::class.java,
+        )
+        assertEquals("|||", allNull.balanceIdentity)
+    }
+
+    @Test
     fun explicitNullOrMissingFieldsNeverThrowOnRead() {
         // 复现崩溃现场：老存档没有 dormCode，release 包里读出来是 null。
         // 修复前 `restored.isBound` / `dormCode.isNotBlank()` 都会 NPE

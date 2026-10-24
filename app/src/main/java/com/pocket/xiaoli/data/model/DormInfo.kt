@@ -32,6 +32,22 @@ data class DormInfo(
     val isBound: Boolean get() = building.orEmpty().isNotBlank() || room.orEmpty().isNotBlank()
 
     /**
+     * 电费余额快照的"认人"键：主动气泡与首页低余额提醒共用。
+     *
+     * 带上校区覆盖与宿舍编号 —— 换了宿舍 / 改了编号之后，旧余额对新账户没有意义，
+     * 必须自然失配而不是继续被念出来。两处各拼一份的话，迟早会有一处漏掉某个字段。
+     *
+     * `orEmpty()` 同样是为 Gson 反射赋值留下的 `null` 兜底（见 [sanitized]）。
+     */
+    val balanceIdentity: String
+        get() = listOf(
+            serviceCampusId.orEmpty(),
+            building.orEmpty(),
+            room.orEmpty(),
+            dormCode.orEmpty(),
+        ).joinToString("|")
+
+    /**
      * 把 Gson 可能留下的 `null` 归零。
      *
      * ## 为什么必须有这一步（v1.0.93 服务页崩溃的根因）

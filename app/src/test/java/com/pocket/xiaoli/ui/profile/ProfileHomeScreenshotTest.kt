@@ -79,11 +79,20 @@ class ProfileHomeScreenshotTest {
         val bound: Boolean,
         val rowPadding: Dp = 14.dp,
         val scrollToBottom: Boolean = false,
+        /** 深色态：验证渐变卡面与实心图标块在暗底上仍分得清层次 */
+        val dark: Boolean = false,
+        /** 界面风格：极简档走的是"中性白卡 + 单色图标"分支，要单独看一眼 */
+        val skin: SkinStyle = SkinStyle.VIVID,
     )
 
     private val cases = listOf(
         Case("70-profile-home-bound", bound = true),
         Case("71-profile-home-unbound", bound = false),
+        // 深色态：四格是这一页唯一的大色块，暗底下最容易"糊成一片"。
+        // ⚠️ 必须排在「滚到底」用例之前：列表滚动位置是跨用例记忆的（rememberCampusLazyListState）。
+        Case("324-profile-home-dark", bound = true, dark = true),
+        // 极简皮肤：四格退化成中性白卡 + 单色图标，不能出现"彩色渐变残留"
+        Case("325-profile-home-minimal", bound = true, skin = SkinStyle.MINIMAL),
         // 「列表密度 = 宽松」档（18dp）。这一张是**这个设置真的接线了**的证据：
         // 与 `73`（同为滚到底、标准档）逐行对比即可看出行距变大，而改前两个档位渲出来一模一样。
         //
@@ -154,8 +163,8 @@ class ProfileHomeScreenshotTest {
             val case = current.value
             PocketXiaoliTheme(
                 appearanceMode = AppearanceMode.RAINBOW,
-                skinStyle = SkinStyle.VIVID,
-                darkTheme = false,
+                skinStyle = case.skin,
+                darkTheme = case.dark,
             ) {
                 // 行高由「外观 → 我的 → 列表密度」决定（见 TabAppearanceStore）。
                 // 这里显式 provide：不 provide 时用的是该 CompositionLocal 的默认
@@ -176,7 +185,7 @@ class ProfileHomeScreenshotTest {
                         focusHint = if (case.bound) "今天 50 分钟" else "今天还没开始",
                         onOpenFocus = {},
                         focusStats = if (case.bound) focusStats else FocusStatsView(),
-                        showerHint = if (case.bound) "趣智校园 · 已登录" else "热水 · 淋浴",
+                        showerHint = if (case.bound) "¥16.76" else "登录后查看余额",
                         onOpenShower = {},
                         onOpenExpress = {},
                         onSchemeManager = {},

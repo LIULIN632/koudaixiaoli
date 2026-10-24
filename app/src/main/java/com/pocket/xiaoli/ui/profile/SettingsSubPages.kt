@@ -3,6 +3,7 @@ package com.pocket.xiaoli.ui.profile
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -57,6 +59,7 @@ import com.pocket.xiaoli.data.legal.AgreementText
 import com.pocket.xiaoli.telemetry.Telemetry
 import com.pocket.xiaoli.ui.legal.AgreementMode
 import com.pocket.xiaoli.ui.legal.UserAgreementScreen
+import com.pocket.xiaoli.ui.contribution.ContributionLeaderboardScreen
 import com.pocket.xiaoli.ui.profile.components.FaqDialog
 import com.pocket.xiaoli.ui.share.AppShare
 import com.pocket.xiaoli.ui.share.RecommendSheet
@@ -133,6 +136,11 @@ private const val FEEDBACK_MAIL = "mailto:pocketxiaoyan@outlook.com"
 internal fun SettingsSubPageScaffold(
     title: String,
     onBack: () -> Unit,
+    /**
+     * 滚动状态可外部注入 —— 「关于 → 用户协议」是整页 `return`，会把这一页连同
+     * 滚动位置一起销毁；宿主把它提到分流之前传进来，返回时才能停在原处。
+     */
+    scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val skin = LocalSkin.current
@@ -143,7 +151,7 @@ internal fun SettingsSubPageScaffold(
                 .fillMaxSize()
                 .padding(padding)
                 .background(colors.surfaceBase)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = skin.spaceLg, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(skin.spaceWide),
             content = content,
@@ -178,12 +186,21 @@ internal fun SettingsSubPageHost(
     // 现象就是「关于 → 用户协议」点进去一片空白（2026-10-23 真机反馈）。
     // 所以在这个函数**最外层**分流：打开协议时整页替换掉设置页，返回即关闭。
     var agreementOpen by remember { mutableStateOf(false) }
+    // 共建榜与协议页同理：它是整页（有自己的滚动与顶栏），不能塞进设置卡里。
+    var leaderboardOpen by remember { mutableStateOf(false) }
+    // 协议页整页替换 ⇒ 下面这一页会离开组合。状态按页各记一份、且提到分流之前，
+    // 从用户协议返回时还停在原来的位置（换到另一张设置页则从顶部开始）。
+    val pageScrollState = remember(page) { ScrollState(0) }
     if (agreementOpen) {
         UserAgreementScreen(mode = AgreementMode.READ, onBack = { agreementOpen = false })
         return
     }
+    if (leaderboardOpen) {
+        ContributionLeaderboardScreen(container = container, onBack = { leaderboardOpen = false })
+        return
+    }
 
-    SettingsSubPageScaffold(title = page.title, onBack = onBack) {
+    SettingsSubPageScaffold(title = page.title, onBack = onBack, scrollState = pageScrollState) {
         when (page) {
             SettingsSubPage.UPDATE -> UpdateContent(container, onCheckUpdate, onChangelog)
             SettingsSubPage.ABOUT ->
@@ -195,8 +212,10 @@ internal fun SettingsSubPageHost(
                     onOpenFeedback = onOpenFeedback,
                     onOpenAgreement = { agreementOpen = true },
                 )
-            SettingsSubPage.FEEDBACK -> FeedbackContent()
-            SettingsSubPage.CONTRIBUTE -> ContributeContent()
+            SettingsSubPage.FEEDBACK -> FeedbackContent(container)
+            SettingsSubPage.CONTRIBUTE -> ContributeContent(
+                onOpenLeaderboard = { leaderboardOpen = true },
+            )
             SettingsSubPage.THANKS -> ThanksContent()
             SettingsSubPage.DANGER -> DangerContent(onClearData, onDeleteAllData)
             // 这三页实现在 ProfileSettingsScreen.kt 里（它们要带一堆父页回调），走不到这里。
@@ -447,7 +466,7 @@ private fun UpdateContent(
 // 这一页存在的理由：这是个人项目，没有"客服"，也没有应用商店的评价入口。
 // 想帮忙的人需要一条明确的路径 —— 光在「关于」里塞一句"欢迎反馈"是没人看得见的。
 @Composable
-private fun ContributeContent() {
+private fun ContributeContent(onOpenLeaderboard: () -> Unit) {
     val context = LocalContext.current
     val colors = LocalPocketXiaoliColors.current
 
@@ -458,6 +477,25 @@ private fun ContributeContent() {
         color = colors.textTertiary,
         lineHeight = 18.sp,
     )
+
+    if (!BuildConfig.FDROID) {
+        SettingsCard {
+            SettingsMenuItem(
+                icon = Icons.Filled.EmojiEvents,
+                title = "校园共建榜",
+                subtitle = "看看谁在导课表、补教室、写笔记",
+                onClick = onOpenLeaderboard,
+                accent = ServiceAccent.ACADEMIC,
+            )
+        }
+        Text(
+            "榜单默认不参与。加入时只上传昵称和「做了什么动作」，课表、教室号、" +
+                "笔记正文都不会离开这台手机；随时可以退出并删除记录。",
+            fontSize = 12.sp,
+            color = colors.textTertiary,
+            lineHeight = 18.sp,
+        )
+    }
 
     SettingsCard {
         SettingsMenuItem(

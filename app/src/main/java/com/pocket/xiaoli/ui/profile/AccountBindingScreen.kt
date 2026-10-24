@@ -34,8 +34,6 @@ import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +41,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -91,9 +88,9 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.LocalProfileRowPadding
 import com.pocket.xiaoli.ui.theme.ServiceAccent
+import com.pocket.xiaoli.ui.theme.miuixPress
 import com.pocket.xiaoli.ui.theme.serviceAccentColor
 import com.pocket.xiaoli.ui.theme.serviceAccentContainer
-import com.pocket.xiaoli.ui.theme.SuccessGreen
 import com.pocket.xiaoli.ui.zhengfang.ZhengfangCaptchaHost
 import com.pocket.xiaoli.util.BindingValidators
 import com.pocket.xiaoli.util.YitAccountDefaults
@@ -177,11 +174,17 @@ fun AccountBindingScreen(
     val verifyProgress by verifyVm.progress.collectAsStateWithLifecycle()
     val verifyError by verifyVm.error.collectAsStateWithLifecycle()
     val verified by verifyVm.verified.collectAsStateWithLifecycle()
-    val verifyState: AcademicVerifyUi = when {
-        verifying -> AcademicVerifyUi.Running(verifyProgress)
-        verified -> AcademicVerifyUi.Success
-        verifyError != null -> AcademicVerifyUi.Failed(verifyError!!)
-        else -> AcademicVerifyUi.Idle
+    val verifyState: BindingActionUi = when {
+        verifying -> BindingActionUi.Running(verifyProgress.ifBlank { "正在连接教务系统……" })
+        verified -> BindingActionUi.Success(
+            message = "账号密码正确，已保存",
+            detail = "导入课表、网页导入、成绩查询会直接使用这份账号。",
+        )
+        verifyError != null -> BindingActionUi.Failed(
+            message = verifyError!!,
+            hint = "核对学号与密码后重试；改过密码请填新密码。教务系统维护时可选「仅保存」。",
+        )
+        else -> BindingActionUi.Idle
     }
     val schoolError = if (submitted) BindingValidators.schoolName(school) else null
     val studentIdError = if (submitted) BindingValidators.studentId(studentId) else null
@@ -205,7 +208,8 @@ fun AccountBindingScreen(
     var casStudentId by remember { mutableStateOf(container.loadCasCredential()?.first.orEmpty()) }
     var casPassword by remember { mutableStateOf(container.loadCasCredential()?.second.orEmpty()) }
     var casPasswordVisible by remember { mutableStateOf(false) }
-    var casLoggingIn by remember { mutableStateOf(false) }
+    // 一键登录的结果留在页面上（不再只弹一次 Toast）：失败 / 要验证码时用户需要照着那句话去处理。
+    var casLoginUi by remember { mutableStateOf<BindingActionUi>(BindingActionUi.Idle) }
     var portalLoggedIn by remember { mutableStateOf(TodayCampusPortal.cachedSnapshot()?.loggedIn) }
     val scope = rememberCoroutineScope()
     val casBound = casStudentId.isNotBlank() && casPassword.isNotBlank()
@@ -215,8 +219,7 @@ fun AccountBindingScreen(
     var cardPhone by remember { mutableStateOf(container.loadCardCredential()?.first.orEmpty()) }
     var cardPassword by remember { mutableStateOf(container.loadCardCredential()?.second.orEmpty()) }
     var cardPasswordVisible by remember { mutableStateOf(false) }
-    var cardChecking by remember { mutableStateOf(false) }
-    var cardCheckResult by remember { mutableStateOf<String?>(null) }
+    var cardCheckUi by remember { mutableStateOf<BindingActionUi>(BindingActionUi.Idle) }
     val cardBound = cardPhone.isNotBlank() && cardPassword.isNotBlank()
 
     // 今日校园 / 校园卡两张表单的"点过提交"开关 + 本地校验（规则统一在 BindingValidators）。
@@ -238,7 +241,7 @@ fun AccountBindingScreen(
         if (phone.isBlank() || cardPassword.isBlank()) return
         container.saveCardCredential(phone, cardPassword)
         cardPhone = phone
-        cardCheckResult = null
+        cardCheckUi = BindingActionUi.Idle
         Toast.makeText(context, "已保存校园卡账号", Toast.LENGTH_SHORT).show()
     }
 
@@ -247,16 +250,21 @@ fun AccountBindingScreen(
         YxyCardRepository.clearCache()
         cardPhone = ""
         cardPassword = ""
-        cardCheckResult = null
+        cardCheckUi = BindingActionUi.Idle
         Toast.makeText(context, "已删除本机保存的校园卡账号", Toast.LENGTH_SHORT).show()
     }
 
-    /** 存之前先真查一次：省得存了一个登不上的账号，到卡片页才发现。 */
+    /**
+     * 存之前先真查一次：省得存了一个登不上的账号，到卡片页才发现。
+     *
+     * 查询成功即**顺手落盘**（与今日校园同一条约定）：用户已经把账号密码交出来、
+     * 平台也认了，还要求他再点一次「仅保存」纯属多此一举 —— 而且很容易漏，
+     * 漏了之后再回来页面还写着"未绑定"。
+     */
     fun checkCard() {
         val phone = cardPhone.trim()
         if (phone.isBlank() || cardPassword.isBlank()) return
-        cardChecking = true
-        cardCheckResult = null
+        cardCheckUi = BindingActionUi.Running("正在登录易校园并查询余额……")
         scope.launch {
             YxyCardRepository.query(
                 context = context,
@@ -265,13 +273,22 @@ fun AccountBindingScreen(
                 forceRefresh = true,
             ).fold(
                 onSuccess = { balance ->
-                    cardCheckResult = "查到余额 ¥" +
-                        String.format(java.util.Locale.getDefault(), "%.2f", balance.balance) +
-                        if (balance.userName.isNotBlank()) "（${balance.userName}）" else ""
+                    container.saveCardCredential(phone, cardPassword)
+                    cardPhone = phone
+                    val who = if (balance.userName.isNotBlank()) "（${balance.userName}）" else ""
+                    cardCheckUi = BindingActionUi.Success(
+                        message = "账号可用 · 余额 ¥" +
+                            String.format(java.util.Locale.getDefault(), "%.2f", balance.balance) + who,
+                        detail = "账号已保存到本机，之后去「服务 → 校园卡」可以直接查余额。",
+                    )
                 },
-                onFailure = { cardCheckResult = "查询失败：${it.message ?: "未知原因"}" },
+                onFailure = {
+                    cardCheckUi = BindingActionUi.Failed(
+                        message = "查询失败：${it.message ?: "未知原因"}",
+                        hint = "易校园密码和教务 / 智慧校园都不是同一个；忘记密码请先在易校园 App 里重置。",
+                    )
+                },
             )
-            cardChecking = false
         }
     }
 
@@ -286,6 +303,7 @@ fun AccountBindingScreen(
         if (sid.isBlank() || casPassword.isBlank()) return
         container.saveCasCredential(sid, casPassword)
         casStudentId = sid
+        casLoginUi = BindingActionUi.Idle
         Toast.makeText(context, "已保存今日校园账号", Toast.LENGTH_SHORT).show()
     }
 
@@ -293,23 +311,28 @@ fun AccountBindingScreen(
         container.deleteCasCredential()
         casStudentId = ""
         casPassword = ""
+        casLoginUi = BindingActionUi.Idle
         Toast.makeText(context, "已删除本机保存的今日校园账号", Toast.LENGTH_SHORT).show()
     }
 
     fun clearCasLogin() {
         CasLogin.clearLocalSessions()
         portalLoggedIn = false
+        casLoginUi = BindingActionUi.Idle
         Toast.makeText(context, "已退出今日校园登录态", Toast.LENGTH_SHORT).show()
     }
 
     /**
-     * 一键登录：不打开网页，直接走原生 CAS（详见 [CasLogin]）。
+     * 保存并登录：不打开网页，直接走原生 CAS（详见 [CasLogin]）。
      * 只有用户自己按下这个按钮才会用密码；需要验证码时不硬闯。
+     *
+     * ⚠️ 登录成功即落盘账号（与「验证并保存」同一条约定）：CAS 只验证了密码对不对，
+     * 不存下来的话下次打开还是"未绑定"，用户得从头再输一遍。
      */
     fun runCasLogin() {
         val sid = casStudentId.trim()
         if (sid.isBlank() || casPassword.isBlank()) return
-        casLoggingIn = true
+        casLoginUi = BindingActionUi.Running("正在登录今日校园……需要验证码时会停下来提示")
         scope.launch {
             when (val outcome = CasLogin.login(studentId = sid, password = casPassword)) {
                 is CasLogin.Outcome.Success -> {
@@ -318,20 +341,26 @@ fun AccountBindingScreen(
                     TodayCampusPortal.clearCache()
                     portalLoggedIn = TodayCampusPortal.load(forceRefresh = true)
                         .getOrNull()?.loggedIn ?: true
-                    Toast.makeText(context, "已登录今日校园", Toast.LENGTH_SHORT).show()
+                    container.saveCasCredential(sid, casPassword)
+                    casStudentId = sid
+                    casLoginUi = BindingActionUi.Success(
+                        message = "已登录今日校园",
+                        detail = "账号已保存到本机，打开校园服务不用再输密码。",
+                    )
                 }
 
                 CasLogin.Outcome.CaptchaRequired ->
-                    Toast.makeText(
-                        context,
-                        "这次登录要填验证码，去「服务 → 今日校园 → 改用网页登录」",
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    casLoginUi = BindingActionUi.Failed(
+                        message = "这次登录要图片验证码，原生登录走不通",
+                        hint = "去「服务 → 今日校园」点「在内置网页登录」，账号会自动填好。",
+                    )
 
                 is CasLogin.Outcome.Failed ->
-                    Toast.makeText(context, outcome.message, Toast.LENGTH_LONG).show()
+                    casLoginUi = BindingActionUi.Failed(
+                        message = outcome.message,
+                        hint = "智慧校园密码可能和教务不是同一个；改过密码请填新的那个。",
+                    )
             }
-            casLoggingIn = false
         }
     }
 
@@ -350,6 +379,10 @@ fun AccountBindingScreen(
         dormRoom = dorm?.room.orEmpty()
         dormCode = dorm?.dormCode.orEmpty()
         dormServiceCampusId = dorm?.serviceCampusId.orEmpty()
+        // ⚠️ 换校区必须清掉上一条验证结论：否则在新校区的表单下面还挂着
+        // 旧校区的「学号或密码不正确」，看着像是新填的这组账号被判了错。
+        submitted = false
+        verifyVm.reset()
     }
 
     /** 教务表单的**本地**校验（格式层面）。真验证在 [AcademicVerifyViewModel]。 */
@@ -627,103 +660,36 @@ fun AccountBindingScreen(
                 title = "今日校园",
                 subtitle = "智慧校园统一认证 · 校园卡（易校园）也走它",
             ) {
-                PocketField(
-                    label = "学号",
-                    value = casStudentId,
-                    onValueChange = {
+                CasAccountSection(
+                    studentId = casStudentId,
+                    onStudentIdChange = {
                         casStudentId = it
                         casSubmitted = false
+                        casLoginUi = BindingActionUi.Idle
                     },
-                    placeholder = if (studentId.isNotBlank()) "通常与教务学号相同" else "输入学号",
-                    error = if (casSubmitted) BindingValidators.studentId(casStudentId) else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                )
-                PocketField(
-                    label = "智慧校园密码",
-                    value = casPassword,
-                    onValueChange = {
+                    studentIdError = if (casSubmitted) BindingValidators.studentId(casStudentId) else null,
+                    password = casPassword,
+                    onPasswordChange = {
                         casPassword = it
                         casSubmitted = false
+                        casLoginUi = BindingActionUi.Idle
                     },
-                    placeholder = "与教务密码可能不同",
-                    error = if (casSubmitted) BindingValidators.password(casPassword) else null,
-                    visualTransformation = if (casPasswordVisible) {
-                        VisualTransformation.None
-                    } else {
-                        PocketPasswordTransformation
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        IconButton(onClick = { casPasswordVisible = !casPasswordVisible }) {
-                            Icon(
-                                if (casPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = if (casPasswordVisible) "隐藏密码" else "显示密码",
-                                tint = colors.textTertiary,
-                            )
-                        }
-                    },
-                )
-                Text(
-                    "初始密码与教务同规则（${YitAccountDefaults.PREFIX} + 学号后 6 位）。"
-                        + "这份密码只存本机，只在你自己点「一键登录」时用一次。",
-                    fontSize = 11.sp,
-                    color = colors.textTertiary,
-                    lineHeight = 16.sp,
-                )
-
-                Button(
+                    passwordError = if (casSubmitted) BindingValidators.password(casPassword) else null,
+                    passwordVisible = casPasswordVisible,
+                    onTogglePasswordVisible = { casPasswordVisible = !casPasswordVisible },
+                    loginState = casLoginUi,
+                    portalLoggedIn = portalLoggedIn,
+                    hintStudentId = studentId,
                     // ⚠️ 不再静默禁用：点得动，点了把问题写在字段下方（与教务表单同一套规则）
-                    onClick = {
+                    onSave = {
                         casSubmitted = true
                         if (casValid()) saveCas()
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.accentMain,
-                        disabledContainerColor = colors.surfaceHighlight,
-                        disabledContentColor = colors.textTertiary,
-                    ),
-                ) {
-                    Text(if (casBound) "更新今日校园账号" else "保存今日校园账号", fontWeight = FontWeight.Bold)
-                }
-
-                OutlinedButton(
-                    onClick = {
+                    onLogin = {
                         casSubmitted = true
                         if (casValid()) runCasLogin()
                     },
-                    enabled = !casLoggingIn,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape = RoundedCornerShape(50),
-                ) {
-                    Text(if (casLoggingIn) "正在登录…" else "一键登录今日校园", fontSize = 15.sp)
-                }
-
-                // 登录态：来自门户自己的接口（不是我们猜的），所以只有真的读到了才显示状态。
-                // 状态标记走全页统一的那一套（点 + 词，见 StateDot），不再是另一枚 pill。
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("登录态", fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.weight(1f))
-                    StateDot(
-                        when {
-                            casLoggingIn -> BindState.UNKNOWN
-                            portalLoggedIn == true -> BindState.OK
-                            portalLoggedIn == false -> BindState.TODO
-                            else -> BindState.UNKNOWN
-                        }
-                    )
-                    Spacer(Modifier.width(skin.spaceXs))
-                    Text(
-                        when {
-                            casLoggingIn -> "登录中"
-                            portalLoggedIn == true -> "已登录"
-                            portalLoggedIn == false -> "未登录"
-                            else -> "未知"
-                        },
-                        fontSize = 12.sp,
-                        color = colors.textSecondary,
-                    )
-                }
+                )
             }
 
             // ── 校园卡（易校园）──
@@ -738,84 +704,34 @@ fun AccountBindingScreen(
                 title = "校园卡（易校园）",
                 subtitle = "易校园自己的账号，不是学号",
             ) {
-                PocketField(
-                    label = "手机号",
-                    value = cardPhone,
-                    onValueChange = {
+                CardAccountSection(
+                    phone = cardPhone,
+                    onPhoneChange = {
                         cardPhone = it
                         cardSubmitted = false
+                        cardCheckUi = BindingActionUi.Idle
                     },
-                    placeholder = "易校园登录手机号",
-                    error = if (cardSubmitted) BindingValidators.phone(cardPhone) else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                )
-                PocketField(
-                    label = "易校园密码",
-                    value = cardPassword,
-                    onValueChange = {
+                    phoneError = if (cardSubmitted) BindingValidators.phone(cardPhone) else null,
+                    password = cardPassword,
+                    onPasswordChange = {
                         cardPassword = it
                         cardSubmitted = false
+                        cardCheckUi = BindingActionUi.Idle
                     },
-                    placeholder = "与教务 / 智慧校园都不是同一个",
-                    error = if (cardSubmitted) BindingValidators.password(cardPassword) else null,
-                    visualTransformation = if (cardPasswordVisible) {
-                        VisualTransformation.None
-                    } else {
-                        PocketPasswordTransformation
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        IconButton(onClick = { cardPasswordVisible = !cardPasswordVisible }) {
-                            Icon(
-                                if (cardPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = if (cardPasswordVisible) "隐藏密码" else "显示密码",
-                                tint = colors.textTertiary,
-                            )
-                        }
-                    },
-                )
-                Text(
-                    "校园卡余额在易校园（小富宝）平台上，用的是它自己的登录账号。"
-                        + "密码只存本机，只在查余额时用一次；不填就只能进 App / 门户自己看。",
-                    fontSize = 11.sp,
-                    color = colors.textTertiary,
-                    lineHeight = 16.sp,
-                )
-                // 分隔线：上面是"填账号"，下面是"提交 + 查询"。
-                HorizontalDivider(color = colors.borderDivider, thickness = 0.5.dp)
-                Button(
-                    onClick = {
+                    passwordError = if (cardSubmitted) BindingValidators.password(cardPassword) else null,
+                    passwordVisible = cardPasswordVisible,
+                    onTogglePasswordVisible = { cardPasswordVisible = !cardPasswordVisible },
+                    bound = cardBound,
+                    checkState = cardCheckUi,
+                    onSave = {
                         cardSubmitted = true
                         if (cardValid()) saveCard()
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.accentMain,
-                        disabledContainerColor = colors.surfaceHighlight,
-                        disabledContentColor = colors.textTertiary,
-                    ),
-                ) {
-                    Text(if (cardBound) "更新校园卡账号" else "保存校园卡账号", fontWeight = FontWeight.Bold)
-                }
-                OutlinedButton(
-                    onClick = {
+                    onCheck = {
                         cardSubmitted = true
                         if (cardValid()) checkCard()
                     },
-                    enabled = !cardChecking,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape = RoundedCornerShape(50),
-                ) {
-                    Text(if (cardChecking) "正在查询…" else "查一下余额", fontSize = 15.sp)
-                }
-                cardCheckResult?.let { result ->
-                    Text(
-                        result,
-                        fontSize = 12.sp,
-                        color = if (result.startsWith("查询失败")) colors.danger else colors.textSecondary,
-                    )
-                }
+                )
             }
             // ── 学习平台 ──
             // 排在最后：它与上面四个（教务 / 宿舍 / 今日校园 / 校园卡）互不相干 ——
@@ -1219,19 +1135,6 @@ internal fun BindingStatusCard(
 }
 
 /**
- * 「验证并保存」这一条路的界面状态。
- *
- * 单独一个类型（而不是三个布尔）的理由：Running / Success / Failed **互斥且有序**，
- * 用布尔表达会出现"正在验证但已经显示成功"这种组合，而它没有任何意义。
- */
-internal sealed interface AcademicVerifyUi {
-    data object Idle : AcademicVerifyUi
-    data class Running(val progress: String) : AcademicVerifyUi
-    data object Success : AcademicVerifyUi
-    data class Failed(val message: String) : AcademicVerifyUi
-}
-
-/**
  * 「教务账号」表单本体：三个字段 + 初始密码捷径 + 两段说明 + [middle] + 提交区。
  *
  * ## 为什么从 `AccountBindingScreen` 里抽出来
@@ -1277,14 +1180,14 @@ internal fun ColumnScope.AcademicAccountSection(
     schoolError: String? = null,
     studentIdError: String? = null,
     passwordError: String? = null,
-    verify: AcademicVerifyUi = AcademicVerifyUi.Idle,
+    verify: BindingActionUi = BindingActionUi.Idle,
     /** 当前校区是否有可验证的教务系统；没有（如南校区）时只给「保存绑定」 */
     canVerify: Boolean = true,
     /** 夹在"字段"与"提交"之间的配置项（当前是「服务自动登录」） */
     middle: @Composable ColumnScope.() -> Unit = {},
 ) {
     val colors = LocalPocketXiaoliColors.current
-    val running = verify is AcademicVerifyUi.Running
+    val running = verify is BindingActionUi.Running
     // ── IME 类型（2026-10 修「绑定界面输入有问题」）──
     //
     // 三个字段**必须**各自锁住输入法类型，理由见下方每个参数旁的注释。
@@ -1363,48 +1266,16 @@ internal fun ColumnScope.AcademicAccountSection(
     // ── 验证结果 ──
     //
     // 三种结果都落在**按钮上方**：用户刚点完按钮，视线就在那里；放在按钮下方要往下找。
-    when (verify) {
-        AcademicVerifyUi.Idle -> Unit
-
-        is AcademicVerifyUi.Running -> Text(
-            verify.progress.ifBlank { "正在连接教务系统……" },
-            fontSize = 12.sp,
-            color = colors.textSecondary,
-        )
-
-        AcademicVerifyUi.Success -> Text(
-            "✓ 账号密码正确，已保存",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = SuccessGreen,
-        )
-
-        is AcademicVerifyUi.Failed -> Text(
-            verify.message,
-            fontSize = 12.sp,
-            color = colors.danger,
-            lineHeight = 16.sp,
-        )
-    }
+    // 与今日校园 / 校园卡共用同一个 `BindingActionNotice` —— 三个页面的
+    // "进行中·成功·失败"不该有三种长相。
+    BindingActionNotice(verify)
 
     if (canVerify) {
-        Button(
+        BindingPrimaryButton(
+            text = if (running) "正在验证…" else "验证并保存",
             onClick = onVerifyAndSave,
             enabled = !running,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.accentMain,
-                // 禁用态显式给色：不给的话用的是 Material 默认的 onSurface 12% ——
-                // 一枚与页面无关的灰疙瘩（「鲤鱼输入框太难看」那轮记过同一笔账）。
-                disabledContainerColor = colors.surfaceHighlight,
-                disabledContentColor = colors.textTertiary,
-            )
-        ) {
-            Text(if (running) "正在验证…" else "验证并保存", fontWeight = FontWeight.Bold)
-        }
+        )
         TextButton(
             onClick = onSaveOnly,
             enabled = !running,
@@ -1418,16 +1289,7 @@ internal fun ColumnScope.AcademicAccountSection(
         }
     } else {
         // 没有教务系统的校区（如烟大南校）：只能本地保存，别给一个注定失败的"验证"
-        Button(
-            onClick = onSaveOnly,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = colors.accentMain)
-        ) {
-            Text("保存绑定", fontWeight = FontWeight.Bold)
-        }
+        BindingPrimaryButton(text = "保存绑定", onClick = onSaveOnly)
     }
 }
 
@@ -1599,7 +1461,7 @@ private fun ChecklistRow(
  * ⚠️ 不用"低透明度 warning / danger 当底色"：深色主题下那点色差读不出来
  *（`CLAUDE.md` 记过这个坑）。所以待办与失败都靠**描边 / 实心点**表意。
  */
-private enum class BindState { OK, TODO, FAILED, UNKNOWN }
+internal enum class BindState { OK, TODO, FAILED, UNKNOWN }
 
 /**
  * 状态点 —— 本页**唯一**的状态可视化组件。
@@ -1621,7 +1483,7 @@ private enum class BindState { OK, TODO, FAILED, UNKNOWN }
  *（深色下那点色差读不出来，"标了但看不出"）。点的颜色本身就承担了表意。
  */
 @Composable
-private fun StateDot(state: BindState) {
+internal fun StateDot(state: BindState) {
     val colors = LocalPocketXiaoliColors.current
     val color = when (state) {
         BindState.OK -> colors.accentMain
@@ -1703,7 +1565,9 @@ internal fun BindingSectionCard(
                     Text(
                         subtitle,
                         fontSize = 12.sp,
-                        color = if (danger) colors.textSecondary else colors.textTertiary,
+                        // 副标题是"这一页在做什么"的唯一说明，用次级色而不是最弱一档：
+                        // textTertiary 压卡底约 2.15:1，长句几乎读不清（见 DangerRow 的说明）。
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -1723,6 +1587,13 @@ private fun formatImportTime(timestamp: Long): String =
     if (timestamp <= 0L) "时间未知"
     else SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
 
+/**
+ * 「学习平台」的一张行卡：平台名 + 登录状态 + 去登录。
+ *
+ * 2026-10 改：整行可点（此前只有右侧那个小文字按钮可点，命中区约 48×20dp），
+ * 左侧补上一块与总览清单同款的分类图标，状态点 + 文字也沿用 [StateDot] ——
+ * 这一页的所有"登录没登录"都用同一套语义，不该在最后一张卡里换一种说法。
+ */
 @Composable
 private fun LearningBindingRow(
     name: String,
@@ -1737,9 +1608,28 @@ private fun LearningBindingRow(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(skin.spaceCompact),
+            modifier = Modifier
+                .fillMaxWidth()
+                // 按压反馈走全 App 的 MIUIX 手感（`miuixPress` 已内置 clickable）
+                .miuixPress(onClick = onLogin)
+                .padding(skin.spaceCompact),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(skin.radiusChip))
+                    .background(serviceAccentContainer(ServiceAccent.STUDY)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = serviceAccentColor(ServiceAccent.STUDY),
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+            Spacer(Modifier.width(skin.spaceMd))
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(skin.spaceMicro),
@@ -1756,14 +1646,24 @@ private fun LearningBindingRow(
                         if (bound) "已登录 · Cookie 已加密保存在本机"
                         else "未登录 · 登录后可同步考试 / 作业",
                         fontSize = 12.sp,
-                        color = colors.textTertiary,
+                        // 这里承载的是"去登录能得到什么"，用次级色而不是最弱的一档
+                        color = colors.textSecondary,
                     )
                 }
             }
             Spacer(Modifier.width(skin.spaceSm))
-            TextButton(onClick = onLogin) {
-                Text(if (bound) "换绑" else "登录", color = colors.accentMain, fontSize = 14.sp)
-            }
+            Text(
+                if (bound) "换绑" else "登录",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.accentMain,
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.textTertiary,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

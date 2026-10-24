@@ -205,12 +205,8 @@ object ProactiveEvaluator {
     /** 宿舍电费余额，口径同上；身份里带上校区与编号（换了宿舍就不能再念旧数字）。 */
     private fun electricityBalance(container: AppContainer, store: ProactiveStore): Double? {
         val dorm = container.dormInfo.value?.sanitized()?.takeIf { it.isBound } ?: return null
-        val identity = listOf(
-            dorm.serviceCampusId.orEmpty(),
-            dorm.building,
-            dorm.room,
-            dorm.dormCode,
-        ).joinToString("|")
+        // 与首页低余额提醒共用同一个键：两边各拼一份，改宿舍编号时会有一边读不出来
+        val identity = dorm.balanceIdentity
         val fresh = DormElectricityRepository.cachedSnapshot(dorm)?.balance?.toDoubleOrNull()
         if (fresh != null) {
             store.rememberBalance(ProactiveStore.KIND_ELECTRICITY, identity, fresh)

@@ -9,17 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 83,
-    "versionName": "0.1.82",
+    "versionCode": 84,
+    "versionName": "0.1.83",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.82/koudaixiaoli_v0.1.82.apk",
-    "sha256": "145cb3d7eb1528252a68114d2bb6f8d679ca8336131f15989abbb2532724173a",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.83/koudaixiaoli_v0.1.83.apk",
+    "sha256": "0889c6dc89601569786b811c8a1ede385c3bfff4787add46b5eb4e1676335704",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "绑定信息页多了绑定进度：教务 / 宿舍 / 今日校园 / 校园卡 / 学习平台，还差哪项一眼看到",
-      "导入课表少一步：选完学校直接进登录，不再先选一遍教务系统",
-      "「我的」页与设置页的几处间距、图标对齐修正"
+      "「我的 → 贡献」新增贡献榜：导课表、补教室、写笔记都有记录，谁补得多一眼看到",
+      "首页新增电费提醒：宿舍余额低于提醒线时，提示排在最前（比作业更急）",
+      "绑定页与电力页重排：表单拆成两步，窄屏不再挤成一团"
     ]
   },
   "announcements": []

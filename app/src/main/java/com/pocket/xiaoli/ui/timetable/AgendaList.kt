@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -64,6 +66,11 @@ internal fun AgendaList(
     timeSlots: List<TimeSlotEntity>,
     startOfWeek: LocalDate,
     modifier: Modifier = Modifier,
+    /**
+     * 滚动状态可外部注入：课表页进「学期设置」是整页 `return`，会把本列表一起销毁。
+     * 宿主提到分流之前传进来，返回时才能停在原处。
+     */
+    state: LazyListState = rememberLazyListState(),
     /** 「今天」的判定基准。默认取系统日期；测试注入固定值，避免基准图随日期漂移。 */
     today: LocalDate = LocalDate.now(),
 ) {
@@ -112,6 +119,7 @@ internal fun AgendaList(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        state = state,
         contentPadding = PaddingValues(horizontal = skin.spaceSmall, vertical = skin.spaceSm),
         verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
     ) {

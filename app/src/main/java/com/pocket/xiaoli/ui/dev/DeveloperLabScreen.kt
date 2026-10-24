@@ -135,6 +135,10 @@ fun DeveloperLabScreen(
     var deepLinkInput by remember { mutableStateOf("pocketxiaoli://timetable") }
     var showResetConfirm by remember { mutableStateOf(false) }
 
+    // 数据查看器 / 拓扑预览都是整屏 `return`：把列表滚动状态提到分流之前，
+    // 从这两页返回时还停在原来那一节，而不是被弹回顶部。
+    val labScrollState = rememberScrollState()
+
     val importDataLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -232,7 +236,7 @@ fun DeveloperLabScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(labScrollState)
                 .padding(horizontal = skin.spaceLg),
             verticalArrangement = Arrangement.spacedBy(skin.spaceMd),
         ) {

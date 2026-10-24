@@ -14,9 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -32,7 +34,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -45,6 +46,13 @@ import com.pocket.xiaoli.network.AcademicSummary
 import com.pocket.xiaoli.network.AcademicTypeInfo
 import com.pocket.xiaoli.network.ZhengfangClient
 import com.pocket.xiaoli.ui.assistant.copyToClipboard
+import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.ServiceEmptyCard
+import com.pocket.xiaoli.ui.components.ServiceHeroBadge
+import com.pocket.xiaoli.ui.components.ServiceHeroCard
+import com.pocket.xiaoli.ui.components.ServiceHeroChip
+import com.pocket.xiaoli.ui.components.ServicePageTopBar
+import com.pocket.xiaoli.ui.components.ServiceSectionLabel
 import com.pocket.xiaoli.ui.components.campusui.CampusSearchBar
 import com.pocket.xiaoli.ui.theme.*
 import com.pocket.xiaoli.ui.zhengfang.ZhengfangCaptchaHost
@@ -81,27 +89,17 @@ fun AcademicQueryScreen(
     LaunchedEffect(Unit) { viewModel.prefillBoundCredentials() }
 
     Scaffold(
+        // 页底与顶栏同色（surfaceBase），不再用 surfaceAlt 压出一层灰底 ——
+        // 与服务页里其余二级页（成绩查询 / 成绩档案）保持同一套视觉。
+        containerColor = colors.surfaceBase,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("修课情况", fontWeight = FontWeight.Bold)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.surfaceCard)
-            )
+            ServicePageTopBar(title = "修课情况", onBack = onBack)
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(colors.surfaceAlt)
         ) {
             when {
                 selectedSchool == null -> ZhengfangSchoolList(state = viewModel)
@@ -169,61 +167,61 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
         // 操作行：复制诊断（常显）+ 重新登录
         // ⚠️ 复制诊断**必须常显**：它现在不只是"解析异常时上报"，还是把**明细接口原始记录**
         // 取回来的唯一入口（那几列的字段名只能从真实响应读出来）。藏在异常分支里就点不到了。
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                "已修课程 · 学分统计",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = colors.textSecondary,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(
-                onClick = {
-                    copyToClipboard(
-                        context,
-                        buildString {
-                            // 版本号放最前面：远程排查时第一件事是确认"这份输出是哪个包产生的"
-                            append("口袋小鲤 v").append(appVersionName(context)).append('\n')
-                            append(parseDiag).append('\n')
-                            append("类型 ").append(types.size).append(" 个\n")
-                            if (probe.isNotBlank()) append(probe)
-                        }
+        // 2026-10 美化：从"一小行灰字 + 两个按钮"改成区块标题 —— 与下方「培养方案」同一套层级。
+        AcademicActionsHeader(
+            onCopyDiagnostics = {
+                copyToClipboard(
+                    context,
+                    buildString {
+                        // 版本号放最前面：远程排查时第一件事是确认"这份输出是哪个包产生的"
+                        append("口袋小鲤 v").append(appVersionName(context)).append('\n')
+                        append(parseDiag).append('\n')
+                        append("类型 ").append(types.size).append(" 个\n")
+                        if (probe.isNotBlank()) append(probe)
+                    }
+                )
+            },
+            onLogout = { viewModel.logout() },
+        )
+
+        if (error != null && !loaded) {
+            AppCard(
+                modifier = Modifier.fillMaxWidth(),
+                // 失败用描边而不是红底：整块红会把页面其余内容也压得紧张，
+                // 而这里只需要"这一块出了问题"这一条信息。
+                border = BorderStroke(1.dp, colors.danger.copy(alpha = 0.35f)),
+            ) {
+                Column(modifier = Modifier.padding(skin.spaceLg)) {
+                    Text("查询失败", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.danger)
+                    Spacer(Modifier.height(skin.spaceXs))
+                    Text(
+                        error!!,
+                        color = colors.textSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
                     )
                 }
-            ) { Text("复制诊断", fontSize = 12.sp) }
-            TextButton(onClick = { viewModel.logout() }) {
-                Text("重新登录", fontSize = 13.sp)
             }
         }
 
-        if (error != null && !loaded) {
-            Text(
-                error!!,
-                color = colors.danger,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(vertical = skin.spaceSm)
-            )
-        }
-
         if (isLoading && !loaded) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = skin.spaceLg)
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = accentColor()
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    progress.ifBlank { "加载中……" },
-                    fontSize = 13.sp,
-                    color = colors.textTertiary
-                )
+            AppCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = skin.spaceLg, vertical = skin.spaceMd)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = accentColor()
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        progress.ifBlank { "加载中……" },
+                        fontSize = 13.sp,
+                        color = colors.textSecondary
+                    )
+                }
             }
         }
 
@@ -266,22 +264,15 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
                 }
                 if (types.isEmpty()) {
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = skin.spaceHuge),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // ⚠️ 空的要能分得清是"没选课"还是"没解析出来"：
-                            // 2026-10 出过一次解析全空的事故，界面只显示"暂无课程明细"，
-                            // 看上去像"我这个学期没课"，排查方向一开始就跑偏了。
-                            Text(
-                                "未解析到课程类型\n教务页面结构可能已变更，请更新 App 后重试",
-                                color = colors.textTertiary,
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        // ⚠️ 空的要能分得清是"没选课"还是"没解析出来"：
+                        // 2026-10 出过一次解析全空的事故，界面只显示"暂无课程明细"，
+                        // 看上去像"我这个学期没课"，排查方向一开始就跑偏了。
+                        ServiceEmptyCard(
+                            icon = Icons.Filled.Warning,
+                            title = "未解析到课程类型",
+                            message = "教务页面结构可能已变更，请更新 App 后重试。",
+                            accent = ServiceAccent.ACADEMIC,
+                        )
                     }
                 } else if (filtering && visibleTypes.isEmpty()) {
                     item {
@@ -346,6 +337,29 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
     }
 }
 
+/**
+ * 结果页顶部的操作行：「已修课程」+ 复制诊断 + 重新登录。
+ *
+ * `internal`：整页 `ResultContent` 依赖 ViewModel、渲不出来；而这一行是本页**唯一常显的操作**，
+ * 标题与两个按钮在 360dp 屏上会不会互相挤掉，只能靠整页基线确认。
+ */
+@Composable
+internal fun AcademicActionsHeader(
+    onCopyDiagnostics: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    val skin = LocalSkin.current
+    ServiceSectionLabel(
+        title = "已修课程",
+        accent = ServiceAccent.ACADEMIC,
+        modifier = Modifier.padding(top = skin.spaceSm, bottom = skin.spaceSm),
+        trailing = {
+            TextButton(onClick = onCopyDiagnostics) { Text("复制诊断", fontSize = 12.sp) }
+            TextButton(onClick = onLogout) { Text("重新登录", fontSize = 13.sp) }
+        },
+    )
+}
+
 /** 当前 App 版本号（读法与「我的」页/更新检查一致 —— 本项目没开 BuildConfig 生成） */
 private fun appVersionName(context: Context): String = try {
     context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "未知"
@@ -381,11 +395,10 @@ internal fun AcademicFilterBar(
                 val count = badges[option]
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = if (selected) accentColor().copy(alpha = 0.14f) else colors.surfaceCard,
-                    border = BorderStroke(
-                        1.dp,
-                        if (selected) accentColor() else colors.borderDivider
-                    ),
+                    // 选中态用**实心主色**而不是 14% 淡底：淡底 + 同色字在小屏上
+                    // 只是"稍微深一点的一枚胶囊"，筛没筛过一眼看不出来（用户此前报过"灰蒙蒙"）。
+                    color = if (selected) accentColor() else colors.surfaceCard,
+                    border = if (selected) null else BorderStroke(1.dp, colors.borderDivider),
                     modifier = Modifier
                         // ⚠️ chip 天然矮，触摸高度**写死下限**而不靠内边距估（本页折叠键同一个坑）
                         .heightIn(min = 44.dp)
@@ -398,7 +411,8 @@ internal fun AcademicFilterBar(
                         Text(
                             if (count != null && count > 0) "${option.label} $count" else option.label,
                             fontSize = 12.sp,
-                            color = if (selected) accentColor() else colors.textSecondary,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) onAccentColor() else colors.textSecondary,
                         )
                     }
                 }
@@ -416,22 +430,14 @@ internal fun AcademicFilterBar(
 /** 筛选后一门课都没有：给一句实话 + 一个出口 */
 @Composable
 private fun EmptyFilterState(onClear: () -> Unit) {
-    val colors = LocalPocketXiaoliColors.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            "没有符合条件的课程\n换个筛选条件，或清空搜索词试试",
-            color = colors.textTertiary,
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onClear) { Text("清除筛选", fontSize = 13.sp) }
-    }
+    ServiceEmptyCard(
+        icon = Icons.Filled.Search,
+        title = "没有符合条件的课程",
+        message = "换个筛选条件，或清空搜索词试试。",
+        accent = ServiceAccent.ACADEMIC,
+        actionLabel = "清除筛选",
+        onAction = onClear,
+    )
 }
 
 // ── 折叠 ──
@@ -545,23 +551,22 @@ internal fun AcademicTreeHeader(
     showToggleAll: Boolean = true,
 ) {
     val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
     val allExpanded = courseGroupCount > 0 && expandedCount >= courseGroupCount
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "培养方案 · $typeCount 个类型",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary,
-            modifier = Modifier.weight(1f)
-        )
-        if (courseGroupCount > 0 && showToggleAll) {
+    val toggle: (@Composable () -> Unit)? = if (courseGroupCount > 0 && showToggleAll) {
+        {
             TextButton(onClick = { onToggleAll(!allExpanded) }) {
                 Text(if (allExpanded) "收起全部课程" else "展开全部课程", fontSize = 12.sp)
             }
         }
-        Spacer(Modifier.height(skin.spaceXs))
+    } else {
+        null
     }
+    ServiceSectionLabel(
+        title = "培养方案 · $typeCount 个类型",
+        accent = ServiceAccent.ACADEMIC,
+        modifier = Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
+        trailing = toggle,
+    )
 }
 
 // ── 汇总卡片 ──
@@ -569,66 +574,74 @@ internal fun AcademicTreeHeader(
 /**
  * 学业汇总卡（绩点 + 学分环 + 一行脚注）。
  *
- * ## 版式（2026-10 美化时重排）
+ * ## 版式（2026-10 第二次美化：从"白卡"升级成"主视觉卡"）
  *
- * **一个主角 + 一行脚注**：左边学分环（这一页最想让人一眼看到的"修了多少"），
- * 右边绩点（同样是大字，但排在环的右侧，两者并排而不是上下叠）。
- * 学号与「计划内通过 N 门」压成**最底下一行弱化小字** ——
- * 它们是"核实身份用"的信息，不该与绩点争字号（改造前它们占着右上角两行，
- * 与左下的大字形成两块同重的视觉，卡里还空出一大块）。
+ * 这一页此前是一张白卡 + 页底灰，翻进来像一张表单；而服务页里的其余二级页
+ * （成绩查询 / 成绩档案）都已经是「语义色深底 hero + 白字」。这里改走同一套语言：
+ * 语义色取 [ServiceAccent.ACADEMIC]（与「成绩查询」同源），所以"点的是学业卡，进来还是学业色"。
+ *
+ * 结构仍是**一个主角 + 一行脚注**：右边学分环是"修了多少"的图形答案，
+ * 左边绩点是数字答案，学号 / 计划内通过 / 计划内未修压成底部胶囊 ——
+ * 它们是"核实身份用"的信息，不该与绩点争字号。
  *
  * `internal` 而非 `private`：整页 `ResultContent` 依赖 ViewModel、渲不出来，
  * 而这条卡上有两个**只能靠语义树守**的约定（学号必须脱敏、学分为 0 时不显示「还差」），
  * 所以把它抽成纯入参组件供 `AcademicQueryPrivacyTest` / `AcademicQueryScreenshotTest` 直接渲染。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SummaryCard(summary: AcademicSummary, progress: CreditProgress?) {
     val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusChip),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = skin.spaceLg, vertical = 14.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (progress != null) {
-                    CreditRing(progress = progress, modifier = Modifier.size(78.dp))
-                    Spacer(Modifier.width(skin.spaceLg))
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("平均学分绩点", fontSize = 12.sp, color = colors.textTertiary)
+    ServiceHeroCard(accent = ServiceAccent.ACADEMIC) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "平均学分绩点",
+                    fontSize = 12.sp,
+                    // 0.9 而不是 0.7：主视觉卡底压到亮度 ≤ 0.16，70% 白字只有约 3:1。
+                    color = Color.White.copy(alpha = 0.9f),
+                )
+                Spacer(Modifier.height(skin.spaceXs))
+                Text(
+                    summary.gpa.ifBlank { "—" },
+                    fontSize = 42.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    lineHeight = 50.sp,
+                )
+                if (progress != null && progress.required > 0f) {
+                    Spacer(Modifier.height(skin.spaceSm))
                     Text(
-                        summary.gpa.ifBlank { "—" },
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = accentColor()
+                        "已获 ${"%.1f".format(progress.earned)} / 要求 ${"%.1f".format(progress.required)} 学分",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.9f),
                     )
-                    if (progress != null && progress.required > 0f) {
-                        Spacer(Modifier.height(skin.spaceMicro))
-                        Text(
-                            "已获 ${"%.1f".format(progress.earned)} / 要求 ${"%.1f".format(progress.required)} 学分",
-                            fontSize = 12.sp,
-                            color = colors.textSecondary
-                        )
-                    }
                 }
             }
-            val footnote = buildList {
-                // ⚠️ 必须脱敏：学号是全项目共用一条规则的敏感值（util/StudentIdMask.kt），
-                // 这一页曾经整串印出来 —— 与「我的」页/选课页的显示口径不一致，
-                // 也会在截图分享时把学号漏出去。
-                if (summary.studentId.isNotBlank()) add("学号 ${maskStudentId(summary.studentId)}")
-                if (summary.plannedPassed.isNotBlank()) add("计划内通过 ${summary.plannedPassed} 门")
-                if (summary.plannedMissed.isNotBlank()) add("计划内未修 ${summary.plannedMissed} 门")
-            }.joinToString("  ·  ")
-            if (footnote.isNotBlank()) {
-                Spacer(Modifier.height(skin.spaceMd))
-                Text(footnote, fontSize = 11.sp, color = colors.textTertiary)
+            Spacer(Modifier.width(skin.spaceMd))
+            if (progress != null) {
+                CreditRing(progress = progress, modifier = Modifier.size(84.dp))
+            } else {
+                ServiceHeroBadge(Icons.Filled.School)
+            }
+        }
+        val chips = buildList {
+            // ⚠️ 必须脱敏：学号是全项目共用一条规则的敏感值（util/StudentIdMask.kt），
+            // 这一页曾经整串印出来 —— 与「我的」页/选课页的显示口径不一致，
+            // 也会在截图分享时把学号漏出去。
+            if (summary.studentId.isNotBlank()) add("学号 ${maskStudentId(summary.studentId)}")
+            if (summary.plannedPassed.isNotBlank()) add("计划内通过 ${summary.plannedPassed} 门")
+            if (summary.plannedMissed.isNotBlank()) add("计划内未修 ${summary.plannedMissed} 门")
+        }
+        if (chips.isNotEmpty()) {
+            Spacer(Modifier.height(skin.spaceLg))
+            // FlowRow 而不是一行三枚：小屏（360dp）+ 系统字号放大时，
+            // 三枚胶囊加起来会超过卡片内宽 —— 换行比被裁掉或缩成小字好。
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(skin.spaceSm),
+                verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
+            ) {
+                chips.forEach { ServiceHeroChip(it) }
             }
         }
     }
@@ -637,7 +650,6 @@ internal fun SummaryCard(summary: AcademicSummary, progress: CreditProgress?) {
 /** 学分完成度环形进度：中心显示百分比，外圈按已获/要求绘制（与总进度条同一套金属金）。 */
 @Composable
 private fun CreditRing(progress: CreditProgress, modifier: Modifier = Modifier) {
-    val colors = LocalPocketXiaoliColors.current
     // 这枚环代表**总进度**（培养方案总学分），所以用总进度金属金、并在弧上走一遍
     // `#FFD700 → #F9A825` 的扫掠渐变 —— 与那条金属条同一个"材质"，两处不会各长一样。
     // 渐变的两个端点都**不透明**（用户要求"去掉任何降低透明度的属性"）。
@@ -648,8 +660,10 @@ private fun CreditRing(progress: CreditProgress, modifier: Modifier = Modifier) 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val stroke = 7.dp.toPx()
+            // 轨道用白 20%：压在深色 hero 上仍看得见"没修完的那一段"，
+            // 而不会与金色进度抢注意力。
             drawArc(
-                color = colors.surfaceHighlight,
+                color = Color.White.copy(alpha = 0.20f),
                 startAngle = -90f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -668,11 +682,11 @@ private fun CreditRing(progress: CreditProgress, modifier: Modifier = Modifier) 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 if (ratio != null) "${(ratio * 100).roundToInt()}%" else "—",
-                fontSize = 16.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = colors.textPrimary
+                color = Color.White
             )
-            Text("学分", fontSize = 10.sp, color = colors.textTertiary)
+            Text("学分", fontSize = 10.sp, color = Color.White.copy(alpha = 0.9f))
         }
     }
 }
@@ -680,24 +694,22 @@ private fun CreditRing(progress: CreditProgress, modifier: Modifier = Modifier) 
 private fun CourseStatsCard(summary: AcademicSummary) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusChip),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = skin.spaceLg, vertical = 12.dp)) {
-            Text("培养方案完成情况", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-            Spacer(Modifier.height(10.dp))
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(horizontal = skin.spaceLg, vertical = skin.spaceMd)) {
+            Text("培养方案完成情况", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Spacer(Modifier.height(skin.spaceMd))
             if (summary.plannedTotal.isNotBlank()) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     StatCell("计划内总数", summary.plannedTotal, Modifier.weight(1f))
-                    StatCell("通过", summary.plannedPassed, Modifier.weight(1f))
-                    StatCell("未通过", summary.plannedFailed, Modifier.weight(1f))
+                    // 数值按语义上色：通过=绿、未通过=红、在读=蓝 ——
+                    // 三格数字同色时，用户得先读标题才知道哪格是"坏消息"。
+                    StatCell("通过", summary.plannedPassed, Modifier.weight(1f), colors.success)
+                    StatCell("未通过", summary.plannedFailed, Modifier.weight(1f), colors.danger)
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(skin.spaceMd))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     StatCell("未修", summary.plannedMissed, Modifier.weight(1f))
-                    StatCell("在读", summary.plannedIn, Modifier.weight(1f))
+                    StatCell("在读", summary.plannedIn, Modifier.weight(1f), colors.info)
                     Spacer(Modifier.weight(1f))
                 }
             }
@@ -706,8 +718,8 @@ private fun CourseStatsCard(summary: AcademicSummary) {
                 HorizontalDivider(color = Divider, thickness = 0.5.dp)
                 Spacer(Modifier.height(skin.spaceSm))
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    StatCell("计划外通过", summary.unplannedPassed, Modifier.weight(1f))
-                    StatCell("计划外未通过", summary.unplannedFailed, Modifier.weight(1f))
+                    StatCell("计划外通过", summary.unplannedPassed, Modifier.weight(1f), colors.success)
+                    StatCell("计划外未通过", summary.unplannedFailed, Modifier.weight(1f), colors.danger)
                 }
             }
         }
@@ -715,15 +727,20 @@ private fun CourseStatsCard(summary: AcademicSummary) {
 }
 
 @Composable
-private fun StatCell(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color? = null,
+) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             value.ifBlank { "—" },
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = valueColor ?: colors.textPrimary
         )
         Spacer(Modifier.height(skin.spaceMicro))
         Text(label, fontSize = 11.sp, color = colors.textTertiary)
@@ -1139,11 +1156,7 @@ private fun AcademicCourseCard(item: AcademicCourseItem) {
         CourseStatusTone.FAILED -> colors.danger
         CourseStatusTone.UNTAKEN -> colors.textTertiary
     }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusChip),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard)
-    ) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
         // ⚠️ `height(IntrinsicSize.Min)` 不能省：左侧色条用 `fillMaxHeight()`，
         // 而它需要**确定的高度约束** —— 在 LazyColumn 里直接给的是无限高，色条会画成 0 高
         //（看着就是"根本没画"，渲图对比才发现的）。IntrinsicSize.Min 让 Row 先量出内容高度。

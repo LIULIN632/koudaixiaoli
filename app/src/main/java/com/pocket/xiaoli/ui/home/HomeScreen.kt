@@ -102,6 +102,7 @@ fun HomeScreen(
     onOpenNotifications: () -> Unit = {},
     /** 时钟旁的天气胶囊：打开天气页（命名路由 `weather`，见 AppNavigation）。 */
     onOpenWeather: () -> Unit = {},
+    onOpenElectricity: () -> Unit = {},
     /**
      * 从某条自定义待办起一个番茄钟（`taskId` 是 `tasks.id`）。
      *
@@ -147,6 +148,7 @@ fun HomeScreen(
         onOpenGlobalSearch = onOpenGlobalSearch,
         onOpenNotifications = onOpenNotifications,
         onOpenWeather = onOpenWeather,
+        onOpenElectricity = onOpenElectricity,
         onAddTodo = { showAddTodo = true },
         onToggleExam = viewModel::toggleExam,
         onDeleteExam = viewModel::deleteExam,
@@ -207,6 +209,7 @@ internal fun HomeContent(
     onOpenGlobalSearch: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     onOpenWeather: () -> Unit = {},
+    onOpenElectricity: () -> Unit = {},
     onAddTodo: () -> Unit = {},
     onToggleExam: (ExamEntity) -> Unit = {},
     onDeleteExam: (ExamEntity) -> Unit = {},
@@ -323,6 +326,16 @@ internal fun HomeContent(
                                         count = state.pendingExams.size +
                                             state.pendingHomework.size +
                                             state.pendingTasks.size,
+                                    )
+                                }
+                            }
+                            // 电费提醒不是待办：不计入条数，但排在考试前（欠费比作业更急）。
+                            state.electricityAlert?.let { alert ->
+                                item(key = "electricity_alert") {
+                                    ElectricityReminderRow(
+                                        alert = alert,
+                                        onClick = onOpenElectricity,
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }

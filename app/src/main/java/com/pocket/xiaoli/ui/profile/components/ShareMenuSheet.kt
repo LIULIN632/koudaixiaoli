@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.ui.components.SectionCaption
+import com.pocket.xiaoli.ui.components.SheetBackToDismiss
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
@@ -78,6 +79,7 @@ internal fun ShareMenuDialog(
         title = "备份与分享",
         onDismissRequest = onDismiss,
     ) {
+        SheetBackToDismiss(onDismiss = onDismiss)
         ShareMenuBody(
             onGenerateCode = onGenerateCode,
             onExportImage = onExportImage,

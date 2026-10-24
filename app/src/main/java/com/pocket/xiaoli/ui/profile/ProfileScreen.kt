@@ -497,17 +497,6 @@ fun ProfileScreen(
         )
     }
 
-    /**
-     * 洗澡格子的副标题。
-     *
-     * 已登录趣智校园 → 显示姓名（拿不到就显示打码手机号）；未登录 → 引导登录。
-     * 这样用户不点进去也能看出「这一格跟我的账号有关、还差一步」。
-     */
-    val showerSession by container.qzxySessionStore.session.collectAsStateWithLifecycle()
-    val showerHint = showerSession?.let { s ->
-        s.name.ifBlank { s.telephone.replaceRange(3, 7, "****") }
-    } ?: "登录后查看余额"
-
     // 原 `appearanceMode` / `campusLayoutMode` 的订阅已移除：它们的消费者是「通用设置」页，
     // 而那一页 2026-10 已合并进设置页 —— 值由 ProfileSettingsScreen 自己订阅，
     // 父页再订一份只会多两次无谓重组。
@@ -767,6 +756,42 @@ fun ProfileScreen(
         ShowerScreen(onBack = { showShower = false })
         return
     }
+
+    /**
+     * 洗澡格子的副标题：**一卡通剩余余额**（2026-10 用户要求，替换原来的姓名 / 打码手机号）。
+     *
+     * 数据与洗澡页顶部那个大数字同源（`QzxyRepository.campusBalance`），
+     * 所以两处不会出现两个余额。放在「洗澡页 return」之后：洗澡页自己会查一次，
+     * 这里不必在它开着时再查；从洗澡页返回后正文重新组合，拿到的就是刚消费后的新值。
+     *
+     * 四种「没有数字」的状态由 [showerTileHint] 分开表达 —— 查不到不能写成 ¥0.00。
+     */
+    val showerSession by container.qzxySessionStore.session.collectAsStateWithLifecycle()
+    var showerBalance by remember(showerSession?.telephone) { mutableStateOf<Double?>(null) }
+    var showerBalanceSigned by remember(showerSession?.telephone) { mutableStateOf<Boolean?>(null) }
+    var showerBalanceLoading by remember(showerSession?.telephone) {
+        mutableStateOf(showerSession != null)
+    }
+    LaunchedEffect(showerSession?.telephone) {
+        val session = showerSession
+        if (session == null) {
+            showerBalance = null
+            showerBalanceSigned = null
+            showerBalanceLoading = false
+            return@LaunchedEffect
+        }
+        showerBalanceLoading = true
+        val info = container.qzxyRepository.campusBalance().getOrNull()
+        showerBalance = info?.amountYuan
+        showerBalanceSigned = info?.isSigned
+        showerBalanceLoading = false
+    }
+    val showerHint = showerTileHint(
+        loggedIn = showerSession != null,
+        loading = showerBalanceLoading,
+        balance = showerBalance,
+        signed = showerBalanceSigned,
+    )
 
     // 「我的」页正文。
     //

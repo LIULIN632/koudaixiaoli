@@ -51,6 +51,7 @@ import com.pocket.xiaoli.network.DownloadProgressText
 import com.pocket.xiaoli.network.NetworkLogStore
 import com.pocket.xiaoli.telemetry.Telemetry
 import com.pocket.xiaoli.telemetry.TelemetryEvent
+import com.pocket.xiaoli.ui.components.SheetBackToDismiss
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.accentColor
 import com.pocket.xiaoli.util.AppVersion
@@ -390,6 +391,7 @@ internal fun AppUpdateSheetHost(controller: AppUpdatePromptController) {
         allowDismiss = !info.force,
         onDismissRequest = { if (!info.force) controller.dismiss() },
     ) {
+        SheetBackToDismiss(enabled = !info.force) { controller.dismiss() }
         AppUpdateSheetBody(
             force = info.force,
             notes = info.notes,

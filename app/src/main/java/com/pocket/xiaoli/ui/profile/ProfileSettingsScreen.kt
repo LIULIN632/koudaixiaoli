@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.di.AppContainer
+import com.pocket.xiaoli.ui.components.campusui.rememberCampusScrollState
 import com.pocket.xiaoli.ui.profile.components.OptionsDialog
 import com.pocket.xiaoli.ui.profile.components.SkinPreviewDialog
 import com.pocket.xiaoli.ui.theme.BottomBarStyle
@@ -197,6 +198,11 @@ fun ProfileSettingsScreen(
     /** 当前打开的二级页；null = 停在设置首页。 */
     var subPage by remember { mutableStateOf<SettingsSubPage?>(null) }
 
+    // 设置首页的滚动位置要跨两层存活：进二级页（本函数内 `return`）会销毁这段列表，
+    // 进「时间段管理」这类外层整页时连本函数本身都会被销毁。用带记忆的实现，
+    // 两种返回都回到原处（与服务页 2026-10 那次修复同一类问题）。
+    val homeScrollState = rememberCampusScrollState("profile_settings")
+
     // 二级页在本 Composable **内部**换页，不走 `ProfileScreen` 的路由
     //（理由见 SettingsSubPages.kt 的文件头）。返回键由下面这个内层 BackHandler 接管 ——
     // Compose 的 BackHandler 内层优先，所以它天然比父页那个先拿到返回键。
@@ -256,7 +262,7 @@ fun ProfileSettingsScreen(
                 // 页底用 surfaceBase（与「我的」页一致）。改造前这里用的是 surfaceAlt
                 //（比页底再深一档），造成"进设置页像进了另一个 App"。
                 .background(colors.surfaceBase)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(homeScrollState)
                 .padding(horizontal = skin.spaceLg, vertical = 12.dp),
         ) {
             SettingsHomeContent(
@@ -324,7 +330,7 @@ private val SETTINGS_CATEGORIES = listOf(
         page = SettingsSubPage.CONTRIBUTE,
         icon = Icons.Filled.Favorite,
         title = "贡献",
-        subtitle = "报问题 · 提建议 · 参与开发",
+        subtitle = "校园共建榜 · 报问题 · 参与开发",
         accent = ServiceAccent.PAYMENT,
     ),
     SettingsCategory(

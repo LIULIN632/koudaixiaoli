@@ -50,11 +50,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.BuildConfig
+import com.pocket.xiaoli.data.contribution.ContributionAction
 import com.pocket.xiaoli.data.feedback.FeedbackCategory
 import com.pocket.xiaoli.data.feedback.FeedbackDraft
 import com.pocket.xiaoli.data.feedback.FeedbackFormatter
 import com.pocket.xiaoli.data.feedback.FeedbackRemote
 import com.pocket.xiaoli.data.feedback.FeedbackStore
+import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import kotlinx.coroutines.launch
@@ -90,12 +92,13 @@ private const val FEEDBACK_REPO = "LIULIN632/koudaixiaoli"
  * 「附带设备信息」默认**关**。不勾时正文里只有用户自己写的字。
  */
 @Composable
-internal fun ColumnScope.FeedbackContent() {
+internal fun ColumnScope.FeedbackContent(container: AppContainer) {
     val context = LocalContext.current
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val scope = rememberCoroutineScope()
     val store = remember { FeedbackStore(context) }
+    val contribution = remember(container) { container.contributionRepository }
 
     var draft by remember { mutableStateOf(FeedbackDraft()) }
     var sending by remember { mutableStateOf(false) }
@@ -232,6 +235,9 @@ internal fun ColumnScope.FeedbackContent() {
                             sending = true
                             val error = FeedbackRemote.submit(draft, ticket, now, diagnostics)
                             sending = false
+                            if (error == null) {
+                                contribution.record(ContributionAction.FEEDBACK_SEND)
+                            }
                             Toast.makeText(
                                 context,
                                 error ?: "已发送 · 工单 $ticket",
@@ -274,6 +280,7 @@ internal fun ColumnScope.FeedbackContent() {
                         val (now, ticket) = openTicket()
                         val url = FeedbackFormatter.mailtoUrl(FEEDBACK_MAIL, draft, ticket, now, diagnostics)
                         runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(url))) }
+                            .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
                             .onFailure { copyToClipboard(body(), "没找到邮件 App，已复制内容") }
                     },
                     enabled = enabled,
@@ -287,6 +294,7 @@ internal fun ColumnScope.FeedbackContent() {
                         val (now, ticket) = openTicket()
                         val url = FeedbackFormatter.issueUrl(FEEDBACK_REPO, draft, ticket, now, diagnostics)
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                            .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
                             .onFailure { copyToClipboard(body(), "打不开浏览器，已复制内容") }
                     },
                     enabled = enabled,
@@ -305,7 +313,9 @@ internal fun ColumnScope.FeedbackContent() {
                     }
                     runCatching {
                         context.startActivity(Intent.createChooser(intent, "分享反馈"))
-                    }.onFailure { copyToClipboard(body(), "没有可分享的应用，已复制内容") }
+                    }
+                        .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
+                        .onFailure { copyToClipboard(body(), "没有可分享的应用，已复制内容") }
                 },
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),

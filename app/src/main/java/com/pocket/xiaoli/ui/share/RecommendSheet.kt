@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
+import com.pocket.xiaoli.ui.components.SheetBackToDismiss
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -58,6 +59,7 @@ fun RecommendSheet(
         title = "推荐给同学",
         onDismissRequest = onDismiss,
     ) {
+        SheetBackToDismiss(onDismiss = onDismiss)
         RecommendSheetBody(
             qr = qr,
             onCopyLink = { url ->

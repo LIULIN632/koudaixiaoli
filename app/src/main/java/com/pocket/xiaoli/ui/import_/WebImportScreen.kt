@@ -12,7 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -44,12 +43,14 @@ import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.ui.components.SchoolFavoriteButton
 import com.pocket.xiaoli.ui.components.PocketPasswordTransformation
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.LocalSchoolSearchField
+import com.pocket.xiaoli.ui.components.LocalSchoolsEmptyState
 import com.pocket.xiaoli.ui.components.SectionCaption
+import com.pocket.xiaoli.ui.components.localSchoolItems
 import com.pocket.xiaoli.ui.profile.components.SchoolRequestDialog
 import com.pocket.xiaoli.network.CookieStore
 import com.pocket.xiaoli.ui.theme.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.pocket.xiaoli.ui.components.SchoolRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -510,119 +511,41 @@ fun WebImportScreen(
                         }
                     }
                     item {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { viewModel.updateSearch(it) },
-                            placeholder = { Text("搜索学校名称或城市") },
-                            leadingIcon = { Icon(Icons.Outlined.Search, null, tint = colors.textTertiary) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(skin.radiusMicro),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = accentColor(),
-                                unfocusedBorderColor = colors.borderDivider
-                            )
+                        LocalSchoolSearchField(
+                            query = searchQuery,
+                            onQueryChange = { viewModel.updateSearch(it) },
                         )
                     }
                     if (filteredSchools.isEmpty()) {
                         item {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = skin.spaceXxl),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    if (searchQuery.isEmpty()) "暂无可用学校" else "未找到「${searchQuery}」",
-                                    fontSize = 13.sp,
-                                    color = colors.textTertiary
-                                )
-                                if (searchQuery.isNotEmpty()) {
-                                    Spacer(Modifier.height(skin.spaceSmall))
-                                    TextButton(onClick = { showSchoolRequest = true }) {
-                                        Text("不是你要找的学校？反馈", color = accentColor(), fontSize = 13.sp)
-                                    }
-                                }
-                            }
+                            LocalSchoolsEmptyState(
+                                query = searchQuery,
+                                onFeedback = { showSchoolRequest = true },
+                            )
                         }
                     } else {
-                        val favSchools = filteredSchools.filter { it.id in favoriteIds }
-                        val otherSchools = filteredSchools.filter { it.id !in favoriteIds }
-
-                        // ── Favorites section ──
-                        if (favSchools.isNotEmpty()) {
-                            item {
-                                SectionCaption(
-                                    "我的收藏",
-                                    Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
-                                )
-                            }
-                            items(favSchools, key = { it.id }) { school ->
-                                SchoolRow(
-                                    school = school,
-                                    isFavorite = true,
-                                    onSelect = {
-                                        if (school.baseUrl.isBlank()) {
-                                            // 内置未收录地址 → 完善学校信息（与教务直连导入一致）
-                                            pendingBlankSchool = school
-                                            freeNameInput = school.name
-                                            freeUrlInput = ""
-                                            freeJwType = school.jwType
-                                            showFreeUrlDialog = true
-                                        } else {
-                                            viewModel.selectSchool(school)
-                                            viewModel.setCustomUrl("")
-                                            val loadUrl = viewModel.getEffectiveUrl() ?: school.baseUrl
-                                            webView.loadUrl(loadUrl.trimEnd('/'))
-                                        }
-                                    },
-                                    onToggleFavorite = { viewModel.toggleFavorite(school) }
-                                )
-                            }
-                            item {
-                                HorizontalDivider(
-                                    color = colors.textTertiary.copy(alpha = 0.3f),
-                                    thickness = 1.dp,
-                                    modifier = Modifier.padding(vertical = skin.spaceSm)
-                                )
-                            }
-                            item {
-                                SectionCaption(
-                                    "烟台学校",
-                                    Modifier.padding(top = skin.spaceSm, bottom = skin.spaceMicro),
-                                )
+                        val pickSchool: (School) -> Unit = { school ->
+                            if (school.baseUrl.isBlank()) {
+                                // 内置未收录地址 → 完善学校信息（与教务直连导入一致）
+                                pendingBlankSchool = school
+                                freeNameInput = school.name
+                                freeUrlInput = ""
+                                freeJwType = school.jwType
+                                showFreeUrlDialog = true
+                            } else {
+                                viewModel.selectSchool(school)
+                                viewModel.setCustomUrl("")
+                                val loadUrl = viewModel.getEffectiveUrl() ?: school.baseUrl
+                                webView.loadUrl(loadUrl.trimEnd('/'))
                             }
                         }
-
-                        // ── All schools section ──
-                        items(otherSchools, key = { it.id }) { school ->
-                            SchoolRow(
-                                school = school,
-                                isFavorite = school.id in favoriteIds,
-                                onSelect = {
-                                    if (school.baseUrl.isBlank()) {
-                                        // 内置未收录地址 → 完善学校信息（与教务直连导入一致）
-                                        pendingBlankSchool = school
-                                        freeNameInput = school.name
-                                        freeUrlInput = ""
-                                        freeJwType = school.jwType
-                                        showFreeUrlDialog = true
-                                    } else {
-                                        viewModel.selectSchool(school)
-                                        viewModel.setCustomUrl("")
-                                        val loadUrl = viewModel.getEffectiveUrl() ?: school.baseUrl
-                                        webView.loadUrl(loadUrl.trimEnd('/'))
-                                    }
-                                },
-                                onToggleFavorite = { viewModel.toggleFavorite(school) }
-                            )
-                        }
-                        item {
-                            Text(
-                                "列表只收烟台院校，外地学校可点上方「添加自己的学校」手动添加",
-                                fontSize = 11.sp,
-                                color = colors.textTertiary,
-                                modifier = Modifier.padding(top = skin.spaceSm),
-                            )
-                        }
+                        localSchoolItems(
+                            schools = filteredSchools,
+                            favoriteIds = favoriteIds,
+                            onSelect = pickSchool,
+                            onToggleFavorite = { viewModel.toggleFavorite(it) },
+                            footer = "列表只收烟台院校，外地学校可点上方「添加自己的学校」手动添加",
+                        )
                     }
                 }
             } else {

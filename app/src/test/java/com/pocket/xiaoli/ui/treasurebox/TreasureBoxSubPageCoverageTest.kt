@@ -29,7 +29,7 @@ import org.junit.Test
  * `subPage != null` 就是"有子页"，`subPage = null` 就是"复位"。
  * 所以**原来那三条断言已经没有可断言的对象了**，本测试随之改写为守卫**新结构的不变量**。
  *
- * ## 它现在守的四条
+ * ## 它现在守的五条
  *
  * | # | 不变量 | 挡住什么 |
  * |---|---|---|
@@ -37,6 +37,7 @@ import org.junit.Test
  * | 2 | 源码里不许再有 `var showXxx by remember` | 有人把 24 个布尔量的老写法加回来 |
  * | 3 | `BackHandler` 复位体是**单一** `subPage = null` | 有人在复位体里逐项枚举（老病的复发口）|
  * | 4 | **每个 `ServiceSubPage` 条目都被接线**：至少一次置位（`subPage = ServiceSubPage.X`）+ 一次比较（`subPage == ServiceSubPage.X`）| 加了新子页却忘了接线 —— **这是原"集合相等"在新结构下的对应物，而且更强**（同时挡住"无法到达的子页"和"漏进 dispatcher 的子页"）|
+ * | 5 | 列表滚动状态声明在**子页分发之前**，两个列表分支共用 | 状态跟着 `return` 一起被销毁，从子页返回时跳回顶部（2026-10 用户反馈）|
  *
  * ⚠️ 用源码扫描（非反射）的理由与原版相同：`subPage` 是 Composable 内的局部状态，
  * JVM 单测拿不到。路径按 Gradle Test worker 的工作目录（模块根）解析，
@@ -181,6 +182,35 @@ class TreasureBoxSubPageCoverageTest {
                 stale.joinToString("、"),
             emptyList<String>(),
             stale,
+        )
+    }
+
+    /**
+     * 2026-10 用户反馈：从服务页点进任意二级页再返回，列表回到了顶部。
+     *
+     * 成因是结构性的：所有二级页都用 `return` 独占整屏，列表会**整体离开组合**。
+     * `rememberScrollState()` 若写在 `if (asTab)` 分支里，会跟分支一起被销毁 ——
+     * 返回时重新从 0 开始。状态必须声明在第一个子页分发分支**之前**，两个列表分支共用。
+     */
+    @Test
+    fun `列表滚动状态必须声明在子页分发之前`() {
+        val declared = screen.indexOf("val servicesScrollState = rememberScrollState()")
+        assertTrue(
+            "找不到 `val servicesScrollState = rememberScrollState()`：列表滚动状态必须由它提供",
+            declared >= 0,
+        )
+        val firstDispatch = screen.indexOf("if (subPage == ServiceSubPage.")
+        assertTrue("源码里找不到子页分发分支", firstDispatch >= 0)
+        assertTrue(
+            "`servicesScrollState` 必须声明在第一个 `if (subPage == …)` 之前：" +
+                "二级页 `return` 时它会被一起销毁，返回后滚动位置归零。",
+            declared < firstDispatch,
+        )
+        assertEquals(
+            "两个列表分支（底栏 tab / 百宝箱）都要把同一个状态交给 `verticalScroll`：" +
+                "任一处漏掉，那个入口返回后仍会跳回顶部。",
+            2,
+            Regex("""verticalScroll\(servicesScrollState\)""").findAll(screen).count(),
         )
     }
 

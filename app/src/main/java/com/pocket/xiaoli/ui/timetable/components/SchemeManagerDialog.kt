@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.entity.SchemeEntity
+import com.pocket.xiaoli.ui.components.SheetBackToDismiss
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
@@ -93,6 +94,7 @@ fun SchemeManagerDialog(
         title = "课表管理",
         onDismissRequest = onDismiss,
     ) {
+        SheetBackToDismiss(onDismiss = onDismiss)
         SchemeManagerBody(
             schemes = schemes,
             activeSchemeId = activeSchemeId,

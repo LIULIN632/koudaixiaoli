@@ -152,6 +152,10 @@ fun ShowerScreen(
         if (state.isLoggedIn) vm.loadUseCode()
     }
 
+    // 扫码页是整屏 `return`，主页面会整体离开组合。滚动状态必须提到分流之前，
+    // 否则 `rememberScrollState` 被销毁，扫码回来页面又跳回顶部。
+    val showerScrollState = rememberScrollState()
+
     if (showScanner) {
         QzxyQrScanDialog(
             onScanned = { raw ->
@@ -247,7 +251,7 @@ fun ShowerScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .background(colors.surfaceAlt)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(showerScrollState)
                 .padding(horizontal = skin.spaceLg, vertical = skin.spaceMd),
             verticalArrangement = Arrangement.spacedBy(skin.spaceMd),
         ) {

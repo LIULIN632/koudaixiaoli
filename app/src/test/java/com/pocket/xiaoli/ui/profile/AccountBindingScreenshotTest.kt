@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -25,6 +27,7 @@ import com.pocket.xiaoli.util.BindingValidators
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
+import com.pocket.xiaoli.ui.theme.ServiceAccent
 import com.pocket.xiaoli.ui.theme.SkinStyle
 import org.junit.Rule
 import org.junit.Test
@@ -205,7 +208,7 @@ class AccountBindingScreenshotTest {
         /** true = 渲染"点过提交之后"的形态：三个字段下方带红字原因 */
         val showErrors: Boolean = false,
         /** 「验证并保存」那条路的结果 */
-        val verify: AcademicVerifyUi = AcademicVerifyUi.Idle,
+        val verify: BindingActionUi = BindingActionUi.Idle,
     )
 
     private val formCases = listOf(
@@ -247,7 +250,20 @@ class AccountBindingScreenshotTest {
             studentId = "2023123456789",
             password = "错的密码哈哈哈",
             passwordVisible = false,
-            verify = AcademicVerifyUi.Failed("学号或密码不正确，请核对后重试"),
+            verify = BindingActionUi.Failed(
+                message = "学号或密码不正确，请核对后重试",
+                hint = "核对学号与密码后重试；改过密码请填新密码。教务系统维护时可选「仅保存」。",
+            ),
+        ),
+        // 验证进行中：转圈 + 进度文案（慢网下"有没有在跑"必须看得出来）
+        FormCase(
+            name = "307-binding-academic-verify-running",
+            dark = false,
+            school = "烟台理工学院",
+            studentId = "2023123456789",
+            password = "Ytlg@56789",
+            passwordVisible = false,
+            verify = BindingActionUi.Running("正在连接教务系统……"),
         ),
     )
 
@@ -484,5 +500,317 @@ class AccountBindingScreenshotTest {
                 onPick = {},
             )
         }
+    }
+
+    // ── 今日校园 / 校园卡两张表单 ──
+    //
+    // 这两张此前一直内联在整页里（吃 `AppContainer`），没有视觉基线。抽成
+    // `CasAccountSection` / `CardAccountSection` 之后，这里渲的就是生产代码本体。
+
+    private data class TodayCampusCase(
+        val name: String,
+        val dark: Boolean,
+        val studentId: String,
+        val password: String,
+        val passwordVisible: Boolean,
+        val loginState: BindingActionUi,
+        val portalLoggedIn: Boolean?,
+        val showErrors: Boolean = false,
+    )
+
+    private val todayCampusCases = listOf(
+        // 已绑 + 门户已登录：登录态是绿的，两个动作都在
+        TodayCampusCase(
+            name = "301-binding-today-campus",
+            dark = false,
+            studentId = "2023123456789",
+            password = "Ytlg@56789",
+            passwordVisible = false,
+            loginState = BindingActionUi.Idle,
+            portalLoggedIn = true,
+        ),
+        // 深色 + 明文密码 + 已绑但当前未登录（橙色待办点）
+        TodayCampusCase(
+            name = "302-binding-today-campus-dark",
+            dark = true,
+            studentId = "2023123456789",
+            password = "我自己改过的密码",
+            passwordVisible = true,
+            loginState = BindingActionUi.Idle,
+            portalLoggedIn = false,
+        ),
+        // 点过提交之后的错误态：两个字段下方各给一句具体原因
+        TodayCampusCase(
+            name = "303-binding-today-campus-invalid",
+            dark = false,
+            studentId = "2023abc",
+            password = "123",
+            passwordVisible = false,
+            loginState = BindingActionUi.Idle,
+            portalLoggedIn = null,
+            showErrors = true,
+        ),
+        // 要验证码：原生这条路走不通时，把"去哪儿填验证码"写在按钮上方，
+        // 而不是弹一次 Toast 就消失（改造前就是弹完即忘）。
+        TodayCampusCase(
+            name = "308-binding-today-campus-login-blocked",
+            dark = false,
+            studentId = "2023123456789",
+            password = "Ytlg@56789",
+            passwordVisible = false,
+            loginState = BindingActionUi.Failed(
+                message = "这次登录要图片验证码，原生登录走不通",
+                hint = "去「服务 → 今日校园」点「在内置网页登录」，账号会自动填好。",
+            ),
+            portalLoggedIn = false,
+        ),
+    )
+
+    @Test
+    fun `今日校园表单截图`() {
+        val current = mutableStateOf(todayCampusCases.first())
+        composeRule.setContent {
+            val case = current.value
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = case.dark,
+            ) {
+                TodayCampusFormPage(case)
+            }
+        }
+
+        todayCampusCases.forEach { case ->
+            composeRule.runOnIdle { current.value = case }
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/screenshots/${case.name}.png")
+        }
+    }
+
+    @Composable
+    private fun TodayCampusFormPage(case: TodayCampusCase) {
+        val skin = LocalSkin.current
+        val colors = LocalPocketXiaoliColors.current
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.surfaceBase)
+                .padding(
+                    start = skin.screenH,
+                    end = skin.screenH,
+                    top = skin.spaceMd,
+                    bottom = skin.spaceXxl,
+                ),
+            verticalArrangement = Arrangement.spacedBy(skin.sectionGap),
+        ) {
+            BindingSectionCard(
+                icon = Icons.Outlined.Today,
+                accent = ServiceAccent.INFO,
+                title = "今日校园",
+                subtitle = "智慧校园统一认证 · 校园卡（易校园）也走它",
+            ) {
+                CasAccountSection(
+                    studentId = case.studentId,
+                    onStudentIdChange = {},
+                    studentIdError = if (case.showErrors) BindingValidators.studentId(case.studentId) else null,
+                    password = case.password,
+                    onPasswordChange = {},
+                    passwordError = if (case.showErrors) BindingValidators.password(case.password) else null,
+                    passwordVisible = case.passwordVisible,
+                    onTogglePasswordVisible = {},
+                    loginState = case.loginState,
+                    portalLoggedIn = case.portalLoggedIn,
+                    hintStudentId = "2023123456789",
+                    onSave = {},
+                    onLogin = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `今日校园表单点过提交后给出具体原因`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                TodayCampusFormPage(todayCampusCases.first { it.showErrors })
+            }
+        }
+
+        composeRule.onNodeWithText("学号应是一串 6–20 位数字").assertExists()
+        composeRule.onNodeWithText("密码至少 6 位（初始密码是 Ytlg@ + 学号后 6 位）").assertExists()
+    }
+
+    @Test
+    fun `今日校园要验证码时给出网页登录退路`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                TodayCampusFormPage(todayCampusCases.first { it.name.endsWith("login-blocked") })
+            }
+        }
+
+        composeRule.onNodeWithText("这次登录要图片验证码，原生登录走不通").assertExists()
+        composeRule.onNodeWithText("去「服务 → 今日校园」点「在内置网页登录」，账号会自动填好。").assertExists()
+    }
+
+    private data class CampusCardCase(
+        val name: String,
+        val dark: Boolean,
+        val phone: String,
+        val password: String,
+        val passwordVisible: Boolean,
+        val bound: Boolean,
+        val checkState: BindingActionUi,
+        val showErrors: Boolean = false,
+    )
+
+    private val campusCardCases = listOf(
+        // 已绑 + 刚查过一次余额：成功用成功色 + 对勾图标，第二行说明"已经存下来了"
+        CampusCardCase(
+            name = "304-binding-card",
+            dark = false,
+            phone = "13800138000",
+            password = "Yxy@123456",
+            passwordVisible = false,
+            bound = true,
+            checkState = BindingActionUi.Success(
+                message = "账号可用 · 余额 ¥86.50（李同学）",
+                detail = "账号已保存到本机，之后去「服务 → 校园卡」可以直接查余额。",
+            ),
+        ),
+        // 深色 + 查询失败：主结论走 danger，第二行给"密码不是同一个"的排查方向
+        CampusCardCase(
+            name = "305-binding-card-dark",
+            dark = true,
+            phone = "13800138000",
+            password = "错的密码哈哈哈",
+            passwordVisible = false,
+            bound = true,
+            checkState = BindingActionUi.Failed(
+                message = "查询失败：账号或密码不正确",
+                hint = "易校园密码和教务 / 智慧校园都不是同一个；忘记密码请先在易校园 App 里重置。",
+            ),
+        ),
+        // 点过提交之后的错误态
+        CampusCardCase(
+            name = "306-binding-card-invalid",
+            dark = false,
+            phone = "",
+            password = "123",
+            passwordVisible = false,
+            bound = false,
+            checkState = BindingActionUi.Idle,
+            showErrors = true,
+        ),
+        // 查询进行中：慢网下必须看得出在跑
+        CampusCardCase(
+            name = "309-binding-card-checking",
+            dark = false,
+            phone = "13800138000",
+            password = "Yxy@123456",
+            passwordVisible = false,
+            bound = true,
+            checkState = BindingActionUi.Running("正在登录易校园并查询余额……"),
+        ),
+    )
+
+    @Test
+    fun `校园卡表单截图`() {
+        val current = mutableStateOf(campusCardCases.first())
+        composeRule.setContent {
+            val case = current.value
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = case.dark,
+            ) {
+                CampusCardFormPage(case)
+            }
+        }
+
+        campusCardCases.forEach { case ->
+            composeRule.runOnIdle { current.value = case }
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/screenshots/${case.name}.png")
+        }
+    }
+
+    @Composable
+    private fun CampusCardFormPage(case: CampusCardCase) {
+        val skin = LocalSkin.current
+        val colors = LocalPocketXiaoliColors.current
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.surfaceBase)
+                .padding(
+                    start = skin.screenH,
+                    end = skin.screenH,
+                    top = skin.spaceMd,
+                    bottom = skin.spaceXxl,
+                ),
+            verticalArrangement = Arrangement.spacedBy(skin.sectionGap),
+        ) {
+            BindingSectionCard(
+                icon = Icons.Outlined.CreditCard,
+                accent = ServiceAccent.PAYMENT,
+                title = "校园卡（易校园）",
+                subtitle = "易校园自己的账号，不是学号",
+            ) {
+                CardAccountSection(
+                    phone = case.phone,
+                    onPhoneChange = {},
+                    phoneError = if (case.showErrors) BindingValidators.phone(case.phone) else null,
+                    password = case.password,
+                    onPasswordChange = {},
+                    passwordError = if (case.showErrors) BindingValidators.password(case.password) else null,
+                    passwordVisible = case.passwordVisible,
+                    onTogglePasswordVisible = {},
+                    bound = case.bound,
+                    checkState = case.checkState,
+                    onSave = {},
+                    onCheck = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `校园卡表单点过提交后给出具体原因`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                CampusCardFormPage(campusCardCases.first { it.showErrors })
+            }
+        }
+
+        composeRule.onNodeWithText("请填写手机号").assertExists()
+        composeRule.onNodeWithText("密码至少 6 位（初始密码是 Ytlg@ + 学号后 6 位）").assertExists()
+    }
+
+    @Test
+    fun `校园卡查余额成功时说清账号已保存`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                CampusCardFormPage(campusCardCases.first { it.name == "304-binding-card" })
+            }
+        }
+
+        composeRule.onNodeWithText("账号可用 · 余额 ¥86.50（李同学）").assertExists()
+        composeRule.onNodeWithText("账号已保存到本机，之后去「服务 → 校园卡」可以直接查余额。").assertExists()
     }
 }

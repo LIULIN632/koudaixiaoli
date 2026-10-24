@@ -141,6 +141,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pocket.xiaoli.ui.calendar.CampusCalendarScreen
+import com.pocket.xiaoli.ui.electricity.ElectricityScreen
 import com.pocket.xiaoli.ui.exam.ExamScheduleScreen
 import com.pocket.xiaoli.ui.focus.FocusScreen
 import com.pocket.xiaoli.ui.overlay.AppOverlayHostState
@@ -585,6 +586,9 @@ fun AppNavigation(initialDeepLink: String? = null) {
                     onOpenGlobalSearch = { navController.navigate("global_search") },
                     onOpenNotifications = { navController.navigate("notifications") },
                     onOpenWeather = { navController.navigate("weather") },
+                    // 待办区的低余额提醒 → 电费页。服务页 / 「我的」里那两份入口
+                    // 是嵌在页面里的（不经过导航层），这里只服务首页这一条。
+                    onOpenElectricity = { navController.navigate("electricity") },
                     // 一键起钟：**先把钟起上再跳**。钟的真源是 FocusController
                     // （快照 + 前台服务），不在页面上 —— 所以"跳过去"只是去看它，
                     // 起钟本身必须在这里完成，否则用户点完返回首页就什么都没发生。
@@ -741,6 +745,23 @@ fun AppNavigation(initialDeepLink: String? = null) {
                 WeatherScreen(
                     repository = container.weatherRepository,
                     onBack = { navController.popBackStack() },
+                )
+            }
+
+            // 宿舍电费：首页的低余额提醒落在这一条。服务页与「我的」里各有一份
+            // 内嵌入口（不经导航层），这里不复制业务，只把同一个页面挂到路由上。
+            composable("electricity") {
+                val dormInfo by container.dormInfo.collectAsStateWithLifecycle()
+                val selectedCampus by container.selectedCampus.collectAsStateWithLifecycle()
+                ElectricityScreen(
+                    dormInfo = dormInfo,
+                    fallbackCampus = selectedCampus,
+                    onBack = { navController.popBackStack() },
+                    onOpenWeb = { url, title ->
+                        navController.navigate(
+                            "service_web?url=" + Uri.encode(url) + "&title=" + Uri.encode(title)
+                        )
+                    },
                 )
             }
 

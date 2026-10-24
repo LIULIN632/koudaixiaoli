@@ -39,7 +39,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Timer
@@ -75,6 +77,7 @@ import com.pocket.xiaoli.util.EXAM_SOON_DAYS
 import com.pocket.xiaoli.util.examCountdownText
 import com.pocket.xiaoli.util.examDaysLeft
 import java.time.LocalDate
+import kotlin.math.abs
 
 /**
  * 首页待办区的**唯一**一行。
@@ -406,6 +409,109 @@ internal fun ExamRow(
                 tint = colors.textSecondary,
                 background = colors.textSecondary.copy(alpha = 0.08f),
                 onClick = onDelete,
+            )
+        }
+    }
+}
+
+/**
+ * 首页待办区的「电费偏低」提醒行。
+ *
+ * ## 为什么它不是 [TodoRow]
+ *
+ * 它没有完成/删除语义 —— 一笔欠费不是勾一下就没了的事，唯一的动作是"去缴费"。
+ * 所以整张卡可点、没有勾选圆环、也没有删除按钮；配色沿用考试行的警示底，
+ * 因为两者都是"不处理会出事"的东西。
+ *
+ * ## 文案为什么说"上次查到"
+ *
+ * 余额来自本机记住的上一次查询（最多 24 小时，见 `ProactiveStore.BALANCE_MAX_AGE_MS`），
+ * 不是实时值。说成"当前只剩"是在替系统撒谎；点进电费页会真查一次。
+ */
+@Composable
+internal fun ElectricityReminderRow(
+    alert: HomeElectricityAlert,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalPocketXiaoliColors.current
+    val skin = LocalSkin.current
+    // 欠费比"余额偏低"更急：用 danger 而不是 warning 区分这两种状态。
+    val owed = alert.balance < 0.0
+    val tint = if (owed) colors.danger else colors.warning
+    val card = lerp(
+        colors.surfaceCard,
+        tint,
+        if (LocalDarkMode.current) 0.12f else 0.06f,
+    )
+    val amount = "¥" + "%.2f".format(abs(alert.balance))
+    SoftCard(
+        modifier = modifier.fillMaxWidth(),
+        color = card,
+        onClick = onClick,
+        contentPadding = PaddingValues(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.FlashOn,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(skin.spaceMd))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = tint.copy(alpha = 0.14f),
+                    ) {
+                        Text(
+                            text = "电费",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = tint,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = alert.dormLabel,
+                        style = PocketTypography.caption,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = if (owed) "宿舍电费已欠 $amount" else "宿舍电费只剩 $amount",
+                    style = PocketTypography.cardTitle,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "上次查到的余额，点开可刷新",
+                    style = PocketTypography.caption,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                tint = colors.textTertiary,
+                modifier = Modifier.size(20.dp),
             )
         }
     }

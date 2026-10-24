@@ -4,10 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.pocket.xiaoli.data.MockScenario
+import com.pocket.xiaoli.data.electricity.DormElectricityRepository
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.HomeworkEntity
 import com.pocket.xiaoli.data.entity.TaskEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
+import com.pocket.xiaoli.data.model.DormBuildingCatalog
+import com.pocket.xiaoli.data.model.DormInfo
+import com.pocket.xiaoli.data.model.DormServiceRouter
+import com.pocket.xiaoli.data.proactive.ProactiveRules
+import com.pocket.xiaoli.data.proactive.ProactiveStore
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.data.holiday.HolidayDay
@@ -53,6 +59,13 @@ data class HomeUiState(
     val pendingHomework: List<HomeworkEntity> = emptyList(),
     /** 未完成的考试（来自「服务 → 考试安排」的解析结果，用户确认后落库） */
     val pendingExams: List<ExamEntity> = emptyList(),
+    /**
+     * 宿舍电费低于 [ProactiveRules.LOW_BALANCE_ELECTRICITY] 时，待办区顶部的一条提醒。
+     *
+     * 余额来自本机记住的**上一次查询结果**（最多 24 小时），不是实时值 ——
+     * 界面文案必须写明「上次查到」，不能让用户拿它当现在的余额。
+     */
+    val electricityAlert: HomeElectricityAlert? = null,
     val completedTaskCount: Int = 0,
 
     /**
@@ -101,6 +114,31 @@ data class HomeUiState(
     val mockBanner: String? = null
 )
 
+/** 首页电费提醒要显示的两样东西：哪间宿舍、上次查到的余额。 */
+data class HomeElectricityAlert(
+    val dormLabel: String,
+    val balance: Double,
+)
+
+/**
+ * 只回答"该不该在首页说一句"，不查任何数据。
+ *
+ * 阈值与主动气泡共用 [ProactiveRules.LOW_BALANCE_ELECTRICITY]：气泡说"只剩 12 元"时，
+ * 首页那条的状态必须也是"只剩 12 元"，否则用户会觉得两个地方在说两件事。
+ *
+ * [storedBalance] 是本机记住的上一次查询结果（可能已经过去 24 小时），
+ * 所以调用方**不能**把它当成实时余额展示。
+ */
+internal fun electricityAlertOf(
+    dorm: DormInfo?,
+    storedBalance: Double?,
+): HomeElectricityAlert? {
+    if (dorm == null || !dorm.isBound) return null
+    val value = storedBalance ?: return null
+    if (value >= ProactiveRules.LOW_BALANCE_ELECTRICITY) return null
+    return HomeElectricityAlert(dormLabel = dorm.label, balance = value)
+}
+
 class HomeViewModel(
     private val repository: CourseRepository,
     private val settings: AppContainer
@@ -110,7 +148,11 @@ class HomeViewModel(
         val school: String,
         val semesterStart: String,
         val totalWeeks: Int,
-        val schemeId: Long
+        val schemeId: Long,
+        /** 当前校区的宿舍绑定；电费提醒要认人，不能拿别的校区的余额来念。 */
+        val dorm: DormInfo?,
+        /** 当前校区是否有原生电费余额（目前只有南校）。 */
+        val electricitySupported: Boolean,
     )
 
     private data class TimetableSnapshot(
@@ -144,13 +186,27 @@ class HomeViewModel(
         TodoSnapshot(tasks, homework, exams, scenario, focusCounts)
     }
 
+    private val dormFlow: Flow<Pair<DormInfo?, Boolean>> = combine(
+        settings.dormInfo,
+        settings.selectedCampus,
+        settings.proactiveStore.level,
+    ) { dorm, campus, level ->
+        // 支持判据与 `ElectricityScreen` 一致：南校且宿舍已绑定才有原生余额。
+        // 还要看主动提醒档位：关闭时评估器不再采集余额快照，这一行只会读到旧值。
+        val supported = dorm != null && dorm.isBound &&
+            ProactiveRules.alertsAllowed(level) &&
+            DormServiceRouter.serviceCampus(dorm, campus).id == DormBuildingCatalog.CAMPUS_SOUTH
+        dorm to supported
+    }
+
     private val metaFlow: Flow<HomeMeta> = combine(
         settings.school,
         settings.semesterStart,
         settings.semesterWeeks,
-        settings.activeSchemeId
-    ) { school, start, weeks, schemeId ->
-        HomeMeta(school, start, weeks, schemeId)
+        settings.activeSchemeId,
+        dormFlow,
+    ) { school, start, weeks, schemeId, dormState ->
+        HomeMeta(school, start, weeks, schemeId, dormState.first, dormState.second)
     }
 
     private val ticker: Flow<Unit> = flow {
@@ -205,6 +261,22 @@ class HomeViewModel(
             it.schemeId == meta.schemeId || it.schemeId == 0L
         }
 
+        // 只读已经在本机存在的数据：先看电费仓库的进程内缓存（刚在电费页刷过就是它），
+        // 再退回主动提醒记住的快照（最多 24 小时）—— 首页不为了这一行另发请求。
+        // 后者可能是旧值，所以文案说「上次查到」而不是「当前余额」。
+        val dorm = meta.dorm
+        val electricityAlert = if (meta.electricitySupported && dorm != null) {
+            val fresh = DormElectricityRepository.cachedSnapshot(dorm)?.balance?.toDoubleOrNull()
+            val stored = settings.proactiveStore.balanceSnapshot(
+                ProactiveStore.KIND_ELECTRICITY,
+                dorm.balanceIdentity,
+                ProactiveStore.BALANCE_MAX_AGE_MS,
+            )
+            electricityAlertOf(dorm = dorm, storedBalance = fresh ?: stored)
+        } else {
+            null
+        }
+
         val realState = HomeUiState(
             school = meta.school,
             week = week,
@@ -219,6 +291,7 @@ class HomeViewModel(
                 .filter { !it.completed }
                 // 解析器已把日期分隔符统一成 `-`，故字典序与时间序一致
                 .sortedBy { it.date.ifBlank { "9999-99-99" } },
+            electricityAlert = electricityAlert,
             completedTaskCount = todo.tasks.count { it.completed },
             focusCounts = todo.focusCounts,
             // ⚠️ 判据是**该方案下的课程条数**（timetable.courses），不是 todayCourses.size ——

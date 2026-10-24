@@ -87,6 +87,7 @@ internal fun AccountDangerCard(
     // false 时整张卡不渲染（理由见 BindingStatusCard 的同名参数）。
     visible: Boolean = true,
 ) {
+    val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     BindingSectionCard(
         visible = visible,
@@ -112,6 +113,15 @@ internal fun AccountDangerCard(
                     HorizontalDivider(color = colors.borderDivider)
                 }
             }
+            // 一句底线说明：这些操作只动本机，不会去改学校的密码。
+            // 用户站在"删除"按钮前最需要的正是这句 —— 没有它，删账号看起来像把学号注销了。
+            Text(
+                "以上操作只清理本机保存的数据，不会修改学校教务 / 智慧校园的密码。",
+                modifier = Modifier.padding(top = skin.spaceSm),
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = colors.textSecondary,
+            )
         }
     }
 }

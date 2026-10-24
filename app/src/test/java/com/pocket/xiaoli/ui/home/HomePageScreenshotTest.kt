@@ -52,11 +52,15 @@ class HomePageScreenshotTest {
         val name: String,
         val skin: SkinStyle,
         val dark: Boolean,
+        /** 是否摆出「电费偏低」提醒行。 */
+        val lowBalance: Boolean = false,
     )
 
     private val cases = listOf(
         Case("119-home-page-vivid", SkinStyle.VIVID, dark = false),
         Case("250-home-page-vivid-dark", SkinStyle.VIVID, dark = true),
+        Case("322-home-electricity-reminder", SkinStyle.VIVID, dark = false, lowBalance = true),
+        Case("323-home-electricity-reminder-dark", SkinStyle.VIVID, dark = true, lowBalance = true),
     )
 
     private val fixedNow: LocalDateTime = LocalDateTime.of(2026, 10, 21, 18, 24)
@@ -140,7 +144,16 @@ class HomePageScreenshotTest {
             ) {
                 CompositionLocalProvider(LocalBottomBarInset provides 88.dp) {
                     HomeContent(
-                        state = state,
+                        state = if (case.lowBalance) {
+                            state.copy(
+                                electricityAlert = HomeElectricityAlert(
+                                    dormLabel = "北校10楼南602",
+                                    balance = 12.4,
+                                ),
+                            )
+                        } else {
+                            state
+                        },
                         hasUnread = true,
                         weather = weather,
                         modules = HomeModule.entries,

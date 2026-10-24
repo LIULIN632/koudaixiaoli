@@ -218,6 +218,10 @@ fun LibrarySeatScreen(onBack: () -> Unit) {
         loading = false
     }
 
+    // 登录页是整屏 `return`，主页面会整体离开组合。滚动状态必须提到分流之前，
+    // 否则登录完回来页面又跳回顶部。
+    val pageScrollState = rememberScrollState()
+
     if (showLogin) {
         ServiceWebScreen(
             url = TRACEINT_LOGIN_URL,
@@ -249,7 +253,7 @@ fun LibrarySeatScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
                 .background(colors.surfaceBase)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(pageScrollState)
                 .padding(skin.spaceLg),
             verticalArrangement = Arrangement.spacedBy(skin.spaceMd),
         ) {

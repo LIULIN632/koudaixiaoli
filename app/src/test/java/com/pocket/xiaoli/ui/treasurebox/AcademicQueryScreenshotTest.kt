@@ -127,6 +127,11 @@ class AcademicQueryScreenshotTest {
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         item {
+                            // 常显操作行也在基线里：两个按钮与「已修课程」同排，
+                            // 360dp 屏上会不会挤掉只有整页图能确认。
+                            AcademicActionsHeader(onCopyDiagnostics = {}, onLogout = {})
+                        }
+                        item {
                             SummaryCard(
                                 summary = AcademicSummary(
                                     gpa = "3.42", plannedTotal = "48", plannedPassed = "41",

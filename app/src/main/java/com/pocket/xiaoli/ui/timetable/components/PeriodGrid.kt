@@ -2,6 +2,7 @@ package com.pocket.xiaoli.ui.timetable.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -90,13 +91,17 @@ fun PeriodGrid(
      * 放在**滚动内容内部**，网格就能一直铺到屏幕底部，最后几行照样能滚到栏上方。
      */
     bottomContentPadding: Dp = 0.dp,
+    /**
+     * 滚动状态可外部注入：课表页进「学期设置」是整页 `return`，会把网格一起销毁。
+     * 宿主提到分流之前传进来，返回时才能停在原处。
+     */
+    scrollState: ScrollState = rememberScrollState(),
     modifier: Modifier = Modifier
 ) {
     val skin = LocalSkin.current
     val today = java.time.LocalDate.now()
     val todayDay = today.dayOfWeek.value
     val now = LocalTime.now()
-    val scrollState = rememberScrollState()
     val density = LocalDensity.current
     val isDark = LocalDarkMode.current
     val colors = LocalPocketXiaoliColors.current

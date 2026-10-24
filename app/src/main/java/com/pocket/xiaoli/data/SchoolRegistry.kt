@@ -41,8 +41,11 @@ const val HOME_CITY = "烟台"
 /** 置顶学校：先当前对接的烟台理工学院，再下一步优先覆盖的烟台大学。 */
 private val PINNED_SCHOOL_IDS = listOf("YIT", "YTU")
 
+/** 用户自己添加的学校（`custom_` 前缀）：可编辑、可删除，也一定进选校列表。 */
+fun School.isCustomSchool(): Boolean = id.startsWith("custom_")
+
 /** 是否进入选校列表：本地院校，或用户自己添加的学校（`custom_` 前缀）。 */
-fun School.isPickerSchool(): Boolean = city == HOME_CITY || id.startsWith("custom_")
+fun School.isPickerSchool(): Boolean = city == HOME_CITY || isCustomSchool()
 
 /** 选校列表的置顶位次：越小越靠前，非置顶学校统一排在后面。 */
 fun School.pickerRank(): Int = PINNED_SCHOOL_IDS.indexOf(id).let { if (it >= 0) it else PINNED_SCHOOL_IDS.size }

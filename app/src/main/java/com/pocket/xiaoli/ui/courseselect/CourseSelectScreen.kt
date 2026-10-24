@@ -1,13 +1,16 @@
 package com.pocket.xiaoli.ui.courseselect
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,14 +20,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,14 +51,22 @@ import com.pocket.xiaoli.data.SchoolRegistry
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.network.CourseSelectItem
 import com.pocket.xiaoli.network.ZhengfangClient
-import com.pocket.xiaoli.ui.components.EmptyState
-import com.pocket.xiaoli.ui.components.ServicePageTopBar
+import com.pocket.xiaoli.ui.components.AppCard
 import com.pocket.xiaoli.ui.components.InlineError
+import com.pocket.xiaoli.ui.components.ServiceEmptyCard
+import com.pocket.xiaoli.ui.components.ServiceHeroBadge
+import com.pocket.xiaoli.ui.components.ServiceHeroCard
+import com.pocket.xiaoli.ui.components.ServiceHeroChip
+import com.pocket.xiaoli.ui.components.ServiceHeroCount
+import com.pocket.xiaoli.ui.components.ServicePageTopBar
 import com.pocket.xiaoli.ui.components.campusui.CampusSearchBar
 import com.pocket.xiaoli.ui.components.campusui.CampusSegmentedTabs
 import com.pocket.xiaoli.ui.components.uniqueKeys
+import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
+import com.pocket.xiaoli.ui.theme.ServiceAccent
+import com.pocket.xiaoli.ui.theme.onAccentColor
 import com.pocket.xiaoli.ui.zhengfang.ZhengfangCaptchaHost
 import com.pocket.xiaoli.ui.zhengfang.ZhengfangLoginContent
 import com.pocket.xiaoli.ui.zhengfang.ZhengfangSchoolList
@@ -231,15 +243,11 @@ private fun LoggedInContent(viewModel: CourseSelectViewModel) {
             verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
         ) {
             if (filtered.isNotEmpty()) {
-                item(key = "credits") {
-                    val credits = CourseListFilter.formatCredits(CourseListFilter.totalCredits(filtered))
-                    Text(
-                        text = buildString {
-                            append("共 ${filtered.size} 门")
-                            if (credits.isNotBlank()) append(" · 合计 $credits 学分")
-                        },
-                        fontSize = 12.sp,
-                        color = colors.textTertiary,
+                item(key = "summary") {
+                    CourseListHero(
+                        courses = filtered,
+                        chosenCount = chosenCount,
+                        isPreSelect = isPreSelect,
                     )
                 }
             }
@@ -252,14 +260,15 @@ private fun LoggedInContent(viewModel: CourseSelectViewModel) {
                 }
 
                 phase == SelectListPhase.LOADED && filtered.isEmpty() -> item(key = "empty") {
-                    EmptyState(
-                        title = if (query.isNotBlank()) "没有匹配的课程" else "这里还没有课程",
-                        subtitle = when {
-                            query.isNotBlank() -> "换个关键词试试，或清空搜索框看全部"
-                            !isPreSelect -> "当前学期可能还没开放自主选课，或本模块暂未开课"
-                            else -> "当前学期可能还没开放预选"
-                        },
+                    ServiceEmptyCard(
                         icon = Icons.Outlined.Inbox,
+                        title = if (query.isNotBlank()) "没有匹配的课程" else "这里还没有课程",
+                        message = when {
+                            query.isNotBlank() -> "换个关键词试试，或清空搜索框看全部。"
+                            !isPreSelect -> "当前学期可能还没开放自主选课，或本模块暂未开课。"
+                            else -> "当前学期可能还没开放预选。"
+                        },
+                        accent = ServiceAccent.ACADEMIC,
                     )
                 }
 
@@ -283,21 +292,73 @@ private fun LoggedInContent(viewModel: CourseSelectViewModel) {
     }
 }
 
+/**
+ * 列表顶部的主视觉卡：门数 + 学分 + 已选。
+ *
+ * 改造前这里只有一行 12sp 灰字「共 N 门 · 合计 X 学分」—— 统计信息是全页权重最低的，
+ * 而它恰恰是选课时最先要看的两个数（还要选几门、学分够不够）。
+ * 现在与服务页其余二级页统一成 hero：语义色深底 + 白字，数目给到 42sp。
+ * 数字跟着**筛选结果**走（搜索/只看已选后立刻变），与下面列表永远一致。
+ *
+ * `internal`：整页 `LoggedInContent` 依赖 ViewModel，在 Robolectric 里起不来，
+ * 而这张卡是选课页唯一的"统计口径"窗口 —— 抽出来供快照测试直接渲染。
+ */
+@Composable
+internal fun CourseListHero(
+    courses: List<CourseSelectItem>,
+    chosenCount: Int,
+    isPreSelect: Boolean,
+) {
+    val skin = LocalSkin.current
+    val credits = remember(courses) {
+        CourseListFilter.formatCredits(CourseListFilter.totalCredits(courses))
+    }
+    ServiceHeroCard(accent = ServiceAccent.ACADEMIC) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "可选课程",
+                    fontSize = 12.sp,
+                    // 0.9 而不是 0.7：hero 底压到亮度 ≤ 0.16，70% 白字只有约 3:1。
+                    color = Color.White.copy(alpha = 0.9f),
+                )
+                Spacer(Modifier.height(skin.spaceXs))
+                ServiceHeroCount(
+                    number = courses.size.toString(),
+                    unit = "门",
+                    numberSize = 42.sp,
+                )
+            }
+            ServiceHeroBadge(Icons.Filled.School)
+        }
+        Spacer(Modifier.height(skin.spaceLg))
+        Row {
+            ServiceHeroChip(if (credits.isNotBlank()) "合计 $credits 学分" else "学分 —")
+            if (isPreSelect) {
+                Spacer(Modifier.width(skin.spaceSm))
+                ServiceHeroChip("已选 $chosenCount 门")
+            }
+        }
+    }
+}
+
 /** 列表项身份键：行 ID 唯一且稳定；缺失时退到"课程代码+课名" */
 private fun CourseSelectItem.identityKey(): String =
     kcyxbId.ifBlank { "$kch|$kcmc" }
 
 @Composable
 private fun LoadingRow(progress: String) {
+    val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-        Spacer(Modifier.width(10.dp))
-        Text(progress.ifBlank { "加载中……" }, fontSize = 13.sp, color = colors.textSecondary)
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = skin.spaceLg, vertical = skin.spaceLg),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.width(10.dp))
+            Text(progress.ifBlank { "加载中……" }, fontSize = 13.sp, color = colors.textSecondary)
+        }
     }
 }
 
@@ -306,9 +367,11 @@ private fun LoadingRow(progress: String) {
  *
  * ⚠️ `heightIn(min = 44.dp)`：胶囊天然矮（约 30dp），低于本项目 44dp 的无障碍底线，
  * 而**这件事在截图上完全看不出来**（`tools/lint_design.py` 的 touch 检查也是这么判的）。
+ *
+ * `internal`：与 [CourseSelectCard] 一同供 `CourseSelectScreenshotTest` 直接渲染。
  */
 @Composable
-private fun FilterChipText(
+internal fun FilterChipText(
     text: String,
     active: Boolean,
     onClick: () -> Unit,
@@ -319,8 +382,14 @@ private fun FilterChipText(
     Box(
         modifier = modifier
             .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(skin.radiusChip))
+            // 胶囊形（50%）而不是 skin.radiusChip：它与上方分段选择、下方课程卡是**三种**形状，
+            // 圆角一致会让人误以为它们属于同一组控件。
+            .clip(RoundedCornerShape(50))
             .background(if (active) colors.accentMain else colors.surfaceCard)
+            .then(
+                if (active) Modifier
+                else Modifier.border(1.dp, colors.borderDivider, RoundedCornerShape(50))
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = skin.spaceCompact),
         contentAlignment = Alignment.Center,
@@ -329,7 +398,7 @@ private fun FilterChipText(
             text = text,
             fontSize = 12.sp,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-            color = if (active) Color.White else colors.textSecondary,
+            color = if (active) onAccentColor() else colors.textSecondary,
         )
     }
 }
@@ -343,69 +412,82 @@ private fun FilterChipText(
  * - **余量**单独一行带进度条：这是选课决策里唯一"会变"的信息。
  *   ⚠️ 拿不到人数时**不画进度条**，而不是画 0/0 —— 假条会让用户以为"这门课没人选"。
  * - 学分与学时**照抄教务的原字符串**，不做数值格式化（`4` 不该变成 `4.0`）。
+ *
+ * `internal`：这一页的三种课程状态（已选 / 会满 / 已停开）只有并排渲出来才能确认
+ * 颜色与层级真的分得开 —— 整页依赖 ViewModel，所以卡本身对测试开放。
  */
 @Composable
-private fun CourseSelectCard(item: CourseSelectItem) {
+internal fun CourseSelectCard(item: CourseSelectItem) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val capacity = remember(item) { CourseListFilter.capacity(item) }
+    // 左侧状态条：已选 = 主色、已停开 = 红（停开优先，它是更紧急的结论）。
+    // 一列卡片滚过去时，颜色比右下角的小徽标更快被认出来 —— 与「修课情况」的课程卡同一手法。
+    val marker = when {
+        item.sftkzt == "1" -> colors.danger
+        item.chosen -> colors.accentMain
+        else -> null
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(skin.radiusCard))
-            .background(colors.surfaceCard)
-            .padding(horizontal = skin.spaceCompact, vertical = skin.spaceMd),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = item.kcmc,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(skin.spaceSm))
-            if (item.chosen) Badge(text = "已选", tint = colors.accentMain)
-            if (item.sftkzt == "1") {
-                if (item.chosen) Spacer(Modifier.width(4.dp))
-                Badge(text = "已停开", tint = colors.danger)
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            if (marker != null) {
+                Box(modifier = Modifier.width(3.dp).fillMaxHeight().background(marker))
             }
-        }
+            Column(
+                modifier = Modifier.padding(horizontal = skin.spaceMd, vertical = skin.spaceMd),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.kcmc,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(skin.spaceSm))
+                    if (item.chosen) Badge(text = "已选", tint = colors.accentMain)
+                    if (item.sftkzt == "1") {
+                        if (item.chosen) Spacer(Modifier.width(4.dp))
+                        Badge(text = "已停开", tint = colors.danger)
+                    }
+                }
 
-        Spacer(Modifier.height(skin.spaceXs))
+                Spacer(Modifier.height(skin.spaceXs))
 
-        Text(
-            text = buildString {
-                if (item.kch.isNotBlank()) append("${item.kch}  ")
-                if (item.xf.isNotBlank()) append("${item.xf} 学分  ")
-                if (item.zxs.isNotBlank()) append("${item.zxs} 学时")
-                if (item.xsxxxx.isNotBlank()) append("（周 ${item.xsxxxx}）")
-            }.trim(),
-            fontSize = 12.sp,
-            color = colors.textSecondary,
-        )
+                Text(
+                    text = buildString {
+                        if (item.kch.isNotBlank()) append("${item.kch}  ")
+                        if (item.xf.isNotBlank()) append("${item.xf} 学分  ")
+                        if (item.zxs.isNotBlank()) append("${item.zxs} 学时")
+                        if (item.xsxxxx.isNotBlank()) append("（周 ${item.xsxxxx}）")
+                    }.trim(),
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                )
 
-        val teacherLine = buildString {
-            if (item.jsxm.isNotBlank()) {
-                append(item.jsxm)
-                if (item.zcmc.isNotBlank()) append(" · ${item.zcmc}")
+                val teacherLine = buildString {
+                    if (item.jsxm.isNotBlank()) {
+                        append(item.jsxm)
+                        if (item.zcmc.isNotBlank()) append(" · ${item.zcmc}")
+                    }
+                }
+                val extraLine = listOf(
+                    teacherLine,
+                    listOf(item.kclbmc, item.kcxzmc).filter { it.isNotBlank() }.joinToString(" · "),
+                    item.sksj,
+                    item.jxdd,
+                ).filter { it.isNotBlank() }.joinToString("  ")
+                if (extraLine.isNotBlank()) {
+                    Spacer(Modifier.height(skin.spaceTiny))
+                    Text(text = extraLine, fontSize = 11.sp, color = colors.textTertiary)
+                }
+
+                if (capacity != null) {
+                    Spacer(Modifier.height(skin.spaceSm))
+                    CapacityBar(capacity = capacity, sxrsmc = item.sxrsmc)
+                }
             }
-        }
-        val extraLine = listOf(
-            teacherLine,
-            listOf(item.kclbmc, item.kcxzmc).filter { it.isNotBlank() }.joinToString(" · "),
-            item.sksj,
-            item.jxdd,
-        ).filter { it.isNotBlank() }.joinToString("  ")
-        if (extraLine.isNotBlank()) {
-            Spacer(Modifier.height(skin.spaceTiny))
-            Text(text = extraLine, fontSize = 11.sp, color = colors.textTertiary)
-        }
-
-        if (capacity != null) {
-            Spacer(Modifier.height(skin.spaceSm))
-            CapacityBar(capacity = capacity, sxrsmc = item.sxrsmc)
         }
     }
 }
@@ -440,15 +522,19 @@ private fun CapacityBar(capacity: CourseListFilter.Capacity, sxrsmc: String) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(colors.surfaceAlt),
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp))
+                // 轨道用 surfaceHighlight 而不是 surfaceAlt：卡片本身就是 surfaceCard，
+                // surfaceAlt 压上去几乎看不见，等于"满员时只剩一条红"。
+                .background(colors.surfaceHighlight)
+                // 余量是这条卡上唯一"会变"的信息，读屏也该能读出来比例。
+                .progressSemantics(capacity.ratio.coerceIn(0f, 1f)),
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(capacity.ratio)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .fillMaxWidth(capacity.ratio.coerceIn(0f, 1f))
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(3.dp))
                     .background(tint),
             )
         }
@@ -459,12 +545,14 @@ private fun CapacityBar(capacity: CourseListFilter.Capacity, sxrsmc: String) {
 @Composable
 private fun Badge(text: String, tint: Color) {
     val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
+    val isDark = LocalDarkMode.current
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(skin.radiusChip))
-            .background(colors.surfaceAlt)
-            .padding(horizontal = skin.spaceSm, vertical = 2.dp),
+            // 语义色 14% 底 + 同色字（深色主题 26%）：比灰底 + 彩字更"成组"，
+            // 也更容易在卡片上定位 —— 灰底在深色主题里还会和卡色糊在一起。
+            .clip(RoundedCornerShape(50))
+            .background(tint.copy(alpha = if (isDark) 0.26f else 0.14f))
+            .padding(horizontal = skin.spaceSm, vertical = 3.dp),
     ) {
         Text(text = text, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = tint)
     }

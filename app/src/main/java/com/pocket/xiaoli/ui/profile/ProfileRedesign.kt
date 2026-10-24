@@ -55,13 +55,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.CampusInfo
@@ -76,6 +80,7 @@ import com.pocket.xiaoli.ui.theme.serviceAccentColor
 import com.pocket.xiaoli.ui.theme.serviceAccentContainer
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.currentIconPresentation
+import com.pocket.xiaoli.ui.theme.onAccentFor
 import com.pocket.xiaoli.ui.theme.LocalProfileRowPadding
 import com.pocket.xiaoli.ui.theme.rememberSinkIndication
 
@@ -127,11 +132,32 @@ private fun electricityHint(balance: String?, loading: Boolean): String {
     return if (value.startsWith("-")) "-¥" + value.removePrefix("-") else "¥" + value
 }
 
+/**
+ * 洗澡格子的副标题：一卡通剩余余额（与洗澡页的大数字同源）。
+ *
+ * 「拿不到」的几种情况必须分开说，任何一处写成 `¥0.00` 都是在撒谎：
+ * - 未登录 → 引导登录（不是"余额为零"）
+ * - 未签约免密 → 服务端根本不给 `amount`，说清缺什么
+ * - 请求失败 / 还没查到 → 给一个可点的动作，别编数字
+ */
+internal fun showerTileHint(
+    loggedIn: Boolean,
+    loading: Boolean,
+    balance: Double?,
+    signed: Boolean?,
+): String = when {
+    !loggedIn -> "登录后查看余额"
+    loading -> "查询中…"
+    balance != null -> if (balance < 0) "-¥%.2f".format(-balance) else "¥%.2f".format(balance)
+    signed == false -> "未签约免密"
+    else -> "点击查询余额"
+}
+
 @Composable
 fun ProfileStatsGrid(
     electricityBalance: String?,
     electricityLoading: Boolean,
-    /** 洗澡格子的副标题：已登录显示学校/账户，未登录提示去登录 */
+    /** 洗澡格子的副标题：一卡通剩余余额（见 `showerTileHint`） */
     showerHint: String = "热水 · 淋浴",
     /** 专注计时格子的副标题 —— 今日专注时长（见 `focusTileHint`） */
     focusHint: String = "今天还没开始",
@@ -201,37 +227,80 @@ private fun ServiceTile(
     icon: ImageVector,
     title: String,
     hint: String,
-    /** 语义分类；非空时颜色从主题派生，优先于下面的硬编码色。 */
-    serviceAccent: ServiceAccent? = null,
-    background: Color = Color.Unspecified,
-    accent: Color = Color.Unspecified,
+    /** 语义分类；颜色与渐变都从当前主题派生（见 ServiceAccent）。 */
+    serviceAccent: ServiceAccent,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconFilled: ImageVector = icon,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
+    val isDark = LocalDarkMode.current
     // 图标策略：皮肤上限 × 用户用色强度（见 IconPresentation.resolveIcons）。
     // 局部变量**不叫** icon —— 那样会遮蔽上面的 icon 参数。
     val iconPresentation = currentIconPresentation()
-    // 单色态改用中性卡底 + 统一强调色（与 ServiceCard 同一套规则）
-    val cardBackground = if (!iconPresentation.colorful) colors.surfaceCard
-    else serviceAccent?.let { serviceAccentContainer(it) } ?: background
-    val cardAccent = if (iconPresentation.colorful) serviceAccent?.let { serviceAccentColor(it) } ?: accent
-    else colors.accentMain
+    val colorful = iconPresentation.colorful
+    val shape = RoundedCornerShape(skin.radiusLarge)
+    // 彩色态用分类色；单色态退回中性卡 + 主题强调色（与改造前一致）
+    val cardAccent = if (colorful) serviceAccentColor(serviceAccent) else colors.accentMain
+
+    // 同色渐变而不是整块平涂：上浓下淡，让四个格子有"浮起来"的层次。
+    // 下沿仍保留足够色量（0.15 / 0.20），否则卡底会褪成灰白，整页又变"灰蒙蒙"。
+    val fillModifier = if (colorful) {
+        val top = lerp(colors.surfaceCard, cardAccent, if (isDark) 0.36f else 0.30f)
+        val bottom = lerp(colors.surfaceCard, cardAccent, if (isDark) 0.20f else 0.15f)
+        Modifier.background(Brush.verticalGradient(listOf(top, bottom)))
+    } else {
+        Modifier.background(colors.surfaceCard)
+    }
+    // 皮肤有阴影就画（Vivid 16dp 弥散 / Minimal 0dp 自动省略），与同页其它卡片同一套分层
+    val shadowModifier = if (skin.shadowBlur > 0.dp) {
+        Modifier.dropShadow(
+            shape = shape,
+            shadow = Shadow(
+                radius = skin.shadowBlur,
+                spread = 0.dp,
+                color = if (isDark) skin.shadowColorDark else skin.shadowColorLight,
+                offset = DpOffset(skin.shadowOffsetX, skin.shadowOffsetY),
+            ),
+        )
+    } else {
+        Modifier
+    }
+
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(skin.radiusLarge))
-            .background(cardBackground)
+            .then(shadowModifier)
+            .clip(shape)
+            .then(fillModifier)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = rememberSinkIndication(), onClick = onClick)
             .padding(skin.spaceLg)
     ) {
-        Icon(
-            imageVector = if (iconPresentation.filled) iconFilled else icon,
-            contentDescription = null,
-            tint = cardAccent,
-            modifier = Modifier.size(22.dp)
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // 图标从"裸线条"改成实心色块：给每格一个视觉锚点，也让点按目标更明确
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(skin.radiusChip))
+                    .background(if (colorful) cardAccent else colors.surfaceHighlight),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (iconPresentation.filled) iconFilled else icon,
+                    contentDescription = null,
+                    // 压在实心色块上，用对比度更高的前景，而不是一律写死白色
+                    tint = if (colorful) onAccentFor(cardAccent) else colors.accentMain,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = if (colorful) cardAccent.copy(alpha = 0.55f) else colors.textTertiary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Spacer(Modifier.height(skin.spaceSm))
         Text(
             text = title,
@@ -243,7 +312,10 @@ private fun ServiceTile(
         Text(
             text = hint,
             color = colors.textSecondary,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

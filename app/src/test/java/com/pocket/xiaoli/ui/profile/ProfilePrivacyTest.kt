@@ -63,7 +63,7 @@ class ProfilePrivacyTest {
                     electricityLoading = false,
                     onOpenElectricity = {},
                     onOpenFocus = {},
-                    showerHint = "趣智校园 · 已登录",
+                    showerHint = "¥16.76",
                     onOpenShower = {},
                     onOpenExpress = {},
                     onSchemeManager = {},

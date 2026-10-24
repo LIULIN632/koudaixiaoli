@@ -404,6 +404,13 @@ fun TreasureBoxScreen(
         subPage = null
     }
 
+    // 列表滚动位置必须在这里（所有子页 `return` 之前）记住。
+    // 子页都是 `return` 独占整屏，列表会整体离开组合 —— 状态若写在下面的
+    // `if (asTab)` 分支里，`rememberScrollState` 会跟着被销毁，返回时重新从 0 开始
+    //（2026-10 反馈："点一个服务再返回，服务页回到顶部了"）。
+    // 放在这里，子页期间状态一直活着；切 Tab 的位置由 NavHost 的 saveState/restoreState 复现。
+    val servicesScrollState = rememberScrollState()
+
     if (subPage == ServiceSubPage.LibrarySeat) {
         LibrarySeatScreen(onBack = { subPage = null })
         return
@@ -1007,7 +1014,7 @@ fun TreasureBoxScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(servicesScrollState)
                     // 底栏已改成叠在内容上的浮层（见 AppNavigation），Scaffold 不再替页面预留它。
                     // 服务页是长列表，这里**故意**让内容从栏背后滚过去 —— 那是玻璃唯一的采样源；
                     // 只在内容末尾补一段 = 栏高的空白，保证最后一张卡仍能滚到栏上方。
@@ -1061,7 +1068,7 @@ fun TreasureBoxScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(servicesScrollState)
                     .padding(horizontal = 16.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(skin.spaceLg)
             ) {

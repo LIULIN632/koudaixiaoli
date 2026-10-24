@@ -21,6 +21,11 @@ import com.pocket.xiaoli.data.map.BuiltinPois
 import com.pocket.xiaoli.data.map.CampusMapRepository
 import com.pocket.xiaoli.data.map.CampusLocationStore
 import com.pocket.xiaoli.data.promo.PromoRepository
+import com.pocket.xiaoli.data.contribution.ContributionAction
+import com.pocket.xiaoli.data.contribution.ContributionClient
+import com.pocket.xiaoli.data.contribution.ContributionRepository
+import com.pocket.xiaoli.data.contribution.ContributionStore
+import com.pocket.xiaoli.data.SelfHost
 import com.pocket.xiaoli.network.AppUpdateChecker
 import com.pocket.xiaoli.data.proactive.ProactiveStore
 import com.pocket.xiaoli.ui.theme.BottomBarStyleStore
@@ -178,6 +183,19 @@ class AppContainer(context: Context) {
      * 校验（域名白名单 / 时间窗 / 逐条容错）在 `data/promo/PromoConfig.kt`，有单测覆盖。
      */
     val promoRepository by lazy { PromoRepository(appContext, prefs) }
+
+    /**
+     * 校园共建榜。**默认关**，用户自己点「加入」才产生 cid 与上报。
+     *
+     * 与匿名统计共用同一个服务端地址与 key，但账本、生命周期完全独立：
+     * `iid` 30 天轮换、`cid` 长期稳定，库里没有两者映射（见 V3 迁移的说明）。
+     */
+    val contributionRepository by lazy {
+        ContributionRepository(
+            store = ContributionStore(appContext),
+            client = ContributionClient(SelfHost.TELEMETRY_URL, SelfHost.TELEMETRY_KEY),
+        )
+    }
 
     /** 底栏样式（悬浮胶囊 ↔ 液态玻璃）。独立维度，与配色主题 / 皮肤风格正交。 */
     val bottomBarStyleStore by lazy { BottomBarStyleStore(appContext) }
@@ -560,6 +578,8 @@ class AppContainer(context: Context) {
        if (added > 0) {
            _roomCells.value = list
            persistRoomCells(list)
+           // 共建榜只在用户主动加入后记账；record 内部第一行就判开关，这里不用再判。
+           contributionRepository.record(ContributionAction.ROOM_CELL_ADD)
        }
        return added
     }
@@ -568,6 +588,7 @@ class AppContainer(context: Context) {
        val next = _roomCells.value.map { if (it.id == cell.id) cell else it }
        _roomCells.value = next
        persistRoomCells(next)
+       contributionRepository.record(ContributionAction.ROOM_CELL_EDIT)
     }
 
     fun removeRoomCell(id: String) {
@@ -658,6 +679,9 @@ class AppContainer(context: Context) {
            .apply()
        ClassReminderScheduler.rescheduleAsync(appContext)
        ClassWidgetProvider.refresh(appContext)
+       if (success && courseCount > 0) {
+           contributionRepository.record(ContributionAction.COURSE_IMPORT)
+       }
     }
 
     fun clearLastImport() {
@@ -1420,6 +1444,7 @@ class AppContainer(context: Context) {
        val sorted = next.sortedByDescending { it.updatedAt }
        _notes.value = sorted
        prefs.edit().putString(KEY_NOTES, gson.toJson(sorted)).apply()
+       contributionRepository.record(ContributionAction.NOTE_SAVE)
     }
 
     fun deleteNote(id: String) {
