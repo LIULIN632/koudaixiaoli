@@ -9,17 +9,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 84,
-    "versionName": "0.1.83",
+    "versionCode": 85,
+    "versionName": "0.1.84",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.83/koudaixiaoli_v0.1.83.apk",
-    "sha256": "0889c6dc89601569786b811c8a1ede385c3bfff4787add46b5eb4e1676335704",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.84/koudaixiaoli_v0.1.84.apk",
+    "sha256": "bf961a941784fca5f5160df268fd8b980f9a398582d27172c8d394d8cd4deb54",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "「我的 → 贡献」新增贡献榜：导课表、补教室、写笔记都有记录，谁补得多一眼看到",
-      "首页新增电费提醒：宿舍余额低于提醒线时，提示排在最前（比作业更急）",
-      "绑定页与电力页重排：表单拆成两步，窄屏不再挤成一团"
+      "桌面图标换成金色锦鲤：自适应图标，圆形、方圆、圆角方三种桌面遮罩都能完整显示",
+      "旧版桌面（Android 7 及以下）也换成同一只鱼，不再和别的课程表 App 撞脸"
     ]
   },
   "announcements": []

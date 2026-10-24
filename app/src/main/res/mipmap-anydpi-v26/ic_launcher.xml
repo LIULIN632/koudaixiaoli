@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标：整张金色锦鲤底图铺满 108dp 画布，内容（鱼）在中央 72dp 安全区内。
+     不用单独的 foreground 层 —— 分层会把底图缩到 66%，鱼会被裁掉头尾。 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+    <background android:drawable="@drawable/ic_launcher_full" />
+    <foreground android:drawable="@android:color/transparent" />
 </adaptive-icon>
