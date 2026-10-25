@@ -74,21 +74,41 @@ object FeedbackRemote {
     }
 
     /**
-     * 反馈接口的完整地址。feed 里的优先（可热换），否则用编译期默认值。
+     * 反馈接口的**基址**（不含 `/v1/feedback`）。feed 里的优先（可热换），否则用编译期默认值。
      *
-     * 只接受 http(s)：feed 是公开文件，写个 `javascript:` 或相对路径进来只会变成坑。
+     * `endpoints.feedback` 允许写成两种形状，都收：
+     * - `https://host`                —— 基址
+     * - `https://host/v1/feedback`    —— 完整接口前缀（`docs/反馈与建议.md` 里写的就是这种）
+     *
+     * 2026-10-25 的真实事故：feed 里填的是后者，而这里直接 `+ "/v1/feedback/submit"`，
+     * 于是请求打到 `/v1/feedback/v1/feedback/submit` —— 4 个 404，用户说「反馈发不过来」。
+     * 所以现在统一**先归一化成基址**，调用方只拼一次路径。
      */
-    fun endpoint(context: Context): String? {
-        val fromFeed = AppFeedStore(context).feedbackEndpoint()
-            ?.trim()
-            ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
-        if (fromFeed != null) return fromFeed.trimEnd('/')
-        val base = SelfHost.TELEMETRY_URL.trim().trimEnd('/')
-        return if (base.startsWith("https://") || base.startsWith("http://")) base + PATH else null
+    fun endpoint(context: Context): String? =
+        baseOf(AppFeedStore(context).feedbackEndpoint()) ?: baseOf(SelfHost.TELEMETRY_URL)
+
+    /** 把各种写法收敛成基址；非法（非 http(s)、空）返回 null。纯函数，便于单测。 */
+    internal fun baseOf(raw: String?): String? {
+        var text = raw?.trim().orEmpty()
+        if (text.isEmpty()) return null
+        if (!text.startsWith("https://") && !text.startsWith("http://")) return null
+        text = text.trimEnd('/')
+        // 已经带了接口路径就去掉；多写几层也一并收掉（`/v1/feedback/submit` 这种手滑）
+        while (true) {
+            val hit = listOf(SUBMIT, REPLIES, PATH).firstOrNull { text.endsWith(it) } ?: break
+            text = text.removeSuffix(hit).trimEnd('/')
+        }
+        return text.takeIf { it.isNotEmpty() && it != "https:/" && it != "http:/" }
     }
 
     /** 有没有可以直传的服务器。没有就整块按钮不出现，而不是「点了没反应」。 */
     fun configured(context: Context): Boolean = endpoint(context) != null
+
+    /**
+     * 基址 + 接口路径。唯一的拼接点：所有请求都走这里，路径就只会出现一次。
+     * （上一版是在两处各自 `+ "/v1/feedback/..."`，改一处漏一处就出了 404。）
+     */
+    internal fun urlFor(base: String, path: String): String = base.trimEnd('/') + path
 
     /**
      * 请求体。纯函数，便于单测：字段名就是服务端 `FeedbackSubmit` 的字段名，
@@ -142,7 +162,7 @@ object FeedbackRemote {
             ?: return@withContext SubmitOutcome.Rejected("这台设备没有配置反馈通道")
         try {
             val request = Request.Builder()
-                .url(url + SUBMIT)
+                .url(urlFor(url, SUBMIT))
                 .addHeader("X-App-Key", SelfHost.TELEMETRY_KEY)
                 .post(submitJson(draft, ticketId, diagnostics, anonId).toRequestBody(JSON))
                 .build()
@@ -175,7 +195,7 @@ object FeedbackRemote {
             val query = wanted.joinToString(",") { URLEncoder.encode(it, "UTF-8") }
             try {
                 val request = Request.Builder()
-                    .url("$url$REPLIES?tickets=$query")
+                    .url(urlFor(url, REPLIES) + "?tickets=$query")
                     .addHeader("X-App-Key", SelfHost.TELEMETRY_KEY)
                     .get()
                     .build()

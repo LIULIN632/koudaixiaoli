@@ -102,4 +102,48 @@ class FeedbackRemoteTest {
         assertEquals("", FeedbackRemote.formatTime(null))
         assertEquals("2026-10-24", FeedbackRemote.formatTime("2026-10-24")) // 解析不了就原样
     }
+
+    /**
+     * 2026-10-25 的真实事故：feed 里填的是 `https://host/v1/feedback`，
+     * 代码又拼了一次 `/v1/feedback/submit`，线上日志是
+     * `POST /v1/feedback/v1/feedback/submit → 404`。
+     * 所以基址归一化必须把「已经带了接口路径」的写法收掉。
+     */
+    @Test
+    fun `基址归一化 吃掉各种写法`() {
+        assertEquals("https://h", FeedbackRemote.baseOf("https://h"))
+        assertEquals("https://h", FeedbackRemote.baseOf("https://h/"))
+        assertEquals("https://h", FeedbackRemote.baseOf("https://h/v1/feedback"))
+        assertEquals("https://h", FeedbackRemote.baseOf("https://h/v1/feedback/"))
+        assertEquals("https://h", FeedbackRemote.baseOf("  https://h/v1/feedback/submit  "))
+        assertEquals("https://h", FeedbackRemote.baseOf("https://h/v1/feedback/replies"))
+        assertEquals("https://h/v1", FeedbackRemote.baseOf("https://h/v1")) // 不是接口路径就不动
+        assertEquals("http://10.0.0.2:8080", FeedbackRemote.baseOf("http://10.0.0.2:8080/v1/feedback"))
+    }
+
+    @Test
+    fun `基址归一化 非法值返回 null`() {
+        assertNull(FeedbackRemote.baseOf(null))
+        assertNull(FeedbackRemote.baseOf(""))
+        assertNull(FeedbackRemote.baseOf("   "))
+        assertNull(FeedbackRemote.baseOf("javascript:alert(1)"))
+        assertNull(FeedbackRemote.baseOf("/v1/feedback")) // 相对路径没有主机
+        assertNull(FeedbackRemote.baseOf("ftp://h/v1/feedback"))
+    }
+
+    /**
+     * 真正发给服务端的地址：基址 + 一次接口路径。
+     * 这条断言就是防回归——上一个 bug 正是这里多了/少了一次路径。
+     */
+    @Test
+    fun `提交地址只拼一次接口路径`() {
+        assertEquals(
+            "https://h/v1/feedback/submit",
+            FeedbackRemote.urlFor(base = FeedbackRemote.baseOf("https://h/v1/feedback")!!, path = "/v1/feedback/submit"),
+        )
+        assertEquals(
+            "https://h",
+            FeedbackRemote.baseOf("https://h/v1/feedback")!!,
+        )
+    }
 }

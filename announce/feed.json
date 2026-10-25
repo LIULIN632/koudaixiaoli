@@ -9,17 +9,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 91,
-    "versionName": "0.1.90",
+    "versionCode": 92,
+    "versionName": "0.1.91",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.90/koudaixiaoli_v0.1.90.apk",
-    "sha256": "fdf37fd0fd9c297776a500ad11e476c11466c8482430ab336da2aa0fd0526d5c",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.91/koudaixiaoli_v0.1.91.apk",
+    "sha256": "d3683a3df32aae4773b24b2da3f7737fb83f635fd16cc58bf7a9aacc69691013",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "意见反馈可以直接发到我们自己的服务器了，不用再自己复制粘贴；发完会给你一个工单号",
-      "开发者回你之后，反馈页点「检查回复」就能看到",
-      "反馈的服务端地址改成从更新数据里读 —— 以后换服务器不用再更新 App"
+      "「意见反馈 → 直接发送」之前点了发不出去（地址被拼重了一层，服务端返回 404），这一版修好了",
+      "顺带把工单回复的「检查回复」也接到同一个地址上"
     ]
   },
   "endpoints": {
