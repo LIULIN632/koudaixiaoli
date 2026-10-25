@@ -41,6 +41,7 @@ import org.robolectric.annotation.GraphicsMode
  * | `331` | 查询中 | 「查询中…」而不是 `¥0.00`；「正在读取趣智钱包」 |
  * | `332` | 未签约（`amount = null`）| 「未签约」+「未签约免密支付，拿不到实时余额」 |
  * | `333` | 深色 | 34sp 数字与弱化文案在暗底上的对比度 |
+ * | `346` | 登录被挤掉（`authExpired`）| 「登录已失效」而不是「未签约」——这是 2026-10-25 用户报的 bug |
  *
  * ⚠️ 未登录不在覆盖范围内：这张卡在 `state.isLoggedIn` 分支里，未登录时页面显示的是
  * `LoginCard`（见 `ShowerScreen` 第 269 行附近的 `if`）。别为了凑状态去渲不可达的页面。
@@ -101,6 +102,16 @@ class ShowerBalanceScreenshotTest {
                 useCode = useCode,
             ),
             dark = true,
+        ),
+        Case(
+            "346-shower-balance-expired",
+            ShowerUiState(
+                // 登录被挤掉时余额必须清空：留着旧数字会让人误以为还能洗
+                campusBalance = null,
+                authExpired = true,
+                lastConsume = 0.35,
+                useCode = useCode,
+            ),
         ),
     )
 

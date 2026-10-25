@@ -58,6 +58,8 @@ sealed interface ServiceSubPage {
     data object ExpressPickup : ServiceSubPage
     data object TodayCampus : ServiceSubPage
     data object FoodPicker : ServiceSubPage
+    /** 麦当劳蛋白榜：离线快照 + 预算凑蛋白（见 `McProteinPage`）。 */
+    data object McProtein : ServiceSubPage
     data object GymInfo : ServiceSubPage
     data object GoodItems : ServiceSubPage
     data object TreeHole : ServiceSubPage

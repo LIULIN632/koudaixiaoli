@@ -58,4 +58,18 @@ class ShowerTileHintTest {
             showerTileHint(loggedIn = true, loading = false, balance = null, signed = null),
         )
     }
+
+    @Test
+    fun `登录被挤掉时提示重登而不是未签约`() {
+        assertEquals(
+            "登录已失效，点这里重登",
+            showerTileHint(
+                loggedIn = true,
+                loading = false,
+                balance = null,
+                signed = null,
+                expired = true,
+            ),
+        )
+    }
 }

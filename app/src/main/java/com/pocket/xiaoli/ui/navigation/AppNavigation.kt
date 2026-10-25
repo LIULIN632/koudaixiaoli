@@ -103,7 +103,6 @@ import com.pocket.xiaoli.ui.assistant.AssistantAiSettingsScreen
 import com.pocket.xiaoli.ui.assistant.AssistantScreen
 import com.pocket.xiaoli.ui.map.BuildingMapScreen
 import com.pocket.xiaoli.ui.map.CampusMapScreen
-import com.pocket.xiaoli.ui.map.CourseNavigationScreen
 import com.pocket.xiaoli.ui.map.RoomLayoutScreen
 import com.pocket.xiaoli.ui.import_.TimetableImportEntryScreen
 import com.pocket.xiaoli.ui.import_.WebImportScreen
@@ -234,14 +233,28 @@ fun AppNavigation(initialDeepLink: String? = null) {
     // 前后台切换：退到后台就把「本次已弹过」清零，回到前台重新判断。
     // 只靠上面那个 LaunchedEffect 覆盖不到这种情况 —— 用户按 Home 再回来时
     // feedState 与 isTabRoute 都不变，抽屉就再也不会出现。
+    //
+    // ⚠️ 2026-10-24：**回到前台也要核对一次 feed**，不能只重新判断旧状态。
+    // 原因见 `AppFeedRepository` 的 L1/L2 分工：
+    // - L1（MainActivity 冷启动那条）每个进程只跑一次；
+    // - L2（WorkManager）在 worker 里 `new AppFeedRepository(context)`，那是**另一个实例**，
+    //   只发系统通知，不会更新这里 `container.appFeedRepository.state`。
+    // 于是进程一直不死时，界面里的 `updateAvailable` 可能几天都是旧的 ——
+    // 表现就是"只有手动点检查更新才看得见新版"。这里补上带 30 分钟节流的核对
+    //（节流在仓库里），既不会每次切前台都打网络，也让"打开 App"真的等于"查一次"。
     val tabRouteNow = rememberUpdatedState(isTabRoute)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, updatePrompt) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> updatePrompt.onBackground()
-                Lifecycle.Event.ON_START -> if (tabRouteNow.value) {
-                    updatePrompt.autoShow(container.appFeedRepository.state.value)
+                Lifecycle.Event.ON_START -> {
+                    scope.launch {
+                        runCatching { container.appFeedRepository.refresh() }
+                    }
+                    if (tabRouteNow.value) {
+                        updatePrompt.autoShow(container.appFeedRepository.state.value)
+                    }
                 }
                 else -> Unit
             }
@@ -580,7 +593,10 @@ fun AppNavigation(initialDeepLink: String? = null) {
                 HomeScreen(
                     onOpenTimetable = { switchTab(bottomNavItems[1]) },
                     onOpenCampusMap = { navController.navigate("campus_map") },
-                    onNavigateToRoom = { room -> navController.navigate("course_navigation?q=" + Uri.encode(room)) },
+                    // 「去上课」直接进 3D 校园地图（按教室聚焦到对应楼栋）；
+                    // 楼层平面图在 3D 地图里（BUILDING_FLOOR_MAP 默认开），不再经过
+                    // 旧的 2D「课程导航」中间页。
+                    onNavigateToRoom = { room -> navController.navigate("campus_map?q=" + Uri.encode(room)) },
                     onOpenServices = { switchTab(bottomNavItems[3]) },
                     onOpenProfile = { switchTab(bottomNavItems[4]) },
                     onOpenGlobalSearch = { navController.navigate("global_search") },
@@ -606,7 +622,7 @@ fun AppNavigation(initialDeepLink: String? = null) {
                     onOpenImport = { navController.navigate("import_entry") },
                     onOpenCampusMap = { room -> navController.navigate("campus_map?q=" + Uri.encode(room)) },
                     onOpenRoomLayout = { room -> navController.navigate("room_layout?q=" + Uri.encode(room)) },
-                    onOpenCourseNavigation = { room -> navController.navigate("course_navigation?q=" + Uri.encode(room)) },
+                    onOpenCourseNavigation = { room -> navController.navigate("campus_map?q=" + Uri.encode(room)) },
                 )
             }
 
@@ -821,20 +837,6 @@ fun AppNavigation(initialDeepLink: String? = null) {
                 )
             }
 
-            composable(
-                route = "course_navigation?q={q}",
-                arguments = listOf(navArgument("q") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                })
-            ) { entry ->
-                CourseNavigationScreen(
-                    container = container,
-                    initialRoomQuery = entry.arguments?.getString("q").orEmpty(),
-                    onBack = { navController.popBackStack() },
-                    onOpenRoomLayout = { room -> navController.navigate("room_layout?q=" + Uri.encode(room)) },
-                )
-            }
             composable(
                 route = "service_web?url={url}&title={title}",
                 arguments = listOf(

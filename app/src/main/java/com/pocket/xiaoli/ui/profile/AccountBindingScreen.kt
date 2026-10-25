@@ -38,6 +38,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -152,7 +153,6 @@ fun AccountBindingScreen(
         initialCampus.jwBaseUrl?.let { container.loadCredential(it) }
     }
     var campusId by remember { mutableStateOf(initialCampus.id) }
-    var school by remember { mutableStateOf(initialCampus.schoolName.orEmpty()) }
     var studentId by remember { mutableStateOf(initialCred?.first.orEmpty()) }
     var password by remember { mutableStateOf(initialCred?.second.orEmpty()) }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -164,6 +164,9 @@ fun AccountBindingScreen(
     // 改动字段时把验证结果清掉 —— 上一次的"✓ 账号密码正确"对**新填的**值不作数。
     var submitted by remember { mutableStateOf(false) }
     val verifyVm: AcademicVerifyViewModel = viewModel(
+        // 每个校区一个实例：VM 在构造时锁定 `currentCampusSchool()`，
+        // 复用同一个实例会导致"切了学校，验证还打旧学校"。
+        key = "academic_verify_$campusId",
         factory = AcademicVerifyViewModel.Factory(
             container.zhengfangClient,
             container.schoolRegistry,
@@ -186,10 +189,9 @@ fun AccountBindingScreen(
         )
         else -> BindingActionUi.Idle
     }
-    val schoolError = if (submitted) BindingValidators.schoolName(school) else null
     val studentIdError = if (submitted) BindingValidators.studentId(studentId) else null
     val passwordError = if (submitted) BindingValidators.password(password) else null
-    val academicValid = schoolError == null && studentIdError == null && passwordError == null
+    val academicValid = studentIdError == null && passwordError == null
     // 待二次确认的销毁性操作（见 PendingDanger）。
     // 改造前这里是 `showUnbindConfirm: Boolean`，只有「解绑教务」用它。
     var pendingDanger by remember { mutableStateOf<PendingDanger?>(null) }
@@ -369,8 +371,12 @@ fun AccountBindingScreen(
 
     fun switchCampus(target: CampusInfo) {
         if (target.underConstruction) return
+        // ⚠️ 立刻写回 AppContainer：验证用的 `AcademicVerifyViewModel` 在构造时读
+        // `currentCampusSchool()`（见基类），只改页面里的 `campusId` 不会让它换学校，
+        // 结果就是"界面上选了烟大，验证却还在打烟理"。下面 `viewModel(key = campusId)`
+        // 再按新校区取一个新的 VM。
+        container.setSelectedCampus(target.id)
         campusId = target.id
-        school = target.schoolName.orEmpty()
         val cred = target.jwBaseUrl?.let { container.loadCredential(it) }
         studentId = cred?.first.orEmpty()
         password = cred?.second.orEmpty()
@@ -387,8 +393,7 @@ fun AccountBindingScreen(
 
     /** 教务表单的**本地**校验（格式层面）。真验证在 [AcademicVerifyViewModel]。 */
     fun academicValid(): Boolean =
-        BindingValidators.schoolName(school) == null &&
-            BindingValidators.studentId(studentId) == null &&
+        BindingValidators.studentId(studentId) == null &&
             BindingValidators.password(password) == null
 
     /**
@@ -404,7 +409,8 @@ fun AccountBindingScreen(
         val sid = studentId.trim()
         if (sid.isBlank() || password.isBlank()) return false
         container.setSelectedCampus(target.id)
-        container.setSchool(school.ifBlank { target.schoolName.orEmpty() })
+        // 学校名称由校区决定，不再让用户手填（旧字段已删）。
+        container.setSchool(target.schoolName.orEmpty())
         container.saveCredential("campus_bind", sid, password)
         target.jwBaseUrl?.let { container.saveCredential(it, sid, password) }
         onBoundChange()
@@ -526,21 +532,28 @@ fun AccountBindingScreen(
             BindingSectionCard(
                 visible = activeSubPage == BindSubPage.ACADEMIC,
                 icon = Icons.Outlined.HomeWork,
-                title = "选择校区",
-                subtitle = "切换后课表导入、成绩查询会使用对应教务系统",
+                title = "学校",
+                subtitle = "选哪所学校，就用哪所学校的教务系统与校园服务",
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                    CampusConfig.campuses.forEach { item ->
-                        FilterChip(
-                            selected = item.id == campusId,
-                            onClick = { switchCampus(item) },
-                            enabled = !item.underConstruction,
-                            label = { Text(item.shortName, fontSize = 13.sp) }
-                        )
-                    }
+                    // 校区与教务是同一件事：选了学校就同时决定了教务地址和后面的服务商，
+                    // 不再让用户先选一次校区、再手填一次学校名称（那两处以前可以对不上）。
+                    CampusConfig.campuses
+                        .filterNot { it.underConstruction }
+                        .forEach { item ->
+                            FilterChip(
+                                selected = item.id == campusId,
+                                onClick = { switchCampus(item) },
+                                label = { Text(item.schoolName ?: item.name, fontSize = 13.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = colors.accentMain,
+                                    selectedLabelColor = androidx.compose.ui.graphics.Color.White,
+                                ),
+                            )
+                        }
                 }
                 Text(
-                    "当前教务：${campus.jwTypeLabel} · ${campus.schoolName ?: "未设置"}",
+                    "当前：${campus.name} · ${campus.jwTypeLabel}",
                     fontSize = 12.sp,
                     color = colors.textTertiary,
                 )
@@ -553,12 +566,6 @@ fun AccountBindingScreen(
                 subtitle = "账号密码仅加密保存在本机",
             ) {
                 AcademicAccountSection(
-                    school = school,
-                    onSchoolChange = {
-                        school = it
-                        submitted = false
-                        verifyVm.reset()
-                    },
                     studentId = studentId,
                     onStudentIdChange = {
                         studentId = it
@@ -573,7 +580,6 @@ fun AccountBindingScreen(
                     },
                     passwordVisible = passwordVisible,
                     onTogglePasswordVisible = { passwordVisible = !passwordVisible },
-                    schoolError = schoolError,
                     studentIdError = studentIdError,
                     passwordError = passwordError,
                     verify = verifyState,
@@ -622,7 +628,6 @@ fun AccountBindingScreen(
                 DormBindingContent(
                     initialBuilding = dormBuilding,
                     initialRoom = dormRoom,
-                    initialServiceCampusId = dormServiceCampusId.takeIf { it.isNotBlank() },
                     initialDormCode = dormCode,
                     preferredCampusId = campusId,
                     canUnbind = dormBuilding.isNotBlank() || dormRoom.isNotBlank(),
@@ -1161,14 +1166,17 @@ internal fun BindingStatusCard(
  *
  * ## 参数里的错误文案由调用方算
  *
- * [schoolError] / [studentIdError] / [passwordError] 是**调用方**（页面）用
+ * [studentIdError] / [passwordError] 是**调用方**（页面）用
  * `BindingValidators` 算好传进来的：这个组件保持纯展示，才能被快照渲出来；
  * 而"什么时候开始报错"（点了保存之后 / 改字段之后清掉）也属于页面的状态机。
+ *
+ * ## 为什么没有「学校名称」输入框
+ *
+ * 学校由上面的「学校」选择器决定（校区 = 学校 = 教务地址），手填一个校名只会
+ * 和真实教务地址对不上。2026-10 删掉这个字段，`school` 一律取 `campus.schoolName`。
  */
 @Composable
 internal fun ColumnScope.AcademicAccountSection(
-    school: String,
-    onSchoolChange: (String) -> Unit,
     studentId: String,
     onStudentIdChange: (String) -> Unit,
     password: String,
@@ -1177,7 +1185,6 @@ internal fun ColumnScope.AcademicAccountSection(
     onTogglePasswordVisible: () -> Unit,
     onVerifyAndSave: () -> Unit,
     onSaveOnly: () -> Unit,
-    schoolError: String? = null,
     studentIdError: String? = null,
     passwordError: String? = null,
     verify: BindingActionUi = BindingActionUi.Idle,
@@ -1190,16 +1197,9 @@ internal fun ColumnScope.AcademicAccountSection(
     val running = verify is BindingActionUi.Running
     // ── IME 类型（2026-10 修「绑定界面输入有问题」）──
     //
-    // 三个字段**必须**各自锁住输入法类型，理由见下方每个参数旁的注释。
+    // 两个字段**必须**各自锁住输入法类型，理由见下方每个参数旁的注释。
     // 判断依据是实测对比：两个导入页一直是这么做的（`WebImportScreen` 用 `Ascii` / `Password`），
     // 而绑定页此前一个都没设 —— 那正是"导入页没问题、绑定页有问题"的差别所在。
-    PocketField(
-        label = "学校名称",
-        value = school,
-        onValueChange = onSchoolChange,
-        placeholder = "填写学校名称",
-        error = schoolError,
-    )
     PocketField(
         label = "学号",
         value = studentId,

@@ -498,9 +498,16 @@ class ZhengfangClient {
 
             val hasCaptcha = captchaSuccess && captchaBytes.size > 80
 
-            // 加密公钥获取失败时直接报错（fail-closed），绝不发送明文密码
+            // 加密公钥获取失败时直接报错（fail-closed），绝不发送明文密码。
+            // 旧版正方（如烟大，isV8=false）有的根本没开 login_getPublicKey；
+            // 这时给一句**能照着做**的替代路径，而不是让用户对着"请重试"反复试。
             if (modulus.isEmpty()) {
-                return@withContext LoginResult(false, "获取加密密钥失败，请重试")
+                val hint = if (school.isV8) {
+                    "获取加密密钥失败，请重试"
+                } else {
+                    "没能取到这套旧版正方的加密公钥。\n可以改用「网页导入」登录后同步课表。"
+                }
+                return@withContext LoginResult(false, hint)
             }
             val encryptedPwd = RsaUtil.encrypt(password, modulus, exponent)
 

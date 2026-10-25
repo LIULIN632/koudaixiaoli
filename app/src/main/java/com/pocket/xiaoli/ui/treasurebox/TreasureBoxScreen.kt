@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.HotTub
@@ -76,6 +77,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Fastfood
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalLaundryService
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -482,6 +484,10 @@ fun TreasureBoxScreen(
         FoodPickerPage(onBack = { subPage = null })
         return
     }
+    if (subPage == ServiceSubPage.McProtein) {
+        McProteinIndexPage(onBack = { subPage = null })
+        return
+    }
     if (subPage == ServiceSubPage.TaskChecklist) {
         TaskChecklistScreen(
             repository = repository,
@@ -847,6 +853,9 @@ fun TreasureBoxScreen(
                 },
                 ServiceEntry("今天吃什么", "随机抽签解决选择困难", Icons.Outlined.Restaurant, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Restaurant, accent = ServiceAccent.LIFE) {
                     subPage = ServiceSubPage.FoodPicker
+                },
+                ServiceEntry("麦当劳蛋白榜", "每 1 元能买多少克蛋白", Icons.Outlined.Fastfood, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Fastfood, accent = ServiceAccent.LIFE) {
+                    subPage = ServiceSubPage.McProtein
                 },
                 ServiceEntry("迎新网", "报到 · 宿舍 · 缴费", Icons.Outlined.HowToReg, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.HowToReg, accent = ServiceAccent.INFO) {
                     val url = "https://qxj.yitsd.edu.cn/yx/web/"

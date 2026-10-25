@@ -36,6 +36,7 @@ import com.pocket.xiaoli.data.service.CampusCardLauncher
 import com.pocket.xiaoli.data.service.SchoolServiceLauncher
 import com.pocket.xiaoli.ui.components.CardAccountDialog
 import com.pocket.xiaoli.data.learning.LearningPlatform
+import com.pocket.xiaoli.data.qzxy.QzxyErrors
 import com.pocket.xiaoli.data.electricity.DormElectricityRepository
 import com.pocket.xiaoli.ui.electricity.ElectricityScreen
 import com.pocket.xiaoli.ui.card.CampusCardScreen
@@ -772,6 +773,7 @@ fun ProfileScreen(
     val showerSession by container.qzxySessionStore.session.collectAsStateWithLifecycle()
     var showerBalance by remember(showerSession?.telephone) { mutableStateOf<Double?>(null) }
     var showerBalanceSigned by remember(showerSession?.telephone) { mutableStateOf<Boolean?>(null) }
+    var showerBalanceExpired by remember(showerSession?.telephone) { mutableStateOf(false) }
     var showerBalanceLoading by remember(showerSession?.telephone) {
         mutableStateOf(showerSession != null)
     }
@@ -780,13 +782,15 @@ fun ProfileScreen(
         if (session == null) {
             showerBalance = null
             showerBalanceSigned = null
+            showerBalanceExpired = false
             showerBalanceLoading = false
             return@LaunchedEffect
         }
         showerBalanceLoading = true
-        val info = container.qzxyRepository.campusBalance().getOrNull()
-        showerBalance = info?.amountYuan
-        showerBalanceSigned = info?.isSigned
+        val result = container.qzxyRepository.campusBalance()
+        showerBalance = result.getOrNull()?.amountYuan
+        showerBalanceSigned = result.getOrNull()?.isSigned
+        showerBalanceExpired = result.exceptionOrNull()?.message?.let(QzxyErrors::isAuthExpired) == true
         showerBalanceLoading = false
     }
     val showerHint = showerTileHint(
@@ -794,6 +798,7 @@ fun ProfileScreen(
         loading = showerBalanceLoading,
         balance = showerBalance,
         signed = showerBalanceSigned,
+        expired = showerBalanceExpired,
     )
 
     // 「我的」页正文。

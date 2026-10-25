@@ -20,6 +20,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pocket.xiaoli.data.CampusConfig
+import com.pocket.xiaoli.data.CampusServiceKeys
 import com.pocket.xiaoli.data.model.DormBuildingCatalog
 import com.pocket.xiaoli.data.model.DormRoomNumber
 import com.pocket.xiaoli.util.BindingValidators
@@ -57,7 +60,6 @@ import com.pocket.xiaoli.ui.theme.LocalSkin
 fun DormBindingContent(
     initialBuilding: String,
     initialRoom: String,
-    initialServiceCampusId: String? = null,
     initialDormCode: String = "",
     preferredCampusId: String = DormBuildingCatalog.CAMPUS_MAIN,
     canUnbind: Boolean,
@@ -66,12 +68,24 @@ fun DormBindingContent(
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val buildings = remember { DormBuildingCatalog.buildings }
-    // 轮子里只放**短**文案（`10号宿舍楼`）：带上校区标记（`10号宿舍楼 · 南校`）在四列布局里
-    // 会被截成"10号宿舍楼 · 南"—— 校区信息由下面的「服务校区」轮与实时摘要表达，不靠截断的字。
-    val buildingLabels = remember(buildings) { buildings.map { it.name } }
     val campusOptions = remember { CampusConfig.campuses.filterNot { it.underConstruction } }
-    val campusLabels = remember(campusOptions) { campusOptions.map { it.shortName } }
+
+    // ── 宿舍校区 → 该校区的宿舍楼 ──
+    //
+    // 2026-10：楼栋轮原来把 1-6/13（烟理）与 7-12（烟大）混在一个列表里，
+    // 还另有一个「服务校区」轮可以手改 —— 用户看到的是"1 到 13 号楼"一长串，
+    // 根本分不清哪栋属于哪个学校。现在先选校区，楼栋只列该校区的；
+    // 服务校区**不再手改**：它由楼栋决定（见 `DormServiceRouter`），
+    // 服务商则直接来自该校区配置（烟大 U净/趣智，烟理 浣熊/易校园）。
+    var dormCampusId by remember(initialBuilding, preferredCampusId) {
+        mutableStateOf(DormBuildingCatalog.find(initialBuilding)?.campusId ?: preferredCampusId)
+    }
+    val dormCampusIndex = campusOptions.indexOfFirst { it.id == dormCampusId }.coerceAtLeast(0)
+    val dormCampus = campusOptions.getOrNull(dormCampusIndex) ?: CampusConfig.defaultCampus
+    val campusBuildings = remember(dormCampusId) {
+        DormBuildingCatalog.buildings.filter { it.campusId == dormCampusId }
+    }
+    val buildingLabels = remember(campusBuildings) { campusBuildings.map { it.name } }
 
     // ── 已有值反解成三个轮的位置 ──
     //
@@ -80,14 +94,11 @@ fun DormBindingContent(
     val parsed = remember(initialRoom) { DormRoomNumber.parse(initialRoom) }
     val legacyRoom = initialRoom.trim().takeIf { it.isNotBlank() && parsed == null }
 
-    var buildingIndex by remember(initialBuilding, preferredCampusId) {
-        val exact = buildings.indexOfFirst { it.name == initialBuilding }
+    var buildingIndex by remember(initialBuilding, dormCampusId) {
+        val exact = campusBuildings.indexOfFirst { it.name == initialBuilding }
         val matchedAlias = DormBuildingCatalog.find(initialBuilding)
-            ?.let { found -> buildings.indexOfFirst { it.id == found.id } }
-        val preferred = buildings.indexOfFirst { it.campusId == preferredCampusId }
-        mutableIntStateOf(
-            (exact.takeIf { it >= 0 } ?: matchedAlias?.takeIf { it >= 0 } ?: preferred).coerceAtLeast(0)
-        )
+            ?.let { found -> campusBuildings.indexOfFirst { it.id == found.id } }
+        mutableIntStateOf((exact.takeIf { it >= 0 } ?: matchedAlias?.takeIf { it >= 0 } ?: 0).coerceAtLeast(0))
     }
     var sideIndex by remember(initialRoom) {
         mutableIntStateOf(
@@ -103,24 +114,11 @@ fun DormBindingContent(
     // "用户有没有动过房间号" —— 决定历史房号是不是原样写回
     var roomTouched by remember(initialRoom) { mutableStateOf(false) }
 
-    var campusIndex by remember(initialBuilding, initialServiceCampusId, preferredCampusId, campusOptions) {
-        // ⚠️ `initialBuilding` **必须在 remember 的键里**：服务校区默认值是由楼栋推出来的
-        //（1-6/13 → 本校区，7-12 → 南校），漏了它就会"换了楼栋、服务校区还停在上一栋"——
-        // 而服务校区决定洗澡 / 洗衣 / 电费走哪套服务商，错一个就是整条生活服务指向错误的学校。
-        val defaultCampusId = DormBuildingCatalog.find(initialBuilding)?.campusId ?: preferredCampusId
-        val preferred = campusOptions.indexOfFirst { it.id == defaultCampusId }
-        val exact = initialServiceCampusId
-            ?.let { id -> campusOptions.indexOfFirst { it.id == id } }
-            ?.takeIf { it >= 0 }
-        mutableIntStateOf((exact ?: preferred).coerceAtLeast(0))
-    }
-
     var dormCode by remember(initialDormCode) { mutableStateOf(initialDormCode) }
 
-    val selectedBuilding = buildings.getOrNull(buildingIndex)?.name.orEmpty()
-    val selectedCampus = buildings.getOrNull(buildingIndex)?.campusId
+    val selectedBuilding = campusBuildings.getOrNull(buildingIndex)?.name.orEmpty()
     // 南校（7-12 号楼）的房号带侧翼：n602 / s1602；本校区就是楼层 + 房号（412）
-    val southCampus = selectedCampus == DormBuildingCatalog.CAMPUS_SOUTH
+    val southCampus = dormCampusId == DormBuildingCatalog.CAMPUS_SOUTH
     val selectedFloor = DormRoomNumber.floors.getOrNull(floorIndex) ?: DormRoomNumber.MIN_FLOOR
     val selectedRoom = DormRoomNumber.rooms.getOrNull(roomIndex) ?: DormRoomNumber.MIN_ROOM
     val composedRoom = DormRoomNumber.compose(
@@ -129,12 +127,44 @@ fun DormBindingContent(
         room = selectedRoom,
     )
     val effectiveRoom = if (legacyRoom != null && !roomTouched) legacyRoom else composedRoom
-    val selectedServiceCampusId = campusOptions.getOrNull(campusIndex)?.id
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(skin.spaceMd),
     ) {
+        // ── 第一步：宿舍校区 ──
+        DormFormCard {
+            Text(
+                "宿舍校区",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.textSecondary,
+            )
+            Spacer(Modifier.height(skin.spaceXs))
+            Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
+                campusOptions.forEach { option ->
+                    FilterChip(
+                        selected = option.id == dormCampusId,
+                        onClick = {
+                            dormCampusId = option.id
+                            roomTouched = true
+                        },
+                        label = { Text(option.schoolName ?: option.name, fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.accentMain,
+                            selectedLabelColor = androidx.compose.ui.graphics.Color.White,
+                        ),
+                    )
+                }
+            }
+            Spacer(Modifier.height(skin.spaceMicro))
+            Text(
+                "先选校区，下面的宿舍楼只会列出这个校区的。",
+                fontSize = 11.sp,
+                color = colors.textTertiary,
+            )
+        }
+
         // ── 房间号：楼层 + 房号（+ 南校的侧翼）──
         //
         // ⚠️ 2026-10 重做的理由：改造前是**一个 720 项的房间号转盘**（1-18 层 × 01-40 间拼成
@@ -158,10 +188,6 @@ fun DormBindingContent(
                         onSelected = { index ->
                             buildingIndex = index
                             roomTouched = true
-                            // 换楼栋时把服务校区拉回该楼的默认值，用户仍可再手动改
-                            val defaultCampusId = buildings.getOrNull(index)?.campusId
-                            val defaultIndex = campusOptions.indexOfFirst { it.id == defaultCampusId }
-                            if (defaultIndex >= 0) campusIndex = defaultIndex
                         },
                         height = 150.dp,
                     )
@@ -206,26 +232,42 @@ fun DormBindingContent(
             }
         }
 
-        // ── 服务校区 ──
+        // ── 服务商（只读，跟着宿舍校区走）──
+        //
+        // 以前这里是一个「服务校区」轮，允许用户把洗衣/洗澡/电费改到另一个学校。
+        // 实际上一栋楼属于哪个学校是确定的，手动改只会制造"楼在烟理、洗澡走烟大"这种
+        // 自相矛盾的状态。现在服务校区 = 宿舍校区，这里只把结果摆出来让用户核对。
         DormFormCard {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                WheelPicker(
-                    values = campusLabels,
-                    selectedIndex = campusIndex,
-                    onSelected = { campusIndex = it },
-                    width = 200.dp,
-                    height = 116.dp,
-                )
-                Spacer(Modifier.height(skin.spaceXs))
-                Text("服务校区", fontSize = 12.sp, color = colors.textSecondary)
-            }
             Text(
-                "默认：1-6 / 13 号楼走本校区，7-12 号楼走烟大南校；" +
-                    "自动匹配不准时可以在这里手动修正。",
+                "宿舍服务商",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.textSecondary,
+            )
+            Spacer(Modifier.height(skin.spaceXs))
+            DORM_SERVICE_LINES.chunked(2).forEach { pair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(skin.spaceMd),
+                ) {
+                    pair.forEach { (label, key) ->
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(label, fontSize = 11.sp, color = colors.textTertiary)
+                            Text(
+                                dormCampus.services[key] ?: "未配置",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.textPrimary,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(skin.spaceMicro))
+            Text(
+                "洗衣、洗澡、热水、电费按宿舍校区自动匹配；选错校区就改上面的「宿舍校区」。",
                 fontSize = 11.sp,
+                lineHeight = 16.sp,
                 color = colors.textTertiary,
             )
         }
@@ -275,7 +317,7 @@ fun DormBindingContent(
             text = if (selectedBuilding.isBlank()) {
                 "请选择宿舍楼"
             } else {
-                val tail = campusOptions.getOrNull(campusIndex)?.shortName.orEmpty()
+                val tail = dormCampus.shortName
                 val code = dormCode.trim()
                 "$selectedBuilding  $effectiveRoom · $tail" + if (code.isBlank()) "" else " · $code"
             },
@@ -294,7 +336,7 @@ fun DormBindingContent(
                 onConfirm(
                     selectedBuilding,
                     effectiveRoom,
-                    selectedServiceCampusId,
+                    dormCampus.id,
                     dormCode.trim(),
                 )
             },
@@ -319,6 +361,19 @@ fun DormBindingContent(
         }
     }
 }
+
+/**
+ * 宿舍绑定页要展示的四项服务：键与 `CampusConfig.services` 一一对应。
+ *
+ * 只用于**展示**（让用户看到"烟大宿舍 = U净 / 趣智校园"）；真正的路由仍走
+ * `DormServiceRouter`，不要在别处硬编码服务商名字。
+ */
+private val DORM_SERVICE_LINES: List<Pair<String, String>> = listOf(
+    "洗衣" to CampusConfig.SERVICE_LAUNDRY,
+    "洗澡" to CampusServiceKeys.SHOWER,
+    "热水" to CampusServiceKeys.HOT_WATER,
+    "电费" to CampusServiceKeys.ELECTRICITY,
+)
 
 /**
  * 转盘 + 下方小标题的竖排容器。

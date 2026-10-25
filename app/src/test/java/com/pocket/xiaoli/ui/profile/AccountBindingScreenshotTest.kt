@@ -201,11 +201,10 @@ class AccountBindingScreenshotTest {
     private data class FormCase(
         val name: String,
         val dark: Boolean,
-        val school: String,
         val studentId: String,
         val password: String,
         val passwordVisible: Boolean,
-        /** true = 渲染"点过提交之后"的形态：三个字段下方带红字原因 */
+        /** true = 渲染"点过提交之后"的形态：字段下方带红字原因 */
         val showErrors: Boolean = false,
         /** 「验证并保存」那条路的结果 */
         val verify: BindingActionUi = BindingActionUi.Idle,
@@ -216,7 +215,6 @@ class AccountBindingScreenshotTest {
         FormCase(
             name = "85-binding-academic-form",
             dark = false,
-            school = "烟台理工学院",
             studentId = "2023123456789",
             password = "我自己改过的密码",
             passwordVisible = false,
@@ -226,7 +224,6 @@ class AccountBindingScreenshotTest {
         FormCase(
             name = "86-binding-academic-form-invalid",
             dark = false,
-            school = "",
             studentId = "2023abc",
             password = "123",
             passwordVisible = false,
@@ -236,7 +233,6 @@ class AccountBindingScreenshotTest {
         FormCase(
             name = "87-binding-academic-form-dark",
             dark = true,
-            school = "烟台理工学院",
             studentId = "2023123456789",
             password = "Ytlg@56789",
             passwordVisible = true,
@@ -246,7 +242,6 @@ class AccountBindingScreenshotTest {
         FormCase(
             name = "88-binding-academic-verify-failed",
             dark = false,
-            school = "烟台理工学院",
             studentId = "2023123456789",
             password = "错的密码哈哈哈",
             passwordVisible = false,
@@ -259,7 +254,6 @@ class AccountBindingScreenshotTest {
         FormCase(
             name = "307-binding-academic-verify-running",
             dark = false,
-            school = "烟台理工学院",
             studentId = "2023123456789",
             password = "Ytlg@56789",
             passwordVisible = false,
@@ -314,8 +308,6 @@ class AccountBindingScreenshotTest {
                 subtitle = "账号密码仅加密保存在本机",
             ) {
                 AcademicAccountSection(
-                    school = case.school,
-                    onSchoolChange = {},
                     studentId = case.studentId,
                     onStudentIdChange = {},
                     password = case.password,
@@ -326,7 +318,6 @@ class AccountBindingScreenshotTest {
                     onSaveOnly = {},
                     // 错误文案由页面用 BindingValidators 算好传进来（组件保持纯展示），
                     // 所以这里也照那个办法算 —— 与生产代码同一条规则，不是另写一套判据。
-                    schoolError = if (case.showErrors) BindingValidators.schoolName(case.school) else null,
                     studentIdError = if (case.showErrors) BindingValidators.studentId(case.studentId) else null,
                     passwordError = if (case.showErrors) BindingValidators.password(case.password) else null,
                     verify = case.verify,

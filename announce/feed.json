@@ -9,16 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 92,
-    "versionName": "0.1.91",
+    "versionCode": 93,
+    "versionName": "0.1.92",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.91/koudaixiaoli_v0.1.91.apk",
-    "sha256": "d3683a3df32aae4773b24b2da3f7737fb83f635fd16cc58bf7a9aacc69691013",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.92/koudaixiaoli_v0.1.92.apk",
+    "sha256": "bbcbda292eeaaed304912abc8f773073fc183dac13d7ecb6026953132be0c550",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "「意见反馈 → 直接发送」之前点了发不出去（地址被拼重了一层，服务端返回 404），这一版修好了",
-      "顺带把工单回复的「检查回复」也接到同一个地址上"
+      "第一次打开会有一页简短的引导：选学校，或者先随便看看",
+      "服务页新增「淋浴预约」和「麦当劳蛋白榜」（把价格换算成每克蛋白多少钱来排）",
+      "绑定页的宿舍 / 账号表单拆成分步填写，一屏只问一件事"
     ]
   },
   "endpoints": {

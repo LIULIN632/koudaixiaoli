@@ -73,7 +73,7 @@ private const val FEEDBACK_MAIL = "pocketxiaoyan@outlook.com"
 private const val FEEDBACK_REPO = "LIULIN632/koudaixiaoli"
 
 /**
- * 意见反馈页（二级设置页）。
+ * 反馈页（二级设置页）。
  *
  * ## 为什么是"一页"而不是"一个弹窗"
  *

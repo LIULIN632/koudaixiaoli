@@ -151,9 +151,12 @@ internal fun showerTileHint(
     loading: Boolean,
     balance: Double?,
     signed: Boolean?,
+    /** 余额接口明确回了"登录失效"（趣智挤号）—— 与"未签约"是两回事。 */
+    expired: Boolean = false,
 ): String = when {
     !loggedIn -> "登录后查看余额"
     loading -> "查询中…"
+    expired -> "登录已失效，点这里重登"
     balance != null -> if (balance < 0) "-¥%.2f".format(-balance) else "¥%.2f".format(balance)
     signed == false -> "未签约免密"
     else -> "点击查询余额"

@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
@@ -67,6 +68,7 @@ import com.pocket.xiaoli.PocketXiaoliApplication
 import com.pocket.xiaoli.data.qzxy.QzxyBleScanner
 import com.pocket.xiaoli.data.qzxy.QzxyKnownDevice
 import com.pocket.xiaoli.data.qzxy.QzxyUsingState
+import com.pocket.xiaoli.data.service.SchoolServiceLauncher
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import kotlinx.coroutines.delay
@@ -266,6 +268,10 @@ fun ShowerScreen(
                 )
             }
 
+            if (state.isLoggedIn && state.authExpired) {
+                SessionExpiredCard(onRelogin = { vm.logout() })
+            }
+
             if (state.isLoggedIn) {
                 ControlCard(
                     state = state,
@@ -282,6 +288,19 @@ fun ShowerScreen(
                             vm.discoverNearby(context)
                         } else {
                             blePermissionLauncher.launch(QzxyBleScanner.requiredPermissions)
+                        }
+                    },
+                )
+                BookingCard(
+                    needsBooking = state.needsBooking,
+                    onOpenOfficial = {
+                        val launched = SchoolServiceLauncher.launchApp("com.klcxkj.zqxy", context)
+                        if (!launched) {
+                            Toast.makeText(
+                                context,
+                                "没安装趣智校园，可在「服务 → 洗澡」打开",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                     },
                 )
@@ -329,6 +348,96 @@ private fun MessageBanner(text: String) {
             fontSize = 13.sp,
             color = colors.textPrimary,
         )
+    }
+}
+
+/**
+ * 登录被挤掉时的提示卡。
+ *
+ * 趣智不支持多设备同时在线（见 `docs/QzxyShower.md` 与 [QzxyErrors]），
+ * 在官方 App 或另一台手机上登录过，本机的 `loginCode` 就失效了。
+ * 以前这里只会显示「未签约」，用户会去查签约状态，查不出问题 —— 必须说清是重新登录。
+ */
+@Composable
+private fun SessionExpiredCard(onRelogin: () -> Unit) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(skin.radiusCard),
+        colors = CardDefaults.cardColors(containerColor = colors.danger.copy(alpha = 0.10f)),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(skin.cardPadding)) {
+            Text(
+                "登录已失效",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.danger,
+            )
+            Spacer(Modifier.height(skin.spaceXs))
+            Text(
+                "趣智不支持多设备同时在线 —— 在官方 App 或别的手机上登录过，就会挤掉本机。重新登录后余额和开关阀都会恢复。",
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = colors.textSecondary,
+            )
+            Spacer(Modifier.height(skin.spaceXs))
+            TextButton(onClick = onRelogin) {
+                Text("重新登录", color = colors.danger, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+/**
+ * 预约 / 选浴位。
+ *
+ * 趣智没有对第三方开放预约接口（`docs/QzxyShower.md` §预约），所以这里不伪造
+ * 「占位成功」：能做的只有两件真事 —— 提前把设备选好（到浴室直接开阀），
+ * 或者把用户送去官方 App 里做真正的预约。服务端明确要求预约时才提示。
+ */
+@Composable
+internal fun BookingCard(
+    needsBooking: Boolean,
+    onOpenOfficial: () -> Unit,
+) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(skin.radiusCard),
+        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = if (needsBooking) colors.warning.copy(alpha = 0.5f) else colors.borderDivider,
+        ),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(skin.cardPadding)) {
+            Text(
+                if (needsBooking) "这台设备需要先预约" else "预约 / 选浴位",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (needsBooking) colors.warning else colors.textPrimary,
+            )
+            Spacer(Modifier.height(skin.spaceXs))
+            Text(
+                if (needsBooking) {
+                    "服务端提示需要预约才能开阀。官方 App 的「预约」就是选位 + 占位，只能在趣智校园里完成；你也可以先用上方设备卡里的「选设备」把浴位挑好。"
+                } else {
+                    "占位预约要在趣智校园里完成。提前把浴位选好（上方设备卡的「选设备」），到浴室就能直接开阀。"
+                },
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = colors.textSecondary,
+            )
+            Spacer(Modifier.height(skin.spaceSm))
+            OutlinedButton(
+                onClick = onOpenOfficial,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("打开趣智校园", color = colors.accentMain)
+            }
+        }
     }
 }
 
@@ -810,7 +919,12 @@ internal fun UseCodeCard(
             Text(
                 // 三种"没有数字"的状态要分开表达，见上方表格
                 state.campusBalance?.amountYuan?.let { "¥%.2f".format(it) }
-                    ?: if (state.loadingAccount) "查询中…" else "未签约",
+                    ?: when {
+                        state.loadingAccount -> "查询中…"
+                        // 登录被挤掉 ≠ 没签约：一个重登、一个去签约，不能混成一句话
+                        state.authExpired -> "登录已失效"
+                        else -> "未签约"
+                    },
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (state.campusBalance?.amountYuan != null) colors.accentMain
@@ -818,6 +932,7 @@ internal fun UseCodeCard(
             )
             val balanceHint = when {
                 state.campusBalance == null && state.loadingAccount -> "正在读取趣智钱包"
+                state.authExpired -> "可能在别的设备登录过；重新登录后恢复"
                 state.campusBalance?.isSigned == false -> "未签约免密支付，拿不到实时余额"
                 state.campusBalance?.amountYuan == null -> "需开通免密支付"
                 else -> "趣智钱包实时余额"

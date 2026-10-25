@@ -31,10 +31,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -58,7 +62,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun ImportScreen(
     onBack: () -> Unit,
-    onGoSettings: (() -> Unit)? = null
+    onGoSettings: (() -> Unit)? = null,
+    /**
+     * **导入成功之后**离开这一页时调用的回调。
+     *
+     * 首次向导里它代表"设置完成"（→ 进 App），而普通进入导入页时"返回"只是返回。
+     * 为 null 时退回 [onBack]，所以既有调用点不需要改。
+     */
+    onImported: (() -> Unit)? = null,
+    /** 首次向导是来绑定账号的：默认勾选「记住密码」，用户仍可取消。 */
+    rememberPasswordByDefault: Boolean = false,
+    /** 成功卡上离开按钮的文案。向导里是「开始使用」，普通导入页是「返回课表」。 */
+    successActionLabel: String = "返回课表",
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -85,7 +100,7 @@ fun ImportScreen(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var captchaCode by remember { mutableStateOf("") }
-    var rememberPassword by remember { mutableStateOf(false) }
+    var rememberPassword by remember { mutableStateOf(rememberPasswordByDefault) }
     var showPassword by remember { mutableStateOf(false) }
     var showAddCustomSchool by remember { mutableStateOf(false) }
     var showSchoolRequest by remember { mutableStateOf(false) }
@@ -100,15 +115,27 @@ fun ImportScreen(
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val campusOnly = viewModel.campusOnly
 
+    // ── 键盘动线：学号「下一项」→ 密码，「完成」直接登录 ──
+    // 逐字段点、再点按钮的路径太长，尤其锁定校区后只有两个字段，
+    // 打完密码还要把键盘收起来才能看见按钮。这里让 IME 直接接着走。
+    val focusManager = LocalFocusManager.current
+    val canSubmit = !isLoading && username.isNotBlank() && password.isNotBlank()
+
+    fun submitLogin() {
+        if (!canSubmit) return
+        focusManager.clearFocus()
+        viewModel.startLogin(username, password)
+    }
+
     // 逐级返回：成功卡片 → 退出；失败卡片 → 回登录表单；登录表单 → 学校列表；列表 → 退出
     fun handleBack() {
         val res = result
         if (isLoading) viewModel.cancelCaptcha()
         when {
             res?.success == true -> {
-                // 导入成功：直接退出导入页
+                // 导入成功：向导里是"设置完成"，普通入口就是退出导入页
                 viewModel.reset()
-                onBack()
+                (onImported ?: onBack)()
             }
             res != null -> {
                 // 导入失败：回到登录表单，保留已选学校
@@ -278,6 +305,7 @@ fun ImportScreen(
                 SectionCaption("登录教务系统", Modifier.padding(top = skin.spaceSm))
             }
             item {
+                val school = selectedSchool ?: return@item
                 Card(
                     colors = CardDefaults.cardColors(containerColor = accentSoftColor()),
                     shape = RoundedCornerShape(skin.radiusMicro)
@@ -289,8 +317,18 @@ fun ImportScreen(
                         Icon(Icons.Outlined.School, null, tint = accentColor(), modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(selectedSchool!!.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colors.textPrimary)
-                            Text(selectedSchool!!.baseUrl, fontSize = 11.sp, color = colors.textTertiary)
+                            Text(school.name, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = colors.textPrimary)
+                            // 锁定校区时不摆原始地址：烟大是 `210.47.245.4` 这种 IP，
+                            // 露在登录页上既不像校方域名、也帮不上用户判断。
+                            Text(
+                                if (campusOnly) {
+                                    "${school.jwType.label} · 已按当前校区锁定"
+                                } else {
+                                    school.baseUrl
+                                },
+                                fontSize = 11.sp,
+                                color = colors.textTertiary
+                            )
                         }
                     }
                 }
@@ -307,7 +345,16 @@ fun ImportScreen(
                     // ⚠️ 学号必须用 Ascii 键盘（不联想、不纠错）：默认文本键盘在中文输入法下会弹候选条，
                     // 打数字要走候选，而学号要跟系统**逐字**对上 —— 多一个自动纠错就是"登不上但看不出为什么"。
                     // 规矩与理由见 `ui/components/PocketField.kt` 的那张表（这里在补一处漏网的）。
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii)
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Next,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        // 用 focus 系统往下走一步，而不是持有密码框的 FocusRequester：
+                        // 软键盘弹出后密码框可能还没被 LazyColumn 组合，强 focus 会抛
+                        // "FocusRequester is not initialized"。
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                    )
                 )
             }
             item {
@@ -320,7 +367,11 @@ fun ImportScreen(
                     enabled = !isLoading,
                     shape = RoundedCornerShape(skin.radiusMicro),
                     visualTransformation = if (showPassword) VisualTransformation.None else PocketPasswordTransformation,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { submitLogin() }),
                     trailingIcon = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
@@ -369,13 +420,9 @@ fun ImportScreen(
             }
             item {
                 Button(
-                    onClick = {
-                        if (username.isNotBlank() && password.isNotBlank()) {
-                            viewModel.startLogin(username, password)
-                        }
-                    },
+                    onClick = { submitLogin() },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    enabled = !isLoading && username.isNotBlank() && password.isNotBlank(),
+                    enabled = canSubmit,
                     colors = ButtonDefaults.buttonColors(containerColor = accentColor()),
                     shape = RoundedCornerShape(skin.radiusMicro)
                 ) {
@@ -407,8 +454,9 @@ fun ImportScreen(
                         error = result!!.error,
                         courseCount = result!!.courses?.size ?: 0,
                         onOpenSettings = onGoSettings?.let { go -> { viewModel.reset(); go() } },
-                        onBackToTimetable = { viewModel.reset(); onBack() },
+                        onBackToTimetable = { viewModel.reset(); (onImported ?: onBack)() },
                         onRetry = { viewModel.reset() },
+                        successActionLabel = successActionLabel,
                     )
                 }
             }
@@ -563,6 +611,11 @@ fun ImportScreen(
 
     // Captcha dialog
     if (showCaptcha && captchaBase64 != null) {
+        fun submitCaptcha() {
+            if (captchaCode.isBlank()) return
+            viewModel.submitCaptcha(captchaCode)
+            captchaCode = ""
+        }
         AlertDialog(
             onDismissRequest = { viewModel.cancelCaptcha() },
             title = { Text("安全验证", fontWeight = FontWeight.ExtraBold) },
@@ -615,13 +668,17 @@ fun ImportScreen(
                         onValueChange = { captchaCode = it },
                         label = { Text("验证码") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        // 输入法「完成」= 确认登录：验证码页只有这一个输入框，
+                        // 再让用户把键盘收起来去点按钮是白费一步。
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { submitCaptcha() }),
                     )
                 }
             },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.submitCaptcha(captchaCode); captchaCode = "" },
+                    onClick = { submitCaptcha() },
                     enabled = captchaCode.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = accentColor())
                 ) { Text("确认登录") }
@@ -715,6 +772,8 @@ internal fun ImportResultCard(
     onOpenSettings: (() -> Unit)?,
     onBackToTimetable: () -> Unit,
     onRetry: () -> Unit,
+    /** 成功卡离开按钮的文案；默认按普通导入页的叫法。 */
+    successActionLabel: String = "返回课表",
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -785,14 +844,14 @@ internal fun ImportResultCard(
                             modifier = Modifier.heightIn(min = 40.dp),
                             shape = RoundedCornerShape(skin.radiusChip),
                             border = BorderStroke(1.dp, accentColor().copy(alpha = 0.35f)),
-                        ) { Text("返回课表", fontSize = 13.sp) }
+                        ) { Text(successActionLabel, fontSize = 13.sp) }
                     } else {
                         Button(
                             onClick = onBackToTimetable,
                             modifier = Modifier.heightIn(min = 40.dp),
                             shape = RoundedCornerShape(skin.radiusChip),
                             colors = ButtonDefaults.buttonColors(containerColor = accentColor()),
-                        ) { Text("返回课表", fontSize = 13.sp) }
+                        ) { Text(successActionLabel, fontSize = 13.sp) }
                     }
                 }
             } else {

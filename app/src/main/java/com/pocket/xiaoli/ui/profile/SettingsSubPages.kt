@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
@@ -30,7 +29,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Insights
-import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,8 +109,8 @@ internal enum class SettingsSubPage(val title: String) {
     APPEARANCE("外观"),
     SERVICES("服务功能"),
     ABOUT("关于"),
-    /** 意见反馈：从「关于」那一卡点进来，但自己是一整页（表单比弹窗好写）。 */
-    FEEDBACK("意见反馈"),
+    /** 反馈：表单 + 复制 / 邮件 / GitHub / 回复记录都在这一页，设置首页直接进。 */
+    FEEDBACK("反馈"),
     UPDATE("更新"),
     CONTRIBUTE("贡献"),
     THANKS("致谢"),
@@ -121,9 +119,7 @@ internal enum class SettingsSubPage(val title: String) {
 
 /** 仓库与联系方式：只在这里写一次，页面里多处引用。 */
 private const val GITHUB_REPO_URL = "https://github.com/LIULIN632/koudaixiaoli"
-private const val GITHUB_ISSUES_URL = "https://github.com/LIULIN632/koudaixiaoli/issues"
 private const val GITEE_REPO_URL = "https://gitee.com/liulin62633/pocket-carp"
-private const val FEEDBACK_MAIL = "mailto:pocketxiaoyan@outlook.com"
 
 /**
  * 二级设置页的外壳：顶栏 + 返回 + 一屏可滚动的设置卡。
@@ -176,7 +172,6 @@ internal fun SettingsSubPageHost(
     onClearCache: () -> Unit,
     onExportLog: () -> Unit,
     onAnalyzeLog: () -> Unit,
-    onOpenFeedback: () -> Unit,
     onClearData: () -> Unit,
     onDeleteAllData: () -> Unit,
 ) {
@@ -209,7 +204,6 @@ internal fun SettingsSubPageHost(
                     onClearCache = onClearCache,
                     onExportLog = onExportLog,
                     onAnalyzeLog = onAnalyzeLog,
-                    onOpenFeedback = onOpenFeedback,
                     onOpenAgreement = { agreementOpen = true },
                 )
             SettingsSubPage.FEEDBACK -> FeedbackContent(container)
@@ -226,7 +220,7 @@ internal fun SettingsSubPageHost(
 
 // ═══ 关于 ═══
 //
-// 用户找"这是哪个版本"和"我要反馈问题"时看的是同一个地方。
+// 用户找"这是哪个版本"看这里；报 bug / 提建议已经统一收到「设置 → 反馈」。
 // 2026-10-18 起「数据与诊断」并进来：那三项（清理缓存 / 导出日志 / 让鲤鱼看看）
 // 都是"出问题了怎么办"，与"这个 App 是什么"是同一件事的两半。
 // 两个弹窗的开关归本页所有：它们只从这里进，没必要提升到父页。
@@ -236,7 +230,6 @@ private fun AboutContent(
     onClearCache: () -> Unit,
     onExportLog: () -> Unit,
     onAnalyzeLog: () -> Unit,
-    onOpenFeedback: () -> Unit,
     onOpenAgreement: () -> Unit,
 ) {
     var showFaqDialog by remember { mutableStateOf(false) }
@@ -267,13 +260,6 @@ private fun AboutContent(
             title = "常见问题",
             onClick = { showFaqDialog = true },
             accent = ServiceAccent.QUERY,
-        )
-        SettingsDivider()
-        SettingsMenuItem(
-            icon = Icons.Outlined.MailOutline,
-            title = "意见反馈",
-            onClick = onOpenFeedback,
-            accent = ServiceAccent.INFO,
         )
         SettingsDivider()
         // 推广自己的入口本身不挂「推广」角标：那条铁律管的是**第三方/合作方**内容，
@@ -460,16 +446,15 @@ private fun UpdateContent(
 
 // ═══ 贡献 ═══
 //
-// 这一页存在的理由：这是个人项目，没有"客服"，也没有应用商店的评价入口。
-// 想帮忙的人需要一条明确的路径 —— 光在「关于」里塞一句"欢迎反馈"是没人看得见的。
+// 这一页只放"动手参与"（代码 / 榜单）；报 bug、提建议、邮件联系都归「设置 → 反馈」一页。
 @Composable
 private fun ContributeContent(onOpenLeaderboard: () -> Unit) {
     val context = LocalContext.current
     val colors = LocalPocketXiaoliColors.current
 
     Text(
-        "这个 App 由一个人利用课余时间维护。报 bug、提功能建议、指出文案错误、" +
-            "帮忙做适配、把界面翻译成别的语言 —— 都算贡献，没有大小之分。",
+        "这个 App 由一个人利用课余时间维护。改代码、做适配、把界面翻译成别的语言、" +
+            "或者在共建榜里补一份课表 —— 都算贡献，没有大小之分。",
         fontSize = 12.sp,
         color = colors.textTertiary,
         lineHeight = 18.sp,
@@ -495,14 +480,6 @@ private fun ContributeContent(onOpenLeaderboard: () -> Unit) {
 
     SettingsCard {
         SettingsMenuItem(
-            icon = Icons.Filled.BugReport,
-            title = "提交问题或建议",
-            subtitle = "GitHub Issues · 附上报错原文更容易定位",
-            onClick = { openUrl(context, GITHUB_ISSUES_URL) },
-            accent = ServiceAccent.INFO,
-        )
-        SettingsDivider()
-        SettingsMenuItem(
             icon = Icons.Filled.Code,
             title = "参与开发",
             subtitle = "源码在 GitHub，欢迎 fork 与 PR",
@@ -516,14 +493,6 @@ private fun ContributeContent(onOpenLeaderboard: () -> Unit) {
             subtitle = "Gitee 仓库（访问更快）",
             onClick = { openUrl(context, GITEE_REPO_URL) },
             accent = ServiceAccent.QUERY,
-        )
-        SettingsDivider()
-        SettingsMenuItem(
-            icon = Icons.Filled.Email,
-            title = "邮件联系",
-            subtitle = "pocketxiaoyan@outlook.com",
-            onClick = { openUrl(context, FEEDBACK_MAIL) },
-            accent = ServiceAccent.PAYMENT,
         )
     }
 
@@ -601,6 +570,15 @@ private fun ThanksContent() {
             subtitle = "法定节假日与调休数据",
             onClick = { openUrl(context, "https://github.com/NateScarlet/holiday-cn") },
             accent = ServiceAccent.PAYMENT,
+        )
+        SettingsDivider()
+        // 麦当劳蛋白榜的数据快照（官方菜单价 + 官方营养表），MIT 要求保留出处。
+        SettingsMenuItem(
+            icon = Icons.Filled.Info,
+            title = "mcd-protein-index",
+            subtitle = "麦当劳菜单 / 营养 / 价格快照 · MIT",
+            onClick = { openUrl(context, "https://github.com/hework1110/mcd-protein-index") },
+            accent = ServiceAccent.LIFE,
         )
     }
 

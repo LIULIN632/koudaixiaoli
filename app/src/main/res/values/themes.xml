@@ -16,4 +16,21 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!--
+      对话框 / 底部抽屉（`Dialog` 窗口）专用的主题：**窗口背景必须透明**。
+
+      `androidx.compose.ui.window.Dialog` 的窗口会继承当前 Context 的主题，
+      而 Activity 主题的 `windowBackground` 是不透明的 `@color/status_bar`
+      （冷启动时需要它，不能删）。于是抽屉背后的"遮罩"其实盖在一块不透明白板上：
+      MIUIX 再画 30% 黑 → 整块 #A5A5A5 的实色灰，底下的页面完全看不见。
+
+      真正的做法是让窗口透明、只留 Compose 画的那层半透明黑（以及平台 dialog 的
+      dim），这样就能看到被压暗的原页面。MainActivity 会用
+      `ContextThemeWrapper(activity, R.style.Theme_PocketXiaoli_Dialog)` 提供
+      `LocalContext`，只影响 Popup/Dialog 窗口，不动 Activity 自己的窗口底色。
+    -->
+    <style name="Theme.PocketXiaoli.Dialog" parent="Theme.PocketXiaoli">
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
 </resources>

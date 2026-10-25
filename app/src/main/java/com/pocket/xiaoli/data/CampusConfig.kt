@@ -112,7 +112,14 @@ object CampusConfig {
             name = "烟大南校区",
             shortName = "南校区",
             underConstruction = false,
+            schoolId = "YTU",
             schoolName = "烟台大学",
+            jwType = "ZHENGFANG",
+            // ⚠️ 烟大教务是**旧版正方**（学校索引 `schools_zhengfang.json` 里 isV8=false）：
+            // 登录页在 `/default2.aspx` 一带，不能按 V8 的 `/xtgl/login_slogin.html` 硬拼。
+            // 地址保留根路径，由 `ZhengfangClient` 依次探测；明文 IP 已在
+            // `network_security_config.xml` 里单独放行，别改成 https（该主机未提供）。
+            jwBaseUrl = "http://210.47.245.4/",
             services = mapOf(
                 SERVICE_LAUNDRY to "U净",
                 CampusServiceKeys.SHOWER to "趣智校园",

@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.GridOn
 import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.MailOutline
@@ -247,7 +248,6 @@ fun ProfileSettingsScreen(
                 onClearCache = onClearCache,
                 onExportLog = onExportLog,
                 onAnalyzeLog = onAnalyzeLog,
-                onOpenFeedback = { subPage = SettingsSubPage.FEEDBACK },
                 onClearData = onClearData,
                 onDeleteAllData = onDeleteAllData,
             )
@@ -276,11 +276,11 @@ fun ProfileSettingsScreen(
 }
 
 /**
- * 设置首页的七个分类 —— **唯一真源**。
+ * 设置首页的八个分类 —— **唯一真源**。
  *
  * 抽成数据而不是写死在 Composable 里，是为了两件事：
  * 1. 整页基线能渲**真实**的首页（`SettingsScreenshotTest` 调的就是本组件），
- *    不必在测试里另抄一份 7 行；
+ *    不必在测试里另抄一份 8 行；
  * 2. 每个分类的强调色只在这里定义一次，新增一类不会漏掉配色。
  */
 private data class SettingsCategory(
@@ -291,11 +291,11 @@ private data class SettingsCategory(
 )
 
 /**
- * 七个分类**只留标题**（2026-10-24）。
+ * 八个分类**只留标题**（2026-10-24）。
  *
  * 原来每行下面还挂一串"校区 · 时间段 · 学期 …"，看着像目录，实际上是把二级页
  * 的内容清单又抄了一遍 —— 用户要找的是"课表在哪"，不是先读六个词再判断。
- * 而且七行副标题让首页比需要的高出约 1/3 屏：去掉之后七类一屏全见。
+ * 而且八行副标题让首页比需要的高出约 1/3 屏：去掉之后八类一屏全见。
  * 确需解释的（如"危险操作"的不可恢复）留在各自行上，不在这里铺陈。
  */
 private val SETTINGS_CATEGORIES = listOf(
@@ -316,6 +316,14 @@ private val SETTINGS_CATEGORIES = listOf(
         icon = Icons.Filled.CardGiftcard,
         title = "服务功能",
         accent = ServiceAccent.LIFE,
+    ),
+    // 反馈单独成类（2026-10-25）：表单、复制/邮件/GitHub、回复记录都在这一页，
+    // 不再散在「关于」和「贡献」两处。
+    SettingsCategory(
+        page = SettingsSubPage.FEEDBACK,
+        icon = Icons.Outlined.Feedback,
+        title = "反馈",
+        accent = ServiceAccent.INFO,
     ),
     SettingsCategory(
         page = SettingsSubPage.ABOUT,
@@ -344,7 +352,7 @@ private val SETTINGS_CATEGORIES = listOf(
 )
 
 /**
- * 设置首页正文：七个分类 + 高级（解锁后）+ 危险操作。
+ * 设置首页正文：八个分类 + 高级（解锁后）+ 危险操作。
  *
  * 参数只有"打开哪一页"和两个开关状态，不碰 `AppContainer` —— 所以快照测试
  * 能像渲普通组件一样渲它，看到的就是用户真正看到的首页。
@@ -357,7 +365,7 @@ internal fun SettingsHomeContent(
 ) {
     val skin = LocalSkin.current
     Column(verticalArrangement = Arrangement.spacedBy(skin.spaceWide)) {
-        // ═══ 七个分类，一条不落，每一条都进二级页 ═══
+        // ═══ 八个分类，一条不落，每一条都进二级页 ═══
         //
         // 2026-10-18 第二次改：改造前是**混合形态** —— 课表 / 外观 / 服务功能就地展开，
         // 关于 / 更新 / 贡献 / 致谢进二级页。同样的行，有的点进去、有的就地变长，
@@ -809,7 +817,7 @@ internal fun SettingsDivider() {
  *
  * ## 2026-10 二次改版：圆 → 圆角方块 + 分类色
  *
- * 改前是 32dp 淡主色圆形 + 主色图标。整页 7 个分类全是同一种蓝，扫视时没有
+ * 改前是 32dp 淡主色圆形 + 主色图标。整页 8 个分类全是同一种蓝，扫视时没有
  * "这一行是哪一类"的线索，页面读起来像一张灰白表格。
  *
  * 现在按 [ServiceAccent] 取色（与「服务」页、AI 设置首页同一套色板）：

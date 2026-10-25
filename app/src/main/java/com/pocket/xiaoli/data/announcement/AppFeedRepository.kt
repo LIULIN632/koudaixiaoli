@@ -25,9 +25,14 @@ import kotlinx.coroutines.sync.withLock
  *
  * | 层 | 谁在拉 | 节奏 |
  * |---|---|---|
- * | L1 打开即知 | `MainActivity` 冷启动的 `LaunchedEffect` | TTL [TTL_MS]（30 分钟）内有缓存就不联网 |
+ * | L1 打开即知 | `MainActivity` 冷启动 + 导航层每次回前台 | TTL [TTL_MS]（30 分钟）内有缓存就不联网 |
  * | L2 关着也有 | `AppFeedWorker`（WorkManager） | 15 分钟一次，见 `AppFeedScheduler` |
  * | L3 校内变更 | 尚未做（需要教务抓取器） | — |
+ *
+ * ⚠️ **L2 的 worker 是独立实例**（`AppFeedRepository(context)`），它只负责发系统通知，
+ * **不会更新 AppContainer 那份单例的 [state]**。所以"回前台"必须自己再调一次
+ * [refresh]（节流会自动压住频率）——否则进程不死的用户永远等不到新的
+ * `updateAvailable`，表现就是"只有手动检查才看得见新版"。
  *
  * ## 失败也要有东西看
  *

@@ -952,6 +952,24 @@ class AppContainer(context: Context) {
        )
     }
 
+    /**
+     * 这台设备上是否已经有过「开始用」的痕迹。
+     *
+     * 首次向导只有在新装机（或清过数据）时才应该出现；老用户升级到带向导的版本时
+     * 没有 `FirstRunStore` 那个键，但只要有下面任意一条，就说明他配置过 —— 不能再
+     * 拿选校/登录页拦一次。
+     *
+     * 注意**不把「装过 App」本身当痕迹**：装完就放在那儿的用户，重新引导一次反而有用。
+     */
+    fun hasExistingSetup(): Boolean {
+       if (prefs.contains("selected_campus_id")) return true
+       if (school.value.isNotBlank()) return true
+       if (lastImport.value != null) return true
+       // 宿舍绑定也说明用户用过。这里只 `contains` 不解析 JSON：
+       // 判定发生在冷启动组合期，不在主线程做解密/解析（凭据文件尤其慢）。
+       return CampusConfig.campuses.any { prefs.contains(dormPrefKey(it.id)) }
+    }
+
     // ── Scheme management ──
     private val _activeSchemeId = MutableStateFlow(prefs.getLong("active_scheme_id", 0L))
     val activeSchemeId: StateFlow<Long> = _activeSchemeId

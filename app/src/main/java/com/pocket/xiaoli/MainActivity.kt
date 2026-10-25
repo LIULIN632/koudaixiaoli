@@ -35,6 +35,8 @@ import androidx.core.content.ContextCompat
 import com.pocket.xiaoli.appwidget.ClassWidgetProvider
 import com.pocket.xiaoli.data.announcement.AppFeedStore
 import com.pocket.xiaoli.data.legal.AgreementStore
+import com.pocket.xiaoli.data.onboarding.FirstRunStore
+import com.pocket.xiaoli.ui.onboarding.FirstRunOnboardingScreen
 import com.pocket.xiaoli.ui.legal.AgreementMode
 import com.pocket.xiaoli.ui.legal.UserAgreementScreen
 import com.pocket.xiaoli.focus.FocusController
@@ -135,6 +137,16 @@ class MainActivity : ComponentActivity() {
             // 系统栏（状态栏/导航栏）的底色与图标明暗，稍后在主题内部一起画 —— 见下方 SideEffect。
 
             val context = LocalContext.current
+            // ── Dialog / Popup 窗口用透明底的 Context ──
+            //
+            // Activity 主题的 `windowBackground` 是 `@color/status_bar`（冷启动那一帧要用），
+            // 而 `androidx.compose.ui.window.Dialog` 会继承当前主题的窗口底色。结果底部抽屉的
+            // 半透明遮罩盖在一块不透明白板上 —— 看起来就是"整块实色灰、看不到原页面"。
+            // 这里只把 **CompositionLocal 的 context** 换成透明窗口主题，Activity 自己的
+            // 窗口不受影响；所有 Dialog/Sheet 拿到的都是透明窗口，遮罩下面就是真页面。
+            val dialogContext = remember(context) {
+                android.view.ContextThemeWrapper(context, R.style.Theme_PocketXiaoli_Dialog)
+            }
 
             // 启动时静默刷新校园知识库（24 小时节流在 KnowledgeStore 里）。
             //
@@ -221,6 +233,7 @@ class MainActivity : ComponentActivity() {
                 controller.isAppearanceLightNavigationBars = darkSystemBarIcons
             }
                 CompositionLocalProvider(
+                    LocalContext provides dialogContext,
                     LocalNavigationEventDispatcherOwner provides navigationEventOwner,
                     LocalCourseColorMode provides courseColorMode,
                     LocalCampusLayoutMode provides campusLayoutMode,
@@ -245,10 +258,31 @@ class MainActivity : ComponentActivity() {
                                 onDecline = { (context as? android.app.Activity)?.finish() },
                             )
                         } else {
-                            AppNavigation(initialDeepLink = initialDeepLink)
-                            // 匿名统计的首启告知：只在第一次启动出现一次，
-                            // 「不要统计」当场就关（见 TelemetryNoticeDialog 的 KDoc）。
-                            TelemetryNoticeDialog()
+                            // ── 首次向导：选学校 → 用教务账号登录并导入课表 ──
+                            //
+                            // 只对"新装机 / 清过数据"出现。老用户升级上来没有 onboarding_done
+                            // 这个键，用 hasExistingSetup() 兜底：绑过账号 / 导过课表 / 选过校区
+                            // 都不该再被拦一次。
+                            var onboardingDone by remember {
+                                mutableStateOf(
+                                    FirstRunStore.isDone(context) ||
+                                        app.appContainer.hasExistingSetup()
+                                )
+                            }
+                            if (!onboardingDone) {
+                                FirstRunOnboardingScreen(
+                                    container = app.appContainer,
+                                    onDone = {
+                                        FirstRunStore.markDone(context)
+                                        onboardingDone = true
+                                    },
+                                )
+                            } else {
+                                AppNavigation(initialDeepLink = initialDeepLink)
+                                // 匿名统计的首启告知：只在第一次启动出现一次，
+                                // 「不要统计」当场就关（见 TelemetryNoticeDialog 的 KDoc）。
+                                TelemetryNoticeDialog()
+                            }
                         }
                     }
                 }

@@ -9,6 +9,7 @@ import com.pocket.xiaoli.data.qzxy.QzxyCloseOutcome
 import com.pocket.xiaoli.data.qzxy.QzxyDeviceInfo
 import com.pocket.xiaoli.data.qzxy.QzxyKnownDevice
 import com.pocket.xiaoli.data.qzxy.QzxyOpenOutcome
+import com.pocket.xiaoli.data.qzxy.QzxyErrors
 import com.pocket.xiaoli.data.qzxy.QzxyRepository
 import com.pocket.xiaoli.data.qzxy.QzxyRunningState
 import com.pocket.xiaoli.data.qzxy.QzxySession
@@ -39,6 +40,14 @@ data class ShowerUiState(
     // ── 账号 ──
     val loadingAccount: Boolean = false,
     val campusBalance: QzxyCampusUserInfo? = null,
+    /**
+     * 余额接口回的是"登录已失效"（趣智不支持多设备同时在线，在别处登录会挤掉本机）。
+     *
+     * 与"未签约"必须分开：两者都拿不到 `amount`，但一个要重新登录、一个要去签约。
+     */
+    val authExpired: Boolean = false,
+    /** 开阀被"请先预约"挡住 —— 预约只能在官方 App 完成（服务端接口未公开）。 */
+    val needsBooking: Boolean = false,
     val schoolName: String? = null,
     // ── 设备 ──
     val device: QzxyDeviceInfo? = null,
@@ -195,12 +204,20 @@ class ShowerViewModel(private val repo: QzxyRepository) : ViewModel() {
         if (!repo.isLoggedIn) return
         _state.value = _state.value.copy(loadingAccount = true)
         viewModelScope.launch {
-            val balance = repo.campusBalance().getOrNull()
+            val balanceResult = repo.campusBalance()
+            val balance = balanceResult.getOrNull()
+            // 失败原因里带"登录失效"时如实标出来 —— 别让用户以为是自己没签约。
+            val expired = balanceResult.exceptionOrNull()
+                ?.message
+                ?.let(QzxyErrors::isAuthExpired) == true
             val school = repo.schoolName()
             repo.refreshProfile()
             _state.value = _state.value.copy(
                 session = repo.currentSession() ?: _state.value.session,
-                campusBalance = balance ?: _state.value.campusBalance,
+                // 普通网络失败保留旧数字（比空着强）；登录已失效则必须清掉 ——
+                // 旧余额是上一次登录的钱，继续显示会让用户放心地走进浴室。
+                campusBalance = if (expired) null else (balance ?: _state.value.campusBalance),
+                authExpired = expired,
                 schoolName = school ?: _state.value.schoolName,
                 loadingAccount = false,
             )
@@ -366,6 +383,7 @@ class ShowerViewModel(private val repo: QzxyRepository) : ViewModel() {
                     _state.value = _state.value.copy(
                         starting = false,
                         message = if (outcome.resumed) "已恢复正在进行的用水" else "已开始用水",
+                        needsBooking = false,
                     )
                     refreshUsingState(device.snCode)
                 }
@@ -374,7 +392,17 @@ class ShowerViewModel(private val repo: QzxyRepository) : ViewModel() {
                     refreshUsingState(device.snCode)
                 }
                 is QzxyOpenOutcome.Failed -> {
-                    _state.value = _state.value.copy(starting = false, message = outcome.message)
+                    val expired = QzxyErrors.isAuthExpired(outcome.message)
+                    _state.value = _state.value.copy(
+                        starting = false,
+                        message = outcome.message,
+                        // "请先预约"必须单独标出来：重试一百次也开不了，得去官方 App。
+                        needsBooking = QzxyErrors.needsBooking(outcome.message),
+                        // 挤号可能先在任何一个接口上暴露，不只余额（muguang 的做法）——
+                        // 开阀失败文案带"登录失效"也标挤号，让 SessionExpiredCard 出来。
+                        authExpired = expired,
+                        campusBalance = if (expired) null else _state.value.campusBalance,
+                    )
                 }
                 is QzxyOpenOutcome.Unknown -> {
                     // ⚠️ 未知 ≠ 失败。置起待确认，界面在用户确认前禁止再次开阀
