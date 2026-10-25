@@ -9,18 +9,21 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 90,
-    "versionName": "0.1.89",
+    "versionCode": 91,
+    "versionName": "0.1.90",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.89/koudaixiaoli_v0.1.89.apk",
-    "sha256": "f317ac1a93d3916258b0c2db1f3a90fac3d44a55421aaabe3ccffd861e845de0",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.90/koudaixiaoli_v0.1.90.apk",
+    "sha256": "fdf37fd0fd9c297776a500ad11e476c11466c8482430ab336da2aa0fd0526d5c",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "通知栏图标按通知类型分开：更新是下载箭头、下载完是对勾、失败是感叹号、公告是铃铛、上课是时钟、考试是卷面",
-      "服务页卡片换成「类目色底 + 顶部高光 + 类目色竖条」，一眼能分出是哪个分类的服务",
-      "桌面和通知大图标统一用金色锦鲤"
+      "意见反馈可以直接发到我们自己的服务器了，不用再自己复制粘贴；发完会给你一个工单号",
+      "开发者回你之后，反馈页点「检查回复」就能看到",
+      "反馈的服务端地址改成从更新数据里读 —— 以后换服务器不用再更新 App"
     ]
+  },
+  "endpoints": {
+    "feedback": "https://www.linyang62633.vip/v1/feedback"
   },
   "announcements": []
 }

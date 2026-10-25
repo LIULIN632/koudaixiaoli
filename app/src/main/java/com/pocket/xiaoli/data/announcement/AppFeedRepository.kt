@@ -157,6 +157,9 @@ class AppFeedRepository(
             } else {
                 store.cacheFeed(outcome.document.rawJson)
             }
+            // 接口地址跟着 feed 走：搬家只改 feed.json，不用发版。
+            // 写 null 也得写 —— 运营把这条撤掉时要让它退回编译期默认值。
+            store.setFeedbackEndpoint(incoming.endpoints.feedback)
             store.setLastCheckAt(now)
             return@withLock publishChecked(shown, now, stale, true)
         }

@@ -91,7 +91,12 @@ class QzxyRepository(
     //  余额 / 学校 / 账单
     // ─────────────────────────────────────────────
 
-    /** 一卡通真实余额。未签约免密支付时 `amount` 为 null —— 这不是错误。 */
+    /**
+     * 洗澡页 / 「我的」洗澡格子的余额。未签约免密支付时 `amount` 为 null —— 这不是错误。
+     *
+     * ⚠️ 接口名是 `campus`，但 2026-10-24 真机核对它返回的是**趣智钱包**余额；
+     * 界面文案据此写「趣智钱包余额」，不要写成校园卡。
+     */
     suspend fun campusBalance(): Result<QzxyCampusUserInfo> = runCatching {
         val auth = requireAuth()
         val resp = QzxyApi.campusUserInfo(auth)

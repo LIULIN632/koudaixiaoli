@@ -43,13 +43,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.data.contribution.ContributionAction
-import com.pocket.xiaoli.data.contribution.ContributionBoard
 import com.pocket.xiaoli.data.contribution.ContributionCategory
 import com.pocket.xiaoli.data.contribution.ContributionEntry
 import com.pocket.xiaoli.data.contribution.ContributionPeriod
@@ -69,7 +67,6 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.ServiceAccent
 import com.pocket.xiaoli.ui.theme.onAccentColor
-import com.pocket.xiaoli.ui.theme.serviceAccentColor
 
 /**
  * 「校园共建榜」整页。
@@ -84,12 +81,22 @@ import com.pocket.xiaoli.ui.theme.serviceAccentColor
  *
  * 「总榜 / 课程表 / 教室与地图 / 资料笔记 / 反馈纠错」不是按功能模块切的，
  * 而是按**一个人能贡献的东西**切的：有人整份导入课表，有人只顺手补一间教室，
- * 有人写笔记，有人报 bug。只看总分就变成"谁用得久谁第一"。
+ * 有人写笔记，有人报 bug。
+ *
+ * ## 2026-10-24：积分制下线，榜单按昵称列人
+ *
+ * 用户要求“积分制先去掉，按名字排序”。所以这一页**不再有分数、名次和领奖台**：
+ * - 排序口径是昵称（中文按拼音，见 `ContributionOrder`），不是谁做得多；
+ * - 分类 / 周期仍然保留 —— 它们回答的是“这一周、这一类里有哪些人参与过”；
+ * - 服务端仍把动作记进历史账本，只是不再汇总成分数返回（见 `ContributionModels` 的 KDoc）。
+ *
+ * 主视觉的大数字因此改成**在榜人数**；没有分数可秀时，"有多少人一起补校园"
+ * 是这个页面唯一还成立的数量。
  *
  * ## 隐私
  *
  * 默认不参与。加入后只上传昵称与动作名；课表、教室号、笔记正文一个字节都不传。
- * 退出会立刻停止上报，并删除服务器上该 cid 的全部积分。
+ * 退出会立刻停止上报，并删除服务器上该 cid 的全部榜单记录。
  */
 @Composable
 fun ContributionLeaderboardScreen(container: AppContainer, onBack: () -> Unit) {
@@ -164,7 +171,7 @@ internal fun ContributionLeaderboardContent(
                     ServiceEmptyCard(
                         icon = Icons.Outlined.CloudOff,
                         title = "榜单还没接上服务器",
-                        message = "这个版本没有配置榜单地址。下面可以先看看哪些动作能上分。",
+                        message = "这个版本没有配置榜单地址。下面可以先看看哪些动作会被记录。",
                         accent = ServiceAccent.QUERY,
                     )
                 }
@@ -240,17 +247,17 @@ internal fun ContributionLeaderboardContent(
                 board.entries.isEmpty() -> item(key = "empty") {
                     ServiceEmptyCard(
                         icon = Icons.Outlined.Inbox,
-                        title = "这一栏还没有人上分",
+                        title = "这一栏还没有人参与",
                         message = "成为第一个：导一份课表、补一间教室，或者写一条笔记。",
                         accent = ServiceAccent.STUDY,
                     )
                 }
 
                 else -> {
-                    item(key = "podium") {
-                        Podium(board)
-                        if (board.fromCache) {
-                            Spacer(Modifier.height(skin.spaceXs))
+                    // 没有领奖台：前三名是"分数最高"的产物，按昵称排之后它只会
+                    // 把任意三个人抬高。所有人用同一种行，顺序就是名字顺序。
+                    if (board.fromCache) {
+                        item(key = "cache") {
                             Text(
                                 "离线缓存 · 上次更新 ${shortTime(board.fetchedAt)}",
                                 fontSize = 11.sp,
@@ -258,8 +265,8 @@ internal fun ContributionLeaderboardContent(
                             )
                         }
                     }
-                    items(board.entries.drop(3), key = { it.rank }) { entry ->
-                        RankRow(entry)
+                    items(board.entries, key = { it.rank }) { entry ->
+                        NameRow(entry)
                     }
                 }
             }
@@ -271,7 +278,7 @@ internal fun ContributionLeaderboardContent(
             item(key = "privacy") {
                 Text(
                     "榜单只记录昵称和「做了什么动作」，不上传课表、教室号、笔记正文。" +
-                        "退出会删除服务器上这个昵称的全部积分。",
+                        "退出会删除服务器上这个昵称的全部榜单记录。",
                     fontSize = 11.sp,
                     lineHeight = 17.sp,
                     color = colors.textTertiary,
@@ -299,7 +306,7 @@ internal fun ContributionLeaderboardContent(
             title = { Text("退出共建榜？") },
             text = {
                 Text(
-                    "会立即停止上报，并删除服务器上这个昵称的全部积分。这张手机上不会留下 cid 或队列。",
+                    "会立即停止上报，并删除服务器上这个昵称的全部榜单记录。这张手机上不会留下 cid 或队列。",
                     fontSize = 14.sp,
                     lineHeight = 21.sp,
                 )
@@ -371,10 +378,21 @@ private fun Hero(state: ContributionUiState) {
             }
 
             me != null -> {
-                ServiceHeroCount(number = me.points.toString(), unit = "分")
+                // 没有分数可秀：大数字改成"在榜人数"，它是这一页唯一还成立的数量。
+                if (board != null) {
+                    // 人数用服务端的完整计数（列表本身被 limit 截断过）。
+                    val total = board.total.coerceAtLeast(board.entries.size)
+                    ServiceHeroCount(number = total.toString(), unit = "人在榜")
+                } else {
+                    Text(
+                        "已加入",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
                 Spacer(Modifier.height(skin.spaceSm))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ServiceHeroChip("第 ${me.rank} 名")
                     ServiceHeroChip(me.nickname)
                     board?.let { ServiceHeroChip(periodLabel(it.period)) }
                 }
@@ -465,7 +483,7 @@ private fun MyRankCard(
                     if (me == null) {
                         "本期还没有记录"
                     } else {
-                        "第 ${me.rank} 名 · ${me.points} 分"
+                        "已加入 · 按昵称排序"
                     },
                     fontSize = 12.sp,
                     color = colors.textSecondary,
@@ -481,96 +499,11 @@ private fun MyRankCard(
 
 // ── 榜单 ────────────────────────────────────────────────────────────────
 
+/** 榜单里的一行：头像首字 + 昵称 +（自己）「我」。不显示序号与分数。 */
 @Composable
-private fun Podium(board: ContributionBoard) {
-    val top = board.entries.take(3)
-    if (top.isEmpty()) return
-    val order = listOfNotNull(top.getOrNull(1), top.getOrNull(0), top.getOrNull(2))
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        order.forEach { entry ->
-            PodiumColumn(
-                entry = entry,
-                modifier = Modifier.weight(
-                    if (entry.rank == 1) 1.15f else 1f,
-                ),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PodiumColumn(entry: ContributionEntry, modifier: Modifier = Modifier) {
+private fun NameRow(entry: ContributionEntry) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val tint = podiumTint(entry.rank)
-    val blockHeight = when (entry.rank) {
-        1 -> 58.dp
-        2 -> 42.dp
-        else -> 34.dp
-    }
-
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(if (entry.rank == 1) 46.dp else 40.dp)
-                .clip(CircleShape)
-                .background(tint.copy(alpha = 0.18f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                entry.nickname.take(1),
-                fontSize = if (entry.rank == 1) 19.sp else 16.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = tint,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            entry.nickname,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            "${entry.points} 分",
-            fontSize = 11.sp,
-            color = colors.textSecondary,
-        )
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(blockHeight)
-                .clip(RoundedCornerShape(topStart = skin.radiusCard, topEnd = skin.radiusCard))
-                .background(tint.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "${entry.rank}",
-                fontSize = if (entry.rank == 1) 24.sp else 19.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = tint,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RankRow(entry: ContributionEntry) {
-    val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
-    val tint = if (entry.mine) colors.accentMain else colors.textTertiary
 
     AppCard(
         modifier = Modifier.fillMaxWidth(),
@@ -586,13 +519,6 @@ private fun RankRow(entry: ContributionEntry) {
                 .padding(horizontal = skin.spaceLg, vertical = skin.spaceSm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "${entry.rank}",
-                modifier = Modifier.width(28.dp),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = tint,
-            )
             Box(
                 modifier = Modifier
                     .size(30.dp)
@@ -626,19 +552,12 @@ private fun RankRow(entry: ContributionEntry) {
                 ) {
                     Text("我", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.accentMain)
                 }
-                Spacer(Modifier.width(6.dp))
             }
-            Text(
-                "${entry.points} 分",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textSecondary,
-            )
         }
     }
 }
 
-// ── 上分说明 ────────────────────────────────────────────────────────────
+// ── 参与说明 ────────────────────────────────────────────────────────────
 
 @Composable
 private fun RulesCard() {
@@ -648,12 +567,14 @@ private fun RulesCard() {
     AppCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(skin.cardPaddingLarge)) {
             Text(
-                "怎么上分",
+                "怎么参与",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
             )
             Spacer(Modifier.height(skin.spaceSm))
+            // 只列"哪些动作会被记一次"。积分、每日次数都已经不参与展示：
+            // 还写"+10 / 每天最多 1 次"会让用户以为有名次可追。
             ContributionAction.entries.forEach { action ->
                 Row(
                     modifier = Modifier
@@ -661,29 +582,22 @@ private fun RulesCard() {
                         .padding(vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            actionLabel(action),
-                            fontSize = 13.sp,
-                            color = colors.textPrimary,
-                        )
-                        Text(
-                            "每天最多 ${action.dailyCap} 次",
-                            fontSize = 11.sp,
-                            color = colors.textTertiary,
-                        )
-                    }
                     Text(
-                        "+${action.points}",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = serviceAccentColor(ServiceAccent.ACADEMIC),
+                        "·",
+                        fontSize = 13.sp,
+                        color = colors.textTertiary,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        actionLabel(action),
+                        fontSize = 13.sp,
+                        color = colors.textPrimary,
                     )
                 }
             }
             Spacer(Modifier.height(skin.spaceXs))
             Text(
-                "分数在服务器上按动作计算，客户端说了不算；同分时先达到的人排前面。",
+                "榜单只记「做过这类事」，不记次数也不记分数；名字按昵称排序。",
                 fontSize = 11.sp,
                 lineHeight = 17.sp,
                 color = colors.textTertiary,
@@ -748,19 +662,10 @@ private fun NicknameDialog(
 
 // ── 小工具 ──────────────────────────────────────────────────────────────
 
-@Composable
-private fun podiumTint(rank: Int): Color {
-    val colors = LocalPocketXiaoliColors.current
-    return when (rank) {
-        1 -> colors.warning
-        2 -> serviceAccentColor(ServiceAccent.QUERY)
-        else -> serviceAccentColor(ServiceAccent.PAYMENT)
-    }
-}
-
+/** 榜单标题不再出现「总榜 / 名次」：它现在回答的是"哪些人参与过"。 */
 private fun sectionTitle(category: ContributionCategory, period: ContributionPeriod): String = when {
-    category == ContributionCategory.ALL && period == ContributionPeriod.WEEK -> "本周总榜"
-    category == ContributionCategory.ALL -> "总榜 · 全部"
+    category == ContributionCategory.ALL && period == ContributionPeriod.WEEK -> "本周参与"
+    category == ContributionCategory.ALL -> "全部参与"
     else -> "${category.label} · ${period.label}"
 }
 

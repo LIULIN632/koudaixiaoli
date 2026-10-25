@@ -89,7 +89,7 @@ class ContributionClient(
         }
     }
 
-    /** 改名只影响榜单上显示的名字，不产生积分。失败也不影响本地下次上报时带上新名字。 */
+    /** 改名只影响榜单上显示的名字，不产生新的记录。失败也不影响本地下次上报时带上新名字。 */
     fun rename(cid: String, nickname: String): Boolean {
         if (!configured) return false
         val body = JsonObject().apply {
@@ -139,23 +139,25 @@ class ContributionClient(
     ): ContributionBoard? = runCatching {
         val wire = gson.fromJson(raw, WireBoard::class.java) ?: return@runCatching null
         val entries = wire.rows.orEmpty().mapNotNull { row ->
-            val rank = row.rank ?: return@mapNotNull null
             val name = row.nickname?.trim().orEmpty()
-            if (rank <= 0 || name.isEmpty()) return@mapNotNull null
-            ContributionEntry(
-                rank = rank,
-                nickname = name,
-                points = (row.points ?: 0).coerceAtLeast(0),
-                mine = row.mine == true,
-            )
+            if (name.isEmpty()) return@mapNotNull null
+            ContributionEntry(rank = 0, nickname = name, mine = row.mine == true)
         }
         val me = wire.me?.let { m ->
             val name = m.nickname?.trim().orEmpty()
-            val rank = m.rank ?: 0
-            if (rank <= 0 || name.isEmpty()) null
-            else ContributionMe(rank, (m.points ?: 0).coerceAtLeast(0), name)
+            if (name.isEmpty()) null else ContributionMe(name)
         }
-        ContributionBoard(category, period, entries, me, nowMs)
+        // 服务端已按昵称排好；这里再排一次见 [ContributionOrder] 的 KDoc（旧缓存 / 旧服务端）。
+        val sorted = ContributionOrder.sortByName(entries)
+        ContributionBoard(
+            category = category,
+            period = period,
+            entries = sorted,
+            me = me,
+            fetchedAt = nowMs,
+            // 旧服务端不带 total：至少不能比看到的列表还小。
+            total = (wire.total ?: 0).coerceAtLeast(sorted.size),
+        )
     }.getOrNull()
 
     private fun url(path: String): String = baseUrl.trimEnd('/') + path
@@ -163,19 +165,17 @@ class ContributionClient(
     private class WireBoard(
         val rows: List<WireRow>? = null,
         val me: WireMe? = null,
+        val total: Int? = null,
     )
 
+    /** 只认昵称与 `mine`；`rank` / `points` 即使还在响应里也不再解读。 */
     private class WireRow(
-        val rank: Int? = null,
         val nickname: String? = null,
-        val points: Int? = null,
         val mine: Boolean? = null,
     )
 
     private class WireMe(
-        val rank: Int? = null,
         val nickname: String? = null,
-        val points: Int? = null,
     )
 
     companion object {

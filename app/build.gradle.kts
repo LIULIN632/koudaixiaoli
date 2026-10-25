@@ -59,22 +59,9 @@ android {
             abiFilters += "arm64-v8a"
         }
 
-        // 反馈「直接发送到表格」那条渠道的凭据。默认全空 ⇒
-        // `FeedbackRemote.configured == false` ⇒ 反馈页不显示那个按钮。
-        // 凭据放 `gradle.properties`（不进仓库），填上重打一版才生效。
-        //
-        // 前四个是**反馈表**（应用只有写权限）；后两个是另一个多维表格文档里的
-        // **回复表**（应用只有读权限），不填则回复功能整块隐藏。
-        listOf(
-            "FEEDBACK_FEISHU_APP_ID",
-            "FEEDBACK_FEISHU_APP_SECRET",
-            "FEEDBACK_FEISHU_APP_TOKEN",
-            "FEEDBACK_FEISHU_TABLE_ID",
-            "FEEDBACK_FEISHU_REPLY_APP_TOKEN",
-            "FEEDBACK_FEISHU_REPLY_TABLE_ID",
-        ).forEach { key ->
-            val value = (project.findProperty(key) as String?)?.trim().orEmpty()
-            buildConfigField("String", key, "\"$value\"")
+        // 反馈的直传地址不在这里：它由 `announce/feed.json` 的 `endpoints.feedback`
+        // 运行时提供（换服务器不用发版），编译期只留 `SelfHost.TELEMETRY_URL` 作兜底。
+        // APK 里因此**没有任何**反馈相关的密钥 —— 旧版飞书那四个凭据已随 0.1.90 删除。
 
         // ── F-Droid 构建开关 ────────────────────────────────────────
         // `./gradlew assembleRelease -Pfdroid=true` 生成「F-Droid 版」：
@@ -82,7 +69,6 @@ android {
         // 普通构建（不带这个属性）行为完全不变。
         val fdroidBuild = (project.findProperty("fdroid") as String?)?.toBoolean() == true
         buildConfigField("boolean", "FDROID", fdroidBuild.toString())
-        }
     }
 
     buildTypes {

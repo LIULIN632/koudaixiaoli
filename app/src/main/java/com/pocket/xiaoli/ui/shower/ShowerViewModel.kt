@@ -15,7 +15,6 @@ import com.pocket.xiaoli.data.qzxy.QzxySession
 import com.pocket.xiaoli.data.qzxy.QzxyUseCode
 import com.pocket.xiaoli.data.qzxy.QzxyUseCodeCandidate
 import com.pocket.xiaoli.data.qzxy.QzxyUsingState
-import com.pocket.xiaoli.data.qzxy.QzxyWallet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +39,6 @@ data class ShowerUiState(
     // ── 账号 ──
     val loadingAccount: Boolean = false,
     val campusBalance: QzxyCampusUserInfo? = null,
-    val wallet: QzxyWallet? = null,
     val schoolName: String? = null,
     // ── 设备 ──
     val device: QzxyDeviceInfo? = null,
@@ -198,13 +196,11 @@ class ShowerViewModel(private val repo: QzxyRepository) : ViewModel() {
         _state.value = _state.value.copy(loadingAccount = true)
         viewModelScope.launch {
             val balance = repo.campusBalance().getOrNull()
-            val wallet = repo.wallet().getOrNull()
             val school = repo.schoolName()
             repo.refreshProfile()
             _state.value = _state.value.copy(
                 session = repo.currentSession() ?: _state.value.session,
                 campusBalance = balance ?: _state.value.campusBalance,
-                wallet = wallet ?: _state.value.wallet,
                 schoolName = school ?: _state.value.schoolName,
                 loadingAccount = false,
             )

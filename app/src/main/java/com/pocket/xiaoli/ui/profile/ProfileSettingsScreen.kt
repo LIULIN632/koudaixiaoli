@@ -102,6 +102,7 @@ import com.pocket.xiaoli.ui.theme.serviceAccentColor
 import com.pocket.xiaoli.ui.theme.serviceAccentContainer
 import com.pocket.xiaoli.ui.components.MiuixSettingsScaffold
 import com.pocket.xiaoli.ui.components.MiuixSettingsSection
+import com.pocket.xiaoli.ui.proactive.BubbleTip
 import com.pocket.xiaoli.ui.theme.rememberSinkIndication
 import top.yukonga.miuix.kmp.basic.Switch as MiuixSwitch
 
@@ -286,58 +287,58 @@ private data class SettingsCategory(
     val page: SettingsSubPage,
     val icon: ImageVector,
     val title: String,
-    val subtitle: String,
     val accent: ServiceAccent,
 )
 
+/**
+ * 七个分类**只留标题**（2026-10-24）。
+ *
+ * 原来每行下面还挂一串"校区 · 时间段 · 学期 …"，看着像目录，实际上是把二级页
+ * 的内容清单又抄了一遍 —— 用户要找的是"课表在哪"，不是先读六个词再判断。
+ * 而且七行副标题让首页比需要的高出约 1/3 屏：去掉之后七类一屏全见。
+ * 确需解释的（如"危险操作"的不可恢复）留在各自行上，不在这里铺陈。
+ */
 private val SETTINGS_CATEGORIES = listOf(
     SettingsCategory(
         page = SettingsSubPage.TIMETABLE,
         icon = Icons.Outlined.CalendarMonth,
         title = "课表",
-        subtitle = "校区 · 时间段 · 学期 · 调休 · 网格边框 · 上课提醒",
         accent = ServiceAccent.ACADEMIC,
     ),
     SettingsCategory(
         page = SettingsSubPage.APPEARANCE,
         icon = Icons.Outlined.DarkMode,
         title = "外观",
-        subtitle = "深浅色 · 界面风格 · 用色强度 · 界面密度 · 底栏",
         accent = ServiceAccent.STUDY,
     ),
     SettingsCategory(
         page = SettingsSubPage.SERVICES,
         icon = Icons.Filled.CardGiftcard,
         title = "服务功能",
-        subtitle = "百宝箱 · 桌面小组件 · 自定义首页",
         accent = ServiceAccent.LIFE,
     ),
     SettingsCategory(
         page = SettingsSubPage.ABOUT,
         icon = Icons.AutoMirrored.Outlined.HelpOutline,
         title = "关于口袋小鲤",
-        subtitle = "常见问题 · 意见反馈 · 版本信息 · 问题排查",
         accent = ServiceAccent.INFO,
     ),
     SettingsCategory(
         page = SettingsSubPage.UPDATE,
         icon = Icons.Filled.SystemUpdate,
         title = "更新",
-        subtitle = "检查更新 · 后台检查 · 更新日志",
         accent = ServiceAccent.QUERY,
     ),
     SettingsCategory(
         page = SettingsSubPage.CONTRIBUTE,
         icon = Icons.Filled.Favorite,
         title = "贡献",
-        subtitle = "校园共建榜 · 报问题 · 参与开发",
         accent = ServiceAccent.PAYMENT,
     ),
     SettingsCategory(
         page = SettingsSubPage.THANKS,
         icon = Icons.Filled.Star,
         title = "致谢",
-        subtitle = "这份代码站在哪些项目肩上",
         accent = ServiceAccent.ACADEMIC,
     ),
 )
@@ -370,7 +371,6 @@ internal fun SettingsHomeContent(
                 SettingsMenuItem(
                     icon = category.icon,
                     title = category.title,
-                    subtitle = category.subtitle,
                     accent = category.accent,
                     onClick = { onOpenPage(category.page) },
                 )
@@ -386,7 +386,6 @@ internal fun SettingsHomeContent(
                 SettingsMenuItem(
                     icon = Icons.Filled.BugReport,
                     title = "开发者实验室",
-                    subtitle = "诊断报告 · 网络日志 · 数据工具 · Mock / Deep Link · 重置",
                     accent = ServiceAccent.PAYMENT,
                     onClick = onOpenDeveloperLab,
                 )
@@ -428,14 +427,13 @@ private fun TimetableSettingsPage(
     val reminderEnabled by container.reminderEnabled.collectAsStateWithLifecycle()
     val reminderMinutes by container.reminderMinutes.collectAsStateWithLifecycle()
     val borderStyle by container.borderStyle.collectAsStateWithLifecycle()
-    val borderLabel = when (borderStyle) { 1 -> "实线"; 2 -> "虚线"; else -> "无" }
 
     SettingsSubPageScaffold(title = "课表", onBack = onBack) {
         SettingsCard {
             SettingsMenuItem(
                 icon = Icons.Outlined.LocationCity,
                 title = "当前校区",
-                subtitle = selectedCampus.name + " · 点击切换",
+                subtitle = selectedCampus.name,
                 accent = ServiceAccent.QUERY,
                 onClick = onCampusSelect
             )
@@ -443,7 +441,6 @@ private fun TimetableSettingsPage(
             SettingsMenuItem(
                 icon = Icons.Outlined.Schedule,
                 title = "时间段管理",
-                subtitle = "设置每节课时间和休息时长",
                 accent = ServiceAccent.ACADEMIC,
                 onClick = onTimeSlotManagement
             )
@@ -451,35 +448,39 @@ private fun TimetableSettingsPage(
             SettingsMenuItem(
                 icon = Icons.Outlined.CalendarMonth,
                 title = "学期设置",
-                subtitle = "学期开始日期、自动计算当前周",
                 accent = ServiceAccent.ACADEMIC,
-                onClick = onSemesterSettings
+                onClick = onSemesterSettings,
+                hint = "学期开始日期决定「当前第几周」怎么算，开学前改一次就行。",
             )
             SettingsDivider()
             SettingsMenuItem(
                 icon = Icons.Outlined.DateRange,
                 title = "调休补课",
-                subtitle = "指定补班日按哪天的课表上课",
                 accent = ServiceAccent.ACADEMIC,
-                onClick = onAdjustedWorkday
+                onClick = onAdjustedWorkday,
+                hint = "指定补班日按哪天的课表上课。例如周六补周一的课，就在这里选周一。",
             )
             SettingsDivider()
             // 从「通用设置 · 外观」搬来的：它的消费方是 PeriodGrid（课表网格）
             // 与 RoomLayoutGrid（教室平面图），属"内容网格的线"，不是 App 视觉主题。
-            SettingsChoiceItem(
+            //
+            // 2026-10-24：从"展开一排 chip"改成**点行弹气泡**。理由是这页其余选项
+            //（外观页的深色模式、用色强度等）都已统一成气泡，只有这一行摊着三个 chip，
+            // 比邻行高出一截、还把这页唯一的两行行高打乱。选项挪进气泡后，
+            // 当前值挪到右侧；"同时作用于教室平面图"是有用的副作用，收进「?」。
+            SettingsMenuChoiceItem(
                 icon = Icons.Outlined.GridOn,
                 title = "课表网格边框",
-                subtitle = borderLabel + " · 同时作用于教室平面图",
                 options = listOf("无" to 0, "实线" to 1, "虚线" to 2),
                 selected = borderStyle,
                 onSelect = { container.setBorderStyle(it) },
                 accent = ServiceAccent.STUDY,
+                hint = "同时作用于课表网格和教室平面图。虚线比实线轻，课程块多时更不吵。",
             )
             SettingsDivider()
             SettingsMenuItem(
                 icon = Icons.Outlined.CalendarMonth,
                 title = "导入到日程",
-                subtitle = "将本学期课表导入系统日历",
                 accent = ServiceAccent.INFO,
                 onClick = onImportToCalendar
             )
@@ -490,7 +491,6 @@ private fun TimetableSettingsPage(
             SettingsSwitchItem(
                 icon = Icons.Outlined.Notifications,
                 title = "上课提醒总开关",
-                subtitle = "课前自动发送上课提醒通知",
                 checked = reminderEnabled,
                 onToggle = { container.toggleReminder() },
                 accent = ServiceAccent.LIFE,
@@ -544,7 +544,6 @@ private fun AppearanceSettingsPage(
             SettingsMenuChoiceItem(
                 icon = Icons.Outlined.DarkMode,
                 title = "深色/浅色模式",
-                subtitle = "整界面配色跟随它",
                 options = listOf("浅色模式" to "light", "深色模式" to "dark", "跟随系统" to "system"),
                 selected = darkMode,
                 onSelect = { mode ->
@@ -559,7 +558,8 @@ private fun AppearanceSettingsPage(
             SettingsMenuItem(
                 icon = Icons.Outlined.AspectRatio,
                 title = "界面风格",
-                subtitle = skinStyleInfo.label + " · " + skinStyleInfo.description,
+                // 当前风格名是"值"，右侧没有值槽，留在这里；风格释义交给下一跳的预览页。
+                subtitle = skinStyleInfo.label,
                 onClick = { openPick = SettingsPick.SKIN_STYLE },
                 accent = ServiceAccent.QUERY,
             )
@@ -568,11 +568,11 @@ private fun AppearanceSettingsPage(
             SettingsMenuChoiceItem(
                 icon = Icons.Outlined.Tune,
                 title = "用色强度",
-                subtitle = "彩虹 = 每张卡按类型配色；纯净 = 统一中性色",
                 options = AppearanceMode.entries.map { it.label to it },
                 selected = AppearanceMode.fromKey(appearanceMode),
                 onSelect = { container.setAppearanceMode(it.key) },
                 accent = ServiceAccent.ACADEMIC,
+                hint = "彩虹：每张卡按类型配色。纯净：全站用同一套中性色，只留主色做强调。",
             )
             SettingsDivider()
             // 原名「布局模式」，副标题原写"服务页密度"是错的：CampusLayoutMode
@@ -580,21 +580,23 @@ private fun AppearanceSettingsPage(
             SettingsMenuChoiceItem(
                 icon = Icons.Outlined.ViewAgenda,
                 title = "界面密度",
-                subtitle = "紧凑排列首页、我的与百宝箱",
                 options = CampusLayoutMode.entries.map { it.label to it.key },
                 selected = campusLayoutMode,
                 onSelect = { container.setCampusLayoutMode(it) },
                 accent = ServiceAccent.ACADEMIC,
+                hint = "紧凑会缩小首页、我的与百宝箱的行距和卡片高度，一屏多放几项。",
             )
             SettingsDivider()
             SettingsMenuChoiceItem(
                 icon = Icons.Outlined.Smartphone,
                 title = "底栏样式",
-                subtitle = bottomBarStyle.tierNote(),
                 options = BottomBarStyle.entries.map { it.label to it },
                 selected = bottomBarStyle,
                 onSelect = { container.bottomBarStyleStore.set(it) },
                 accent = ServiceAccent.INFO,
+                // tierNote 只在「液态玻璃」下非空，讲的是**本机能力**（有无模糊/折射），
+                // 属于"该知道但不必天天看"的一句，收进问号。
+                hint = bottomBarStyle.tierNote().ifBlank { null },
             )
             SettingsDivider()
             // 震动反馈原在「首页与交互」组。2026-10-18 并进「外观」：
@@ -602,7 +604,6 @@ private fun AppearanceSettingsPage(
             SettingsMenuChoiceItem(
                 icon = Icons.Outlined.Vibration,
                 title = "震动反馈",
-                subtitle = "列表项按下去的手感",
                 options = listOf("关闭" to 0, "轻柔" to 1, "适中" to 2, "强力" to 3),
                 selected = vibrationMode,
                 onSelect = { container.setVibrationMode(it) },
@@ -651,7 +652,6 @@ private fun ServicesSettingsPage(
             SettingsSwitchItem(
                 icon = Icons.Filled.CardGiftcard,
                 title = "百宝箱",
-                subtitle = "学习资源、今天吃什么等（默认关闭）",
                 checked = showTreasureBox,
                 onToggle = { container.toggleTreasureBox() },
                 accent = ServiceAccent.LIFE,
@@ -660,7 +660,6 @@ private fun ServicesSettingsPage(
             SettingsSwitchItem(
                 icon = Icons.Outlined.ToggleOn,
                 title = "桌面小组件",
-                subtitle = "桌面快捷查看课表（默认关闭）",
                 checked = showWidget,
                 onToggle = { container.toggleWidget() },
                 accent = ServiceAccent.QUERY,
@@ -671,7 +670,6 @@ private fun ServicesSettingsPage(
                 SettingsMenuItem(
                     icon = Icons.Filled.CardGiftcard,
                     title = "打开百宝箱",
-                    subtitle = "学习资源、今天吃什么等",
                     onClick = onTreasureBox,
                     accent = ServiceAccent.LIFE,
                 )
@@ -681,7 +679,6 @@ private fun ServicesSettingsPage(
             SettingsMenuItem(
                 icon = Icons.Outlined.Dashboard,
                 title = "自定义首页",
-                subtitle = "模块开关 · 拖动排序",
                 onClick = onCustomHome,
                 accent = ServiceAccent.STUDY,
             )
@@ -847,7 +844,15 @@ private fun SettingsIcon(icon: ImageVector, accent: ServiceAccent?) {
 }
 
 /**
- * 一行可点设置项：图标 + 标题 + 副标题 + 右箭头。
+ * 一行可点设置项：图标 + 标题 + 可选副标题 + 可选「?」+ 右箭头。
+ *
+ * ## 副标题只留给两类信息（2026-10-24 收紧）
+ *
+ * 1. **当前值**（校区名、分钟数、版本号）—— 不写就得进页面才知道；
+ * 2. **不读就会做错的事**（"长按发安装包"、"全部清空"）。
+ *
+ * 其余"解释这个功能是干什么的"一律删掉；真的值得保留的解释挪进 [hint]，
+ * 变成行尾一枚「?」，点开看 — 这样每行剩一行字，页面的密度才降得下来。
  *
  * [onLongClick] 默认 null（= 这一行只有单击）。目前唯一的使用者是「推荐给同学」：
  * 轻点看链接、**长按直接把安装包发出去** —— 同一行的第二个手势，页面上不占任何空间。
@@ -860,10 +865,12 @@ private fun SettingsIcon(icon: ImageVector, accent: ServiceAccent?) {
 internal fun SettingsMenuItem(
     icon: ImageVector,
     title: String,
-    subtitle: String,
     onClick: () -> Unit,
+    subtitle: String? = null,
     onLongClick: (() -> Unit)? = null,
     accent: ServiceAccent? = null,
+    /** 「?」说明。非空时在行尾挂一枚问号，点开弹气泡（见 [BubbleTip]）。 */
+    hint: String? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -880,9 +887,12 @@ internal fun SettingsMenuItem(
         Spacer(Modifier.width(skin.spaceMd))
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-            // textTertiary 在白卡上约 2.15:1，12sp 的说明文字会看不清。
-            Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            if (subtitle != null) {
+                // textTertiary 在白卡上约 2.15:1，12sp 的说明文字会看不清。
+                Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            }
         }
+        if (hint != null) BubbleTip(text = hint)
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             null,
@@ -907,11 +917,14 @@ internal fun SettingsMenuItem(
 internal fun <T> SettingsMenuChoiceItem(
     icon: ImageVector,
     title: String,
-    subtitle: String,
     options: List<Pair<String, T>>,
     selected: T,
     onSelect: (T) -> Unit,
+    /** 只在"当前值不方便放在右侧"或"不读会做错"时才写；纯解释走 [hint]。 */
+    subtitle: String? = null,
     accent: ServiceAccent? = null,
+    /** 「?」说明。非空时在行尾挂一枚问号，点开弹气泡（见 [BubbleTip]）。 */
+    hint: String? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -930,8 +943,11 @@ internal fun <T> SettingsMenuChoiceItem(
         Spacer(Modifier.width(skin.spaceMd))
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-            Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            if (subtitle != null) {
+                Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            }
         }
+        if (hint != null) BubbleTip(text = hint)
         Text(currentLabel, fontSize = 13.sp, color = colors.textSecondary)
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -1008,10 +1024,13 @@ internal fun <T> SettingsChoiceItem(
 internal fun SettingsSwitchItem(
     icon: ImageVector,
     title: String,
-    subtitle: String,
     checked: Boolean,
     onToggle: () -> Unit,
+    /** 只在"开着/关掉会发生什么"不读就会理解错时才写；纯解释走 [hint]。 */
+    subtitle: String? = null,
     accent: ServiceAccent? = null,
+    /** 「?」说明。非空时在行尾挂一枚问号，点开弹气泡（见 [BubbleTip]）。 */
+    hint: String? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -1027,8 +1046,11 @@ internal fun SettingsSwitchItem(
         Spacer(Modifier.width(skin.spaceMd))
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-            Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            if (subtitle != null) {
+                Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            }
         }
+        if (hint != null) BubbleTip(text = hint)
         MiuixSwitch(checked = checked, onCheckedChange = { onToggle() })
     }
 }

@@ -93,8 +93,8 @@ class ContributionStoreTest {
             ContributionBoard(
                 category = ContributionCategory.NOTES,
                 period = ContributionPeriod.ALL,
-                entries = listOf(ContributionEntry(1, "鲤鱼王", 5, mine = true)),
-                me = ContributionMe(1, 5, "鲤鱼王"),
+                entries = listOf(ContributionEntry(1, "鲤鱼王", mine = true)),
+                me = ContributionMe("鲤鱼王"),
                 fetchedAt = dayStart,
             ),
         )
@@ -194,10 +194,10 @@ class ContributionStoreTest {
             category = ContributionCategory.CAMPUS,
             period = ContributionPeriod.WEEK,
             entries = listOf(
-                ContributionEntry(1, "鲤鱼王", 120, mine = false),
-                ContributionEntry(2, "摸鱼佬", 80, mine = true),
+                ContributionEntry(1, "鲤鱼王", mine = false),
+                ContributionEntry(2, "摸鱼佬", mine = true),
             ),
-            me = ContributionMe(2, 80, "摸鱼佬"),
+            me = ContributionMe("摸鱼佬"),
             fetchedAt = dayStart,
         )
         store.cacheBoard(board)
@@ -220,23 +220,30 @@ class ContributionStoreTest {
     }
 
     @Test
-    fun `缓存里的非法行被丢弃，负数分钳到 0`() {
+    fun `缓存里的空昵称被丢弃 且按昵称重排`() {
         prefs.edit()
             .putString(
                 "board_cache",
                 """
                 {"category":"campus","period":"week","fetchedAt":1,"entries":[
-                  {"rank":0,"nickname":"无排名","points":10},
+                  {"rank":9,"nickname":"早八人","points":10},
                   {"rank":1,"nickname":"   ","points":10},
-                  {"rank":2,"nickname":"正常","points":-30}
-                ],"me":{"rank":0,"nickname":"我","points":5}}
+                  {"rank":2,"nickname":"笔记搬运工","points":-30}
+                ],"me":{"nickname":"我"}}
                 """.trimIndent(),
             )
             .commit()
 
         val back = ContributionStore(context).cachedBoard()!!
-        assertEquals(listOf(ContributionEntry(2, "正常", 0)), back.entries)
-        assertNull(back.me)
+        // 排序与序号都重新算：bei < zao，rank 从 1 重排。
+        assertEquals(
+            listOf(
+                ContributionEntry(1, "笔记搬运工"),
+                ContributionEntry(2, "早八人"),
+            ),
+            back.entries,
+        )
+        assertEquals(ContributionMe("我"), back.me)
     }
 
     @Test

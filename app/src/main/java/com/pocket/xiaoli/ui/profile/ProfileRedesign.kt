@@ -135,7 +135,11 @@ private fun electricityHint(balance: String?, loading: Boolean): String {
 }
 
 /**
- * 洗澡格子的副标题：一卡通剩余余额（与洗澡页的大数字同源）。
+ * 洗澡格子的副标题：趣智钱包余额（与洗澡页的大数字同源）。
+ *
+ * 2026-10-24 真机核对：这个数字是**趣智钱包**的余额，不是一卡通
+ * —— 原先写成「校园卡余额」是把 `/settlement/campus/userInfo` 的接口名当成了钱的归属。
+ * 一卡通余额在「校园卡」那一页单独取。
  *
  * 「拿不到」的几种情况必须分开说，任何一处写成 `¥0.00` 都是在撒谎：
  * - 未登录 → 引导登录（不是"余额为零"）
@@ -159,7 +163,7 @@ internal fun showerTileHint(
 fun ProfileStatsGrid(
     electricityBalance: String?,
     electricityLoading: Boolean,
-    /** 洗澡格子的副标题：一卡通剩余余额（见 `showerTileHint`） */
+    /** 洗澡格子的副标题：趣智钱包余额（见 `showerTileHint`） */
     showerHint: String = "热水 · 淋浴",
     /** 专注计时格子的副标题 —— 今日专注时长（见 `focusTileHint`） */
     focusHint: String = "今天还没开始",

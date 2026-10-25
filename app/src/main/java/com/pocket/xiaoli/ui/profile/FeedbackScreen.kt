@@ -88,10 +88,11 @@ private const val FEEDBACK_REPO = "LIULIN632/koudaixiaoli"
  * | 复制 / 系统分享 | 不要 | 微信、QQ 里发给开发者 |
  * | 邮件 | 不要（mailto） | 附截图、写长文 |
  * | GitHub Issue（预填） | 不要 | 有 GitHub 账号的人，能追踪进度 |
- * | 直接发送到表格 | 要（默认空 ⇒ 按钮不显示） | 开发者自己配好之后 |
+ * | 直接发送 | 不要（走自建服务器，见 `FeedbackRemote`） | 想一次发完、还想收到回复的人 |
  *
- * 三条都不要凭据，所以**装完就能用**；表格那条配了凭据才长出来，没配就不装样子。
- * 配了**回复表**之后，「我提过的」会显示开发者回复，也能手动检查。
+ * 四条都不需要用户配任何东西，所以**装完就能用**。服务端地址优先取
+ * `announce/feed.json` 的 `endpoints.feedback`——**换服务器不用发版**。
+ * 服务端收下之后，「我提过的」会显示开发者回复，也能手动检查。
  *
  * ## 隐私
  *
@@ -115,8 +116,9 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
     var sentIds by remember { mutableStateOf(store.sentIds()) }
     var replies by remember { mutableStateOf(store.cachedReplies()) }
     var checkingReplies by remember { mutableStateOf(false) }
-    val remoteReady = FeedbackRemote.configured
-    val replyReady = FeedbackRemote.replyConfigured
+    val remoteReady = remember(context) { FeedbackRemote.configured(context) }
+    // 回复与提交走同一个服务端，所以两者一起有、一起无。
+    val replyReady = remoteReady
 
     val diagnostics = remember {
         FeedbackFormatter.diagnostics(
@@ -166,6 +168,7 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
         for (item in store.pending()) {
             if (item.blocked) continue
             val outcome = FeedbackRemote.submit(
+                context = context,
                 draft = FeedbackDraft(
                     category = item.category,
                     content = item.content,
@@ -199,7 +202,7 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
         val tickets = store.sentIds().toList()
         if (tickets.isEmpty()) return
         if (!store.shouldFetchReplies(hasPending = store.pending().isNotEmpty(), force = force)) return
-        val got = FeedbackRemote.replies(tickets)
+        val got = FeedbackRemote.replies(context, tickets)
         if (got.isNotEmpty()) store.cacheReplies(got)
         // 失败也记一次：免费版配额按接口次数算，断网时不该每次重进都打一发。
         store.markRepliesFetched()
@@ -342,7 +345,7 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
                             val anonId = store.anonId()
                             scope.launch {
                                 sending = true
-                                val outcome = FeedbackRemote.submit(snapshot, ticket, diagnostics, anonId)
+                                val outcome = FeedbackRemote.submit(context, snapshot, ticket, diagnostics, anonId)
                                 sending = false
                                 when (outcome) {
                                     SubmitOutcome.Sent -> {

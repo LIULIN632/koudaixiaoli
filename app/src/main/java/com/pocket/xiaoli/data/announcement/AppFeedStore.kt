@@ -147,6 +147,23 @@ class AppFeedStore(context: Context) {
         prefs.edit().clear().apply()
     }
 
+    /**
+     * 反馈接口地址（`feed.json` 顶层 `endpoints.feedback`）。
+     *
+     * 为什么要跟着 feed 走、而不是编在 APK 里：换服务器时**不用发版**。
+     * 老客户端读不到这个键就回落到编译期默认值（见 `FeedbackRemote.endpoint`），
+     * 所以下线这个键不会让反馈功能消失。
+     *
+     * 不吃备份：它是「当前该往哪台服务器发」的运行时配置，换机由 feed 重新给。
+     */
+    fun feedbackEndpoint(): String? = prefs.getString(KEY_FEEDBACK_ENDPOINT, null)
+
+    fun setFeedbackEndpoint(url: String?) {
+        prefs.edit().apply {
+            if (url.isNullOrBlank()) remove(KEY_FEEDBACK_ENDPOINT) else putString(KEY_FEEDBACK_ENDPOINT, url)
+        }.apply()
+    }
+
     companion object {
         private const val PREFS = "pocket_app_feed"
         private const val KEY_LAST_CHECK_AT = "last_check_at"
@@ -159,6 +176,7 @@ class AppFeedStore(context: Context) {
         private const val KEY_BACKGROUND_ENABLED = "background_enabled"
         private const val KEY_BETA_ENABLED = "beta_enabled"
     private const val KEY_CHANNEL = "update_channel"
+        private const val KEY_FEEDBACK_ENDPOINT = "feedback_endpoint"
 
         /** 已读 id 最多记这么多条（一条公告几十字节，200 条也就几 KB） */
         const val MAX_SEEN = 200

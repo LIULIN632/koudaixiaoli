@@ -31,8 +31,11 @@ import org.robolectric.annotation.GraphicsMode
  *
  * | 图 | 内容 |
  * |---|---|
- * | 315 | 已加入（Vivid/Rainbow）：主视觉「86 分」+ 三档领奖台 + 我的高亮行 |
- * | 316 | 同一屏（Minimal/Pure 深色）：领奖台的三档色在深色下是否还分得开 |
+ * | 315 | 已加入（Vivid/Rainbow）：主视觉「8 人在榜」+ 纯昵称列表 + 我的高亮行 |
+ * | 316 | 同一屏（Minimal/Pure 深色）：没有领奖台之后，长列表在暗底上的节奏 |
+ *
+ * 2026-10-24 起榜单不再有分数/名次，样例数据按**昵称拼音**排好 —— 如果排序逻辑回退，
+ * 图上的顺序会变，一眼就能看出来。
  *
  * 榜单是**样例数据**，只存在于测试里 —— 不许为了让截图好看往正式逻辑塞假数据。
  * `fetchedAt` 写死，避免"离线缓存 09:30"随运行时间变红。
@@ -40,7 +43,7 @@ import org.robolectric.annotation.GraphicsMode
  * ## 语义约定
  *
  * 1. 没加入时只有「加入共建榜」，不能出现「改名 / 退出」；
- * 2. 加入后才有「改名 / 退出」，并显示自己的名次；
+ * 2. 加入后才有「改名 / 退出」，并说明是按昵称排序（不再显示名次）；
  * 3. 服务端地址没配时显示「榜单还没接上服务器」，而不是一个永远拉不到的空榜。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -56,15 +59,16 @@ class ContributionLeaderboardScreenshotTest {
         .toInstant(ZoneOffset.ofHours(8))
         .toEpochMilli()
 
+    /** 按昵称拼音排好的样例（数字 → b → j → l → m → t → z）。 */
     private val entries = listOf(
-        ContributionEntry(1, "鲤鱼王", 148),
-        ContributionEntry(2, "早八人", 132),
-        ContributionEntry(3, "图书馆钉子户", 110),
-        ContributionEntry(4, "摸鱼佬", 86, mine = true),
-        ContributionEntry(5, "313 路", 74),
-        ContributionEntry(6, "教三常客", 61),
-        ContributionEntry(7, "笔记搬运工", 48),
-        ContributionEntry(8, "不迟到", 35),
+        ContributionEntry(1, "313 路"),
+        ContributionEntry(2, "笔记搬运工"),
+        ContributionEntry(3, "不迟到"),
+        ContributionEntry(4, "教三常客"),
+        ContributionEntry(5, "鲤鱼王"),
+        ContributionEntry(6, "摸鱼佬", mine = true),
+        ContributionEntry(7, "图书馆钉子户"),
+        ContributionEntry(8, "早八人"),
     )
 
     private fun joinedState() = ContributionUiState(
@@ -77,8 +81,9 @@ class ContributionLeaderboardScreenshotTest {
             category = ContributionCategory.ALL,
             period = ContributionPeriod.WEEK,
             entries = entries,
-            me = ContributionMe(rank = 4, points = 86, nickname = "摸鱼佬"),
+            me = ContributionMe("摸鱼佬"),
             fetchedAt = fetchedAt,
+            total = entries.size,
         ),
         loading = false,
         error = null,
@@ -153,7 +158,7 @@ class ContributionLeaderboardScreenshotTest {
     }
 
     @Test
-    fun `加入后显示名次 并有改名退出`() {
+    fun `加入后显示已加入 并有改名退出`() {
         render(
             ContributionUiState(
                 enabled = true,
@@ -163,13 +168,13 @@ class ContributionLeaderboardScreenshotTest {
                     category = ContributionCategory.ALL,
                     period = ContributionPeriod.WEEK,
                     entries = entries,
-                    me = ContributionMe(4, 86, "摸鱼佬"),
+                    me = ContributionMe("摸鱼佬"),
                     fetchedAt = fetchedAt,
                 ),
             ),
         )
 
-        composeRule.onNodeWithText("第 4 名 · 86 分").assertExists()
+        composeRule.onNodeWithText("已加入 · 按昵称排序").assertExists()
         composeRule.onNodeWithText("改名").assertExists()
         composeRule.onNodeWithText("退出").assertExists()
         composeRule.onNodeWithText("还没加入").assertDoesNotExist()

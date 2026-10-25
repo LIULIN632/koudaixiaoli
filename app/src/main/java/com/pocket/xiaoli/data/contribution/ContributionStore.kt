@@ -23,7 +23,7 @@ data class PendingReport(val action: ContributionAction, val eid: String)
  *
  * ## cid 与 iid 的区别
  *
- * 匿名统计的 iid 每 30 天轮换（算 MAU 用），拿它上榜会让积分月月清零。
+ * 匿名统计的 iid 每 30 天轮换（算 MAU 用），拿它上榜会让榜单记录月月清零。
  * cid 是加入榜单时单独生成的 UUID，只在本机保存，与 iid 没有映射关系。
  */
 class ContributionStore(context: Context) {
@@ -151,11 +151,10 @@ class ContributionStore(context: Context) {
         val cached = CachedBoard(
             category = board.category.wire,
             period = board.period.wire,
-            entries = board.entries.map {
-                CachedEntry(it.rank, it.nickname, it.points, it.mine)
-            },
-            me = board.me?.let { CachedMe(it.rank, it.nickname, it.points) },
+            entries = board.entries.map { CachedEntry(it.nickname, it.mine) },
+            me = board.me?.let { CachedMe(it.nickname) },
             fetchedAt = board.fetchedAt,
+            total = board.total,
         )
         prefs.edit().putString(KEY_CACHE, gson.toJson(cached)).apply()
     }
@@ -186,39 +185,42 @@ class ContributionStore(context: Context) {
         val entries: List<CachedEntry>? = null,
         val me: CachedMe? = null,
         val fetchedAt: Long = 0,
+        /** 旧缓存没有这个字段：0 时用列表长度兜底，不能当成"没人"。 */
+        val total: Int = 0,
     ) {
-        fun toBoard(): ContributionBoard = ContributionBoard(
-            category = ContributionCategory.fromWire(category),
-            period = ContributionPeriod.fromWire(period),
-            entries = entries.orEmpty().mapNotNull { it.toEntry() },
-            me = me?.toMe(),
-            fetchedAt = fetchedAt,
-            fromCache = true,
-        )
+        fun toBoard(): ContributionBoard {
+            // 旧缓存是按分数排的：读出来先按昵称重排，离线时也不会看到旧次序。
+            val sorted = ContributionOrder.sortByName(
+                entries.orEmpty().mapNotNull { it.toEntry() },
+            )
+            return ContributionBoard(
+                category = ContributionCategory.fromWire(category),
+                period = ContributionPeriod.fromWire(period),
+                entries = sorted,
+                me = me?.toMe(),
+                fetchedAt = fetchedAt,
+                total = total.coerceAtLeast(sorted.size),
+                fromCache = true,
+            )
+        }
     }
 
     private data class CachedEntry(
-        val rank: Int = 0,
         val nickname: String? = null,
-        val points: Int = 0,
         val mine: Boolean = false,
     ) {
         fun toEntry(): ContributionEntry? {
             val name = nickname?.trim().orEmpty()
-            if (rank <= 0 || name.isEmpty()) return null
-            return ContributionEntry(rank, name, points.coerceAtLeast(0), mine)
+            if (name.isEmpty()) return null
+            // rank 由 [ContributionOrder.sortByName] 统一重排，缓存里不存。
+            return ContributionEntry(rank = 0, nickname = name, mine = mine)
         }
     }
 
-    private data class CachedMe(
-        val rank: Int = 0,
-        val nickname: String? = null,
-        val points: Int = 0,
-    ) {
+    private data class CachedMe(val nickname: String? = null) {
         fun toMe(): ContributionMe? {
             val name = nickname?.trim().orEmpty()
-            if (rank <= 0 || name.isEmpty()) return null
-            return ContributionMe(rank, points.coerceAtLeast(0), name)
+            return if (name.isEmpty()) null else ContributionMe(name)
         }
     }
 }

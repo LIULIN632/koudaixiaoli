@@ -48,6 +48,17 @@ data class AppReleaseFeed(
      * 所以判定"这个包能不能给用户装"的逻辑两个通道共用一份，不用写两遍。
      */
     val beta: AppReleaseFeed? = null,
+    /**
+     * 服务端接口地址。目前只有 `feedback` 一个键：
+     *
+     * ```json
+     * { "endpoints": { "feedback": "https://example.com/v1/feedback" } }
+     * ```
+     *
+     * 存在的理由是**换服务器不发版**：搬家时改这一行、其余全不用动；
+     * 老客户端读不到就回落到编译期默认值，删掉这个键也不会让功能消失。
+     */
+    val endpoints: Endpoints = Endpoints(),
 ) {
     /** 这份 feed 是否带「有版本可以装」的信息 */
     val hasApp: Boolean get() = versionCode > 0 && versionName.isNotBlank()
@@ -56,8 +67,20 @@ data class AppReleaseFeed(
     val hasBeta: Boolean get() = beta?.hasApp == true
 
     /** 是否有任何值得让用户看见的东西 */
-    val isEmpty: Boolean get() = !hasApp && !hasBeta && announcements.isEmpty()
+    val isEmpty: Boolean
+        get() = !hasApp && !hasBeta && announcements.isEmpty() && endpoints.feedback == null
 }
+
+/**
+ * 服务端接口地址（`feed.json` 顶层 `endpoints`）。
+ *
+ * 只有反馈一个键，且**不参与版本判定** —— 它纯粹是「App 该往哪儿发数据」的开关，
+ * 所以解析失败只当成没配，不影响更新链。
+ */
+data class Endpoints(
+    /** 反馈接口的完整地址（含 `/v1/feedback` 路径），null = 没配、走编译期默认值 */
+    val feedback: String? = null,
+)
 
 /**
  * 拉下来的 feed 原文 + 解析结果。
@@ -161,6 +184,7 @@ object AppReleaseFeedParser {
             announcements = parseAnnouncements(root.get("announcements")),
             // 内测块只认顶层 `beta` 里的字段（不继承根上的老式平铺值），否则两个通道谁覆盖谁会说不清
             beta = releaseBlockOrNull(runCatching { root.getAsJsonObject("beta") }.getOrNull()),
+            endpoints = parseEndpoints(root.get("endpoints")),
         )
         return stable.takeIf { !it.isEmpty }
     }
@@ -184,6 +208,18 @@ object AppReleaseFeedParser {
     /** 块不存在就是不存在（区别于 [releaseBlock] 的"块在但字段缺"），别把 null 塞成空对象 */
     private fun releaseBlockOrNull(obj: JsonObject?): AppReleaseFeed? =
         obj?.let { releaseBlock(it, null) }
+
+    /**
+     * `endpoints` 块。只认 `https://` 开头的绝对地址：
+     * feed 是公开文件，写个 `javascript:` 或相对路径进来只会变成坑，不如直接忽略。
+     */
+    private fun parseEndpoints(element: JsonElement?): Endpoints {
+        val obj = element as? JsonObject ?: return Endpoints()
+        val feedback = obj.string("feedback")
+            ?.trim()
+            ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        return Endpoints(feedback = feedback)
+    }
 
     /**
      * 从 Release 正文里抽 `<!-- feed {...} -->` 块。

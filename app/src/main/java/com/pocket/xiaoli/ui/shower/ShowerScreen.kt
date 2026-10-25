@@ -745,6 +745,12 @@ private fun DevicePicker(
  * 进洗澡页最想知道的是「我还有多少钱、够不够洗」—— 这比设备码常用得多。
  * 所以余额是这张卡的视觉主体（大字号 + 强调色），设备码退到下面一个内嵌面板里。
  *
+ * ## 余额是「趣智钱包」，不是一卡通
+ *
+ * 2026-10-24 真机核对：`/settlement/campus/userInfo` 返回的 `amount` 与趣智钱包一致，
+ * 所以这张卡与「我的」页洗澡格子都按**趣智钱包余额**呈现 —— 原先写成「校园卡余额」
+ * 是把代理接口的名字当成了钱的归属。一卡通（易校园）余额由「校园卡」那一页单独取。
+ *
  * ## 缺省值的处理不能含糊
  *
  * | 状态 | 显示 | 为什么不能显示成别的 |
@@ -768,9 +774,13 @@ private fun DevicePicker(
  * ⚠️ 而「换一个」与「关闭」**仍然各有一层弹窗确认**（在调用方 `ShowerScreen` 里）：
  * 换一个要花掉当天 20 次额度里的一次，关闭则会让热水器上再也输不了码。
  * 「开启」不确认 —— 它只是恢复能力，没有代价。
+ *
+ * ⚠️ 这张卡（余额 + 使用码）由 `ShowerBalanceScreenshotTest` 守着：
+ * 余额的「查询中 / 未签约 / 有余额」三态 + 深色各一张。改文案或层级后要重录基线，
+ * 否则测试会红 —— 这正是它的作用。
  */
 @Composable
-private fun UseCodeCard(
+internal fun UseCodeCard(
     state: ShowerUiState,
     nowMs: Long,
     onCopy: (String) -> Unit,
@@ -795,7 +805,7 @@ private fun UseCodeCard(
         Column(Modifier.fillMaxWidth().padding(skin.cardPadding)) {
 
             // ═══════════ 余额（视觉主体）═══════════
-            Text("校园卡余额", fontSize = 12.sp, color = colors.textTertiary)
+            Text("趣智钱包余额", fontSize = 12.sp, color = colors.textTertiary)
             Spacer(Modifier.height(skin.spaceXs))
             Text(
                 // 三种"没有数字"的状态要分开表达，见上方表格
@@ -807,30 +817,22 @@ private fun UseCodeCard(
                 else colors.textSecondary,
             )
             val balanceHint = when {
-                state.campusBalance == null && state.loadingAccount -> "正在读取校园卡"
+                state.campusBalance == null && state.loadingAccount -> "正在读取趣智钱包"
                 state.campusBalance?.isSigned == false -> "未签约免密支付，拿不到实时余额"
-                state.campusBalance?.amountYuan == null -> "需签约校园卡免密支付"
-                else -> "校园卡实时余额"
+                state.campusBalance?.amountYuan == null -> "需开通免密支付"
+                else -> "趣智钱包实时余额"
             }
             Spacer(Modifier.height(skin.spaceMicro))
             Text(balanceHint, fontSize = 11.sp, color = colors.textTertiary)
 
             Spacer(Modifier.height(skin.spaceSm))
-            // 次要金额排一行：趣智钱包余额 + 上次消费
-            Row(Modifier.fillMaxWidth()) {
-                MiniStat(
-                    modifier = Modifier.weight(1f),
-                    label = "趣智钱包",
-                    value = state.wallet?.let { "¥%.2f".format(it.moneyYuan) }
-                        ?: if (state.loadingAccount) "…" else "—",
-                )
-                MiniStat(
-                    modifier = Modifier.weight(1f),
-                    label = "上次消费",
-                    // ⚠️ null 是「还没结算」，不是 0
-                    value = state.lastConsume?.let { "¥%.2f".format(it) } ?: "—",
-                )
-            }
+            // 余额本身已经是钱包余额，这里不再重复列一次「趣智钱包」。
+            MiniStat(
+                modifier = Modifier.fillMaxWidth(),
+                label = "上次消费",
+                // ⚠️ null 是「还没结算」，不是 0
+                value = state.lastConsume?.let { "¥%.2f".format(it) } ?: "—",
+            )
 
             // ═══════════ 设备码 ═══════════
             Spacer(Modifier.height(skin.spaceMd))
@@ -979,7 +981,7 @@ private fun UseCodeCard(
 private fun formatUseCode(code: String): String =
     if (code.length == 8) "${code.take(4)} ${code.drop(4)}" else code
 
-/** 余额卡里的次要金额（趣智钱包 / 上次消费）。 */
+/** 余额卡里的次要金额（上次消费）。 */
 @Composable
 private fun MiniStat(modifier: Modifier, label: String, value: String) {
     val colors = LocalPocketXiaoliColors.current

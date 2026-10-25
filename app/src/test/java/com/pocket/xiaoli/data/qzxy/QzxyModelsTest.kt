@@ -130,7 +130,7 @@ class QzxyModelsTest {
     }
 
     @Test
-    fun `一卡通余额字符串转元`() {
+    fun `余额字符串转元`() {
         assertEquals(16.76, QzxyCampusUserInfo(amount = "16.76").amountYuan!!, 1e-9)
         assertNull("服务端不给 amount 时应当是 null，而不是 0", QzxyCampusUserInfo().amountYuan)
     }
@@ -158,7 +158,7 @@ class QzxyModelsTest {
 
     @Test
     fun `认证参数必须同时带 telephone 与 telPhone`() {
-        // ⚠️ 少 telPhone 会让一卡通余额接口回「手机号不能为空」，而且是 HTTP 200
+        // ⚠️ 少 telPhone 会让余额接口回「手机号不能为空」，而且是 HTTP 200
         val q = QzxyAuth(loginCode = "x", telephone = "13800138000").asQuery()
         assertEquals("13800138000", q["telephone"])
         assertEquals("13800138000", q["telPhone"])

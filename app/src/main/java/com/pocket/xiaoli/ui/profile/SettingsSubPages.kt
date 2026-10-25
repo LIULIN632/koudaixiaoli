@@ -265,7 +265,6 @@ private fun AboutContent(
         SettingsMenuItem(
             icon = Icons.AutoMirrored.Outlined.HelpOutline,
             title = "常见问题",
-            subtitle = "导入、数据存放、分享、深色模式",
             onClick = { showFaqDialog = true },
             accent = ServiceAccent.QUERY,
         )
@@ -273,7 +272,6 @@ private fun AboutContent(
         SettingsMenuItem(
             icon = Icons.Outlined.MailOutline,
             title = "意见反馈",
-            subtitle = "复制 / 邮件 / GitHub，或者填个表单",
             onClick = onOpenFeedback,
             accent = ServiceAccent.INFO,
         )
@@ -292,7 +290,6 @@ private fun AboutContent(
         SettingsMenuItem(
             icon = Icons.Filled.Info,
             title = "关于口袋小鲤",
-            subtitle = "版本信息与开源致谢",
             onClick = onAbout,
             accent = ServiceAccent.INFO,
         )
@@ -394,7 +391,6 @@ private fun UpdateContent(
         SettingsMenuChoiceItem(
             icon = Icons.Filled.Cloud,
             title = "更新渠道",
-            subtitle = "先问哪个仓要新版本",
             options = listOf(
                 "自动（推荐）" to "auto",
                 "Gitee" to "gitee",
@@ -446,15 +442,16 @@ private fun UpdateContent(
         SettingsMenuItem(
             icon = Icons.Filled.SystemUpdate,
             title = "检查更新",
-            subtitle = if (feedState.checking) "正在检查…" else "查到新版会先问你，再下载",
+            // 副标题只承担"进行中"这个瞬时状态；常态下不写小字，行为说明收进「?」。
+            subtitle = if (feedState.checking) "正在检查…" else null,
             onClick = { if (!feedState.checking) onCheckUpdate() },
             accent = ServiceAccent.QUERY,
+            hint = "查到新版会先问你，再下载。",
         )
         SettingsDivider()
         SettingsMenuItem(
             icon = Icons.Filled.History,
             title = "更新日志",
-            subtitle = "查看版本更新记录",
             onClick = onChangelog,
             accent = ServiceAccent.INFO,
         )
@@ -483,7 +480,6 @@ private fun ContributeContent(onOpenLeaderboard: () -> Unit) {
             SettingsMenuItem(
                 icon = Icons.Filled.EmojiEvents,
                 title = "校园共建榜",
-                subtitle = "看看谁在导课表、补教室、写笔记",
                 onClick = onOpenLeaderboard,
                 accent = ServiceAccent.ACADEMIC,
             )

@@ -243,7 +243,11 @@ object QzxyApi {
     suspend fun wallet(auth: QzxyAuth): QzxyResponse<QzxyWallet> =
         parse(rawGet("/account/wallet", auth.asQuery()), QzxyWallet::class.java)
 
-    /** 一卡通真实余额（趣智校园代理了易校园，不必自己破签名）。 */
+    /**
+     * 余额查询（趣智校园代理了易校园，不必自己破签名）。
+     *
+     * ⚠️ 路径写的是 `campus`，但实测返回的是**趣智钱包**余额（见 `QzxyCampusUserInfo`）。
+     */
     suspend fun campusUserInfo(auth: QzxyAuth): QzxyResponse<QzxyCampusUserInfo> =
         parse(rawGet("/settlement/campus/userInfo", auth.asQuery()), QzxyCampusUserInfo::class.java)
 

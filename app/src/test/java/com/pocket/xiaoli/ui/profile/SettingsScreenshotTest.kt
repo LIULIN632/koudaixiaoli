@@ -10,6 +10,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.GridOn
+import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.runtime.CompositionLocalProvider
@@ -211,6 +213,88 @@ class SettingsScreenshotTest {
             }
         }
         homepageCases.forEach { case ->
+            current.value = case
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/screenshots/${case.first}")
+        }
+    }
+
+    /**
+     * 「?」说明入口的行高与位置（2026-10-24 起，多条设置行不再写副标题）。
+     *
+     * 钉两件事：
+     * 1. **44dp 的触摸盒不把行撑高** —— 带「?」的行应与普通行同一高度档
+     *    （图标块 36dp 本来就高于文字列，问号只是把内容高度从 36 抬到 44）；
+     * 2. 问号在**行尾、箭头/开关之前**，不挤占标题列，也不会把右侧的当前值挤掉。
+     *
+     * 覆盖四种行：菜单行 + 问号、多选行 + 问号、菜单行 + 副标题（无问号）、开关行 + 问号。
+     */
+    @Test
+    fun `设置行问号入口截图`() {
+        val cases = listOf(
+            "177-settings-row-hint.png" to false,
+            "178-settings-row-hint-dark.png" to true,
+        )
+        val current = mutableStateOf(cases.first())
+        composeRule.setContent {
+            val (_, dark) = current.value
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = dark,
+            ) {
+                CompositionLocalProvider(LocalProfileRowPadding provides 14.dp) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(LocalPocketXiaoliColors.current.surfaceBase)
+                            .verticalScroll(rememberScrollState())
+                            .padding(
+                                horizontal = LocalSkin.current.spaceLg,
+                                vertical = 12.dp,
+                            ),
+                    ) {
+                        SettingsCard {
+                            SettingsMenuItem(
+                                icon = Icons.Outlined.CalendarMonth,
+                                title = "学期设置",
+                                onClick = {},
+                                accent = ServiceAccent.ACADEMIC,
+                                hint = "学期开始日期决定「当前第几周」怎么算，开学前改一次就行。",
+                            )
+                            SettingsDivider()
+                            SettingsMenuChoiceItem(
+                                icon = Icons.Outlined.GridOn,
+                                title = "课表网格边框",
+                                options = listOf("无" to 0, "实线" to 1, "虚线" to 2),
+                                selected = 1,
+                                onSelect = {},
+                                accent = ServiceAccent.STUDY,
+                                hint = "同时作用于课表网格和教室平面图。",
+                            )
+                            SettingsDivider()
+                            SettingsMenuItem(
+                                icon = Icons.Outlined.LocationCity,
+                                title = "当前校区",
+                                subtitle = "烟理",
+                                onClick = {},
+                                accent = ServiceAccent.QUERY,
+                            )
+                            SettingsDivider()
+                            SettingsSwitchItem(
+                                icon = Icons.Outlined.Notifications,
+                                title = "上课提醒总开关",
+                                checked = true,
+                                onToggle = {},
+                                accent = ServiceAccent.LIFE,
+                                hint = "课前自动发一条提醒。",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        cases.forEach { case ->
             current.value = case
             composeRule.waitForIdle()
             composeRule.onRoot().captureRoboImage("src/test/screenshots/${case.first}")

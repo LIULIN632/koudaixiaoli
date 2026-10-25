@@ -70,13 +70,13 @@ class ContributionClientTest {
     }
 
     @Test
-    fun `正常响应解析出榜单与我的排名`() {
+    fun `正常响应按昵称排序 且忽略分数与名次`() {
         val board = client.parseBoard(
             raw = """
                 {"category":"all","period":"week","rows":[
-                  {"rank":1,"nickname":"鲤鱼王","points":120,"mine":false},
-                  {"rank":2,"nickname":"摸鱼佬","points":80,"mine":true}
-                ],"me":{"rank":2,"nickname":"摸鱼佬","points":80}}
+                  {"rank":1,"nickname":"摸鱼佬","points":80,"mine":true},
+                  {"rank":2,"nickname":"鲤鱼王","points":120,"mine":false}
+                ],"me":{"rank":2,"nickname":"摸鱼佬","points":80},"total":2}
             """.trimIndent(),
             category = ContributionCategory.ALL,
             period = ContributionPeriod.WEEK,
@@ -85,27 +85,28 @@ class ContributionClientTest {
 
         assertNotNull(board)
         board!!
+        // 服务端即使还带着 rank / points，也统统不看：顺序按昵称（li < mo）重排。
         assertEquals(
             listOf(
-                ContributionEntry(1, "鲤鱼王", 120, mine = false),
-                ContributionEntry(2, "摸鱼佬", 80, mine = true),
+                ContributionEntry(1, "鲤鱼王", mine = false),
+                ContributionEntry(2, "摸鱼佬", mine = true),
             ),
             board.entries,
         )
-        assertEquals(ContributionMe(2, 80, "摸鱼佬"), board.me)
+        assertEquals(ContributionMe("摸鱼佬"), board.me)
+        assertEquals(2, board.total)
         assertEquals(123L, board.fetchedAt)
         assertFalse(board.fromCache)
     }
 
     @Test
-    fun `坏行只丢自己 其它照常上榜`() {
+    fun `空昵称的行只丢自己 其它照常上榜`() {
         val board = client.parseBoard(
             raw = """
                 {"rows":[
-                  {"rank":0,"nickname":"没名次","points":10},
-                  {"nickname":"缺名次","points":10},
-                  {"rank":3,"nickname":"   ","points":10},
-                  {"rank":4,"nickname":"负数","points":-99}
+                  {"rank":0,"nickname":"早八人"},
+                  {"rank":1,"nickname":"   "},
+                  {"rank":2,"nickname":"笔记搬运工"}
                 ]}
             """.trimIndent(),
             category = ContributionCategory.ALL,
@@ -113,27 +114,36 @@ class ContributionClientTest {
             nowMs = 0L,
         )
 
-        assertEquals(listOf(ContributionEntry(4, "负数", 0)), board!!.entries)
+        // 笔记搬运工 < 早八人（拼音 b < z），rank 按排序重编号。
+        assertEquals(
+            listOf(
+                ContributionEntry(1, "笔记搬运工"),
+                ContributionEntry(2, "早八人"),
+            ),
+            board!!.entries,
+        )
         assertNull(board.me)
+        // 旧服务端不带 total：至少不能比看得见的列表还小。
+        assertEquals(2, board.total)
     }
 
     @Test
-    fun `我的排名不合法时当没上榜`() {
-        val noRank = client.parseBoard(
-            """{"rows":[],"me":{"rank":0,"nickname":"我","points":5}}""",
-            ContributionCategory.ALL,
-            ContributionPeriod.WEEK,
-            0L,
-        )
-        assertNull(noRank!!.me)
-
+    fun `我的昵称为空时当没上榜`() {
         val noName = client.parseBoard(
-            """{"rows":[],"me":{"rank":3,"nickname":" ","points":5}}""",
+            """{"rows":[],"me":{"nickname":" "}}""",
             ContributionCategory.ALL,
             ContributionPeriod.WEEK,
             0L,
         )
         assertNull(noName!!.me)
+
+        val ok = client.parseBoard(
+            """{"rows":[],"me":{"nickname":"我"}}""",
+            ContributionCategory.ALL,
+            ContributionPeriod.WEEK,
+            0L,
+        )
+        assertEquals(ContributionMe("我"), ok!!.me)
     }
 
     @Test

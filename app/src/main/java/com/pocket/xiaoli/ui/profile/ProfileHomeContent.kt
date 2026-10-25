@@ -79,7 +79,7 @@ fun ProfileHomeContent(
     onOpenFocus: () -> Unit,
     /** 专注统计块的整份数据（概览 + 热力图 + 柱状图 + 分段图），由 `FocusStats.focusStatsView` 一次算好 */
     focusStats: FocusStatsView = FocusStatsView(),
-    /** 洗澡格子的副标题：一卡通剩余余额（见 `showerTileHint`） */
+    /** 洗澡格子的副标题：趣智钱包余额（见 `showerTileHint`） */
     showerHint: String,
     onOpenShower: () -> Unit,
     onOpenExpress: () -> Unit,

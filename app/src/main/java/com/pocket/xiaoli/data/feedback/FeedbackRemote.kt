@@ -1,10 +1,11 @@
 package com.pocket.xiaoli.data.feedback
 
-import com.google.gson.JsonArray
-import com.google.gson.JsonElement
+import android.content.Context
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.pocket.xiaoli.BuildConfig
+import com.pocket.xiaoli.data.SelfHost
+import com.pocket.xiaoli.data.announcement.AppFeedStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,9 +15,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.net.URLEncoder
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 /** 一次提交的结果。UI 按这个决定「清空输入 / 入队 / 原样留着」。 */
@@ -24,320 +25,216 @@ sealed interface SubmitOutcome {
 
     data object Sent : SubmitOutcome
 
-    /** 网络、凭据或服务端临时故障 —— 内容还有救，留在本地队列下次补发。 */
+    /** 网络或服务端临时故障 —— 内容还有救，留在本地队列下次补发。 */
     data class Retryable(val reason: String) : SubmitOutcome
 
-    /** 表格明确拒收（多半是列名对不上）—— 重试没意义，必须让用户看见。 */
+    /** 服务端明确拒收 —— 重试没意义，必须让用户看见并改成手动发送。 */
     data class Rejected(val reason: String) : SubmitOutcome
 }
 
 data class FeedbackReply(val text: String, val at: String)
 
 /**
- * 可选渠道：把反馈写进一张**表格**（飞书多维表格），并从另一张只读表取回复。
+ * 反馈的直传通道：**我们自己的服务器**（`/v1/feedback/submit`）。
  *
- * ## 为什么是"可选"
+ * ## 为什么不再走飞书多维表格
  *
- * 这条链路要凭据（app_id / app_secret / 两张表的 token + table_id），而凭据不可能
- * 塞进公开仓库。`gradle.properties` 里留空 ⇒ [configured] 为 false ⇒ 反馈页
- * **整个「直接发送」按钮不出现**，用户只剩复制 / 邮件 / GitHub 三条真通道。
+ * 旧实现在 APK 里编了 `app_secret` 与四张表的 token。secret 打进包必然能被反编译拿走，
+ * 只能靠「泄露了也不痛」的权限设计兜着；而且回复要人工去表格里翻。
+ * 换成自建之后：数据进自己的 Postgres、面板上直接回、APK 里只剩一个公开地址和一个
+ * 只用于挡扫描器的 `X-App-Key`。
  *
- * ## 两张表，各给一半权限
+ * ## 地址从哪来（这也是「换服务器方便」的全部实现）
  *
- * app_secret 打进 APK 一定能被反编译拿到，所以按「泄露了也不痛」设计：
+ * 1. `announce/feed.json` 的 `endpoints.feedback`（**改它不用发版**）；
+ * 2. 没有就回落到 `SelfHost.TELEMETRY_URL` + `/v1/feedback`（同一台机器，编译期默认值）。
  *
- * | 表 | 应用权限 | 里面有什么 |
- * |---|---|---|
- * | 反馈表（[configured]） | **只写** | 用户原文、联系方式、匿名 ID、可选设备信息 |
- * | 回复表（[replyConfigured]） | **只读** | 工单号、回复正文、回复时间 |
+ * 两边都没有 ⇒ [configured] 为 false ⇒ 反馈页不显示「直接发送」按钮，
+ * 用户只剩复制 / 系统分享 / 邮件 / GitHub Issue 四条不需要服务器的通道。
  *
- * 两张开在不同的多维表格文档里，各自加应用为协作者（一张可编辑、一张只读），
- * 不依赖飞书的高级权限。**绝不能**把回复字段并进反馈表 —— 那等于给读权限开了整张反馈表。
+ * ## 存了什么
  *
- * ## 字段
- *
- * 反馈表列名必须一字不差：工单号 / 类型 / 内容 / 联系方式 / 匿名ID / 版本 / 平台，
- * 勾了「附带设备信息」时多一个 环境。回复表列名：工单号 / 回复 / 回复时间。
+ * 工单号、分类、正文、可选联系方式、可选设备信息、每 30 天轮换的匿名 id。
+ * **没有**学号、IMEI、IP —— 服务端也不记 IP，Nginx 只做限流。
  */
 object FeedbackRemote {
 
-    private const val FEISHU_BASE = "https://open.feishu.cn/open-apis"
-    private const val F_TICKET = "工单号"
-    private const val F_REPLY = "回复"
-    private const val F_REPLY_AT = "回复时间"
-    private const val MAX_REPLY_PAGES = 5
+    private const val PATH = "/v1/feedback"
+    private const val SUBMIT = "$PATH/submit"
+    private const val REPLIES = "$PATH/replies"
 
-    @Volatile
-    private var cachedToken: String? = null
-
-    @Volatile
-    private var tokenExpireAt: Long = 0L
-
-    val configured: Boolean
-        get() = BuildConfig.FEEDBACK_FEISHU_APP_ID.isNotBlank() &&
-            BuildConfig.FEEDBACK_FEISHU_APP_SECRET.isNotBlank() &&
-            BuildConfig.FEEDBACK_FEISHU_APP_TOKEN.isNotBlank() &&
-            BuildConfig.FEEDBACK_FEISHU_TABLE_ID.isNotBlank()
-
-    /** 回复表是独立的只读文档；没配就整块藏起来，不做"半个回复功能"。 */
-    val replyConfigured: Boolean
-        get() = configured &&
-            BuildConfig.FEEDBACK_FEISHU_REPLY_APP_TOKEN.isNotBlank() &&
-            BuildConfig.FEEDBACK_FEISHU_REPLY_TABLE_ID.isNotBlank()
+    private val JSON = "application/json; charset=utf-8".toMediaType()
 
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(12, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
             .build()
     }
 
-    /** 一条记录的 fields。列名改这里之前先改表格。 */
-    fun recordJson(
+    /**
+     * 反馈接口的完整地址。feed 里的优先（可热换），否则用编译期默认值。
+     *
+     * 只接受 http(s)：feed 是公开文件，写个 `javascript:` 或相对路径进来只会变成坑。
+     */
+    fun endpoint(context: Context): String? {
+        val fromFeed = AppFeedStore(context).feedbackEndpoint()
+            ?.trim()
+            ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        if (fromFeed != null) return fromFeed.trimEnd('/')
+        val base = SelfHost.TELEMETRY_URL.trim().trimEnd('/')
+        return if (base.startsWith("https://") || base.startsWith("http://")) base + PATH else null
+    }
+
+    /** 有没有可以直传的服务器。没有就整块按钮不出现，而不是「点了没反应」。 */
+    fun configured(context: Context): Boolean = endpoint(context) != null
+
+    /**
+     * 请求体。纯函数，便于单测：字段名就是服务端 `FeedbackSubmit` 的字段名，
+     * 两边改一边就要改另一边（`server/.../feedback/FeedbackRoutes.kt`）。
+     */
+    internal fun submitJson(
         draft: FeedbackDraft,
         ticketId: String,
         diagnostics: String?,
-        anonId: String,
+        iid: String,
     ): String {
-        val fields = JsonObject().apply {
-            addProperty("工单号", ticketId)
-            addProperty("类型", draft.category.label)
-            addProperty("内容", draft.content.trim())
-            addProperty("联系方式", draft.contact.trim())
-            addProperty("匿名ID", anonId)
-            addProperty("版本", BuildConfig.VERSION_NAME)
-            addProperty("平台", "Android")
+        val body = JsonObject().apply {
+            addProperty("ticket", ticketId)
+            addProperty("category", draft.category.name)
+            addProperty("content", draft.content.trim())
+            addProperty("contact", draft.contact.trim().takeIf { it.isNotBlank() })
+            addProperty("iid", iid)
+            addProperty("versionCode", BuildConfig.VERSION_CODE)
+            addProperty("versionName", BuildConfig.VERSION_NAME)
+            // 设备信息只在用户勾了「附带设备信息」时才有值，没勾就一个字段都不带。
+            val env = if (draft.includeDiagnostics) diagnostics else null
+            addProperty("device", deviceOf(env))
+            addProperty("os", osOf(env))
         }
-        if (draft.includeDiagnostics && !diagnostics.isNullOrBlank()) {
-            // 多维表格的文本列存不下富文本，直接平铺进去即可。
-            fields.addProperty("环境", diagnostics)
-        }
-        val body = JsonObject().apply { add("fields", fields) }
         return body.toString()
     }
 
+    /**
+     * 从 `FeedbackFormatter.diagnostics` 的文本里取机型。
+     *
+     * 为什么不是直接传结构化参数：那段文本是**用户已经在页面上看到**的东西
+     * （「附带设备信息：版本 … 机型 …」），从同一份文本里取，界面上写什么就是发什么，
+     * 不会出现「勾了但它其实没发」。
+     */
+    internal fun deviceOf(diagnostics: String?): String? =
+        diagnostics?.lineSequence()?.firstOrNull { it.startsWith("机型 ") }
+            ?.removePrefix("机型 ")?.trim()?.takeIf { it.isNotBlank() }
+
+    internal fun osOf(diagnostics: String?): String? =
+        diagnostics?.lineSequence()?.firstOrNull { it.startsWith("系统 ") }
+            ?.removePrefix("系统 ")?.trim()?.takeIf { it.isNotBlank() }
+
     suspend fun submit(
+        context: Context,
         draft: FeedbackDraft,
         ticketId: String,
         diagnostics: String?,
         anonId: String,
     ): SubmitOutcome = withContext(Dispatchers.IO) {
-        val token = tenantToken() ?: return@withContext SubmitOutcome.Retryable("没有拿到上传凭据")
+        val url = endpoint(context)
+            ?: return@withContext SubmitOutcome.Rejected("这台设备没有配置反馈通道")
         try {
-            val url = "$FEISHU_BASE/bitable/v1/apps/${BuildConfig.FEEDBACK_FEISHU_APP_TOKEN}" +
-                "/tables/${BuildConfig.FEEDBACK_FEISHU_TABLE_ID}/records"
             val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer $token")
-                .post(recordJson(draft, ticketId, diagnostics, anonId).toRequestBody(JSON))
+                .url(url + SUBMIT)
+                .addHeader("X-App-Key", SelfHost.TELEMETRY_KEY)
+                .post(submitJson(draft, ticketId, diagnostics, anonId).toRequestBody(JSON))
                 .build()
             client.newCall(request).execute().use { response ->
-                val json = parse(response.body?.string().orEmpty())
-                classify(
-                    httpCode = response.code,
-                    code = json.intOr("code", -1),
-                    message = plainText(json.get("msg")),
-                )
+                classify(response.code)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
             SubmitOutcome.Retryable("网络不通：${e.javaClass.simpleName}")
         } catch (e: Exception) {
-            SubmitOutcome.Rejected("发送失败：${e.javaClass.simpleName}")
+            SubmitOutcome.Retryable("发送失败：${e.javaClass.simpleName}")
         }
     }
 
     /**
-     * 拉取这些工单号对应的回复。失败一律返回空表 —— 回复是加分项，不能因为它
-     * 把整个页面变成错误页；节流由 [FeedbackStore] 负责。
+     * 拉取这些工单号对应的回复。失败一律返回空表 —— 回复是加分项，
+     * 不能因为它把整个页面变成错误页；节流由 [FeedbackStore] 负责。
      */
-    suspend fun replies(tickets: List<String>): Map<String, FeedbackReply> =
+    suspend fun replies(context: Context, tickets: List<String>): Map<String, FeedbackReply> =
         withContext(Dispatchers.IO) {
-            if (!replyConfigured) return@withContext emptyMap()
+            val url = endpoint(context) ?: return@withContext emptyMap()
             val wanted = tickets.asSequence()
                 .map(String::trim)
                 .filter(String::isNotEmpty)
                 .distinct()
                 .take(20)
-                .toSet()
+                .toList()
             if (wanted.isEmpty()) return@withContext emptyMap()
-            val token = tenantToken() ?: return@withContext emptyMap()
-
-            // 多行文本的 contains 一次只能放一个值，所以每个工单号一个条件、OR 起来。
-            val conditions = JsonArray().apply {
-                wanted.forEach { id ->
-                    add(
-                        JsonObject().apply {
-                            addProperty("field_name", F_TICKET)
-                            addProperty("operator", "contains")
-                            add("value", JsonArray().apply { add(id) })
-                        }
-                    )
+            val query = wanted.joinToString(",") { URLEncoder.encode(it, "UTF-8") }
+            try {
+                val request = Request.Builder()
+                    .url("$url$REPLIES?tickets=$query")
+                    .addHeader("X-App-Key", SelfHost.TELEMETRY_KEY)
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@withContext emptyMap()
+                    parseReplies(response.body?.string().orEmpty())
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyMap()
             }
-            val filter = JsonObject().apply {
-                addProperty("conjunction", "or")
-                add("conditions", conditions)
-            }
-
-            val found = linkedMapOf<String, FeedbackReply>()
-            var pageToken: String? = null
-            var useFilter = true
-            var pages = 0
-            while (pages < MAX_REPLY_PAGES) {
-                val json = searchRecords(token, filter.takeIf { useFilter }, pageToken) ?: break
-                val code = json.intOr("code", -1)
-                if (code != 0) {
-                    // 工单号若是公式/查找引用字段，filter 会报 1254018。
-                    // 回复表本身是"可读也无所谓"的表，去掉 filter 拉一次再本地匹配。
-                    if (useFilter) {
-                        useFilter = false
-                        pageToken = null
-                        continue
-                    }
-                    break
-                }
-                val data = json.objectOrNull("data") ?: break
-                collectReplies(data.arrayOrNull("items"), wanted, found)
-                if (found.size >= wanted.size) break
-                pages++
-                val hasMore = data.booleanOr("has_more", false)
-                pageToken = data.stringOr("page_token").takeIf { hasMore && it.isNotBlank() }
-                if (pageToken == null) break
-            }
-            found
         }
 
-    /** 成功返回 null，失败返回一句给用户看的话。 */
-    private fun tenantToken(): String? {
-        val now = System.currentTimeMillis()
-        cachedToken?.let { if (now < tokenExpireAt) return it }
-        val payload = JsonObject().apply {
-            addProperty("app_id", BuildConfig.FEEDBACK_FEISHU_APP_ID)
-            addProperty("app_secret", BuildConfig.FEEDBACK_FEISHU_APP_SECRET)
-        }.toString()
-        val request = Request.Builder()
-            .url("$FEISHU_BASE/auth/v3/tenant_access_token/internal")
-            .post(payload.toRequestBody(JSON))
-            .build()
-        return runCatching {
-            client.newCall(request).execute().use { response ->
-                val json = parse(response.body?.string().orEmpty())
-                if (json.intOr("code", -1) != 0) return@use null
-                val token = json.stringOr("tenant_access_token")
-                if (token.isBlank()) return@use null
-                // 用服务端给的 expire，提前 5 分钟换，别写死一个窗口。
-                val expireSeconds = json.intOr("expire", 7200)
-                cachedToken = token
-                tokenExpireAt = System.currentTimeMillis() +
-                    (expireSeconds - 300).coerceAtLeast(60) * 1000L
-                token
-            }
-        }.getOrNull()
+    /**
+     * 解析 `{"replies":[{"ticket","reply","repliedAt"}]}`。
+     *
+     * 时间统一转成本地时区的 `yyyy-MM-dd HH:mm`：面板与 App 显示的是同一句话，
+     * 用户不该看到 UTC 的 08:00 而手机上是 16:00。
+     */
+    internal fun parseReplies(json: String): Map<String, FeedbackReply> {
+        val root = runCatching { JsonParser.parseString(json).asJsonObject }.getOrNull() ?: return emptyMap()
+        val array = runCatching { root.getAsJsonArray("replies") }.getOrNull() ?: return emptyMap()
+        val out = LinkedHashMap<String, FeedbackReply>()
+        for (element in array) {
+            val obj = element as? JsonObject ?: continue
+            val ticket = obj.string("ticket") ?: continue
+            val text = obj.string("reply")?.takeIf { it.isNotBlank() } ?: continue
+            out[ticket] = FeedbackReply(text, formatTime(obj.string("repliedAt")))
+        }
+        return out
     }
 
-    private fun searchRecords(
-        token: String,
-        filter: JsonObject?,
-        pageToken: String?,
-    ): JsonObject? {
-        val url = buildString {
-            append("$FEISHU_BASE/bitable/v1/apps/${BuildConfig.FEEDBACK_FEISHU_REPLY_APP_TOKEN}")
-            append("/tables/${BuildConfig.FEEDBACK_FEISHU_REPLY_TABLE_ID}/records/search?page_size=100")
-            if (!pageToken.isNullOrBlank()) {
-                append("&page_token=").append(URLEncoder.encode(pageToken, "UTF-8"))
-            }
-        }
-        val body = JsonObject().apply { if (filter != null) add("filter", filter) }
-        val request = Request.Builder()
-            .url(url)
-            .addHeader("Authorization", "Bearer $token")
-            .post(body.toString().toRequestBody(JSON))
-            .build()
+    /** ISO-8601（UTC）→ 本地 `yyyy-MM-dd HH:mm`；解析不了就原样给回去。 */
+    internal fun formatTime(raw: String?): String {
+        if (raw.isNullOrBlank()) return ""
         return runCatching {
-            client.newCall(request).execute().use { response ->
-                parse(response.body?.string().orEmpty())
-            }
-        }.getOrNull()
-    }
-
-    private fun collectReplies(
-        items: JsonArray?,
-        wanted: Set<String>,
-        into: MutableMap<String, FeedbackReply>,
-    ) {
-        items?.forEach { element ->
-            val fields = element.asJsonObject.objectOrNull("fields") ?: return@forEach
-            val ticket = plainText(fields.get(F_TICKET)).trim()
-            if (ticket.isEmpty() || ticket !in wanted) return@forEach
-            val text = plainText(fields.get(F_REPLY))
-            if (text.isBlank()) return@forEach
-            into[ticket] = FeedbackReply(text, plainText(fields.get(F_REPLY_AT)))
-        }
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.parse(raw))
+        }.getOrDefault(raw)
     }
 
     /**
-     * 把 HTTP 状态和飞书业务码翻成三种结果。
+     * HTTP 码 → 结果。
      *
-     * 401/403 单独算「可重试」而不是拒收：凭据吊销后旧版本会一直失败，
-     * 但用户升级前后提交的文字不该被丢掉——留在本机，升级后再补发。
+     * 401/403 判成「拒收」而不是「可重试」：那说明地址或 `X-App-Key` 配错了，
+     * 重试一万次也不会通，让用户当场改成复制 / 邮件才有意义。
      */
-    internal fun classify(httpCode: Int, code: Int, message: String): SubmitOutcome = when {
+    internal fun classify(httpCode: Int): SubmitOutcome = when {
+        httpCode in 200..299 -> SubmitOutcome.Sent
+        httpCode == 429 -> SubmitOutcome.Retryable("今天提交得太多了，明天再试")
+        httpCode == 400 || httpCode == 413 ->
+            SubmitOutcome.Rejected("服务端没收下这条反馈（$httpCode）")
         httpCode == 401 || httpCode == 403 ->
-            SubmitOutcome.Retryable(message.ifBlank { "凭据失效（HTTP $httpCode）" })
-        httpCode == 429 || httpCode >= 500 ->
-            SubmitOutcome.Retryable(message.ifBlank { "服务暂时不可用（HTTP $httpCode）" })
-        httpCode !in 200..299 ->
-            SubmitOutcome.Rejected(message.ifBlank { "表格拒收（HTTP $httpCode）" })
-        code == 0 -> SubmitOutcome.Sent
-        code in 99991660..99991670 ->
-            SubmitOutcome.Retryable(message.ifBlank { "凭据失效（$code）" })
-        else -> SubmitOutcome.Rejected(message.ifBlank { "表格拒收（$code）" })
+            SubmitOutcome.Rejected("反馈通道未配置好（$httpCode），请改用复制或邮件")
+        else -> SubmitOutcome.Retryable("服务端暂时不可用（$httpCode）")
     }
 
-    private fun parse(raw: String): JsonObject =
-        runCatching { JsonParser.parseString(raw).asJsonObject }.getOrDefault(JsonObject())
-
-    /** 飞书文本字段可能是字符串，也可能是 `[{type:text,text:"..."}]` 富文本数组。 */
-    internal fun plainText(element: JsonElement?): String {
-        if (element == null || element.isJsonNull) return ""
-        return when {
-            element.isJsonPrimitive -> {
-                val primitive = element.asJsonPrimitive
-                if (primitive.isNumber) maybeMillis(primitive.asLong) else primitive.asString
-            }
-            element.isJsonArray -> element.asJsonArray.joinToString("") { plainText(it) }
-            element.isJsonObject -> {
-                val obj = element.asJsonObject
-                obj.stringOr("text").ifBlank { obj.stringOr("name") }
-            }
-            else -> ""
-        }
-    }
-
-    /** 飞书日期字段回来是毫秒时间戳，直接显示一串数字用户看不懂。 */
-    private fun maybeMillis(value: Long): String =
-        if (value > 10_000_000_000L) {
-            SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA).format(Date(value))
-        } else {
-            value.toString()
-        }
-
-    private fun JsonObject.intOr(key: String, fallback: Int): Int =
-        runCatching { get(key)?.asInt ?: fallback }.getOrDefault(fallback)
-
-    private fun JsonObject.stringOr(key: String): String =
-        runCatching { get(key)?.asString.orEmpty() }.getOrDefault("")
-
-    private fun JsonObject.booleanOr(key: String, fallback: Boolean): Boolean =
-        runCatching { get(key)?.asBoolean ?: fallback }.getOrDefault(fallback)
-
-    private fun JsonObject.objectOrNull(key: String): JsonObject? =
-        runCatching { get(key)?.asJsonObject }.getOrNull()
-
-    private fun JsonObject.arrayOrNull(key: String): JsonArray? =
-        runCatching { get(key)?.asJsonArray }.getOrNull()
-
-    private val JSON = "application/json; charset=utf-8".toMediaType()
+    private fun JsonObject.string(key: String): String? =
+        runCatching { get(key)?.takeIf { !it.isJsonNull }?.asString }.getOrNull()
 }

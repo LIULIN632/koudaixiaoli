@@ -66,7 +66,7 @@ data class QzxyAuth(
         "projectId" to projectId,
         "telephone" to telephone,
         // ⚠️ `telPhone` 必须也带上。绝大多数接口只认 `telephone`，
-        // 但 `/settlement/campus/userInfo`（一卡通余额）要的是 `telPhone` ——
+        // 但 `/settlement/campus/userInfo`（余额接口）要的是 `telPhone` ——
         // 少了它服务端回「手机号不能为空」，而且是 HTTP 200。
         "telPhone" to telephone,
         "phoneSystem" to "android",
@@ -285,15 +285,19 @@ data class QzxyAccountInfo(
 )
 
 /**
- * `GET /settlement/campus/userInfo` —— 一卡通真实余额。
+ * `GET /settlement/campus/userInfo` —— 余额查询。
  *
  * 趣智校园把易校园的接口**代理了**，所以拿余额不必去破易校园那套 HMAC-SHA256 原生签名。
  * ⚠️ 前提是学生**签约过校园卡免密支付**，没签约时服务端不给 `amount`。
+ *
+ * ⚠️ 2026-10-24 真机核对：返回的 `amount` 与**趣智钱包**余额一致，
+ * 界面因此按「趣智钱包余额」呈现（见 `ShowerScreen` 账户卡与「我的」洗澡格子）。
+ * 接口路径里的 `campus` 是历史包袱，**不要**据此把文案写成「校园卡余额」。
  */
 data class QzxyCampusUserInfo(
     val studentNumber: String? = null,
     val studentName: String? = null,
-    /** 一卡通余额，**字符串**形式（如 `"16.76"`），要自己转 Double */
+    /** 余额，**字符串**形式（如 `"16.76"`），要自己转 Double。实测为趣智钱包余额 */
     val amount: String? = null,
     /** 1 = 已签约免密支付 */
     val signStatus: Int? = null,

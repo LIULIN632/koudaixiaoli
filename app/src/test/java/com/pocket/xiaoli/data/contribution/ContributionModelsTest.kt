@@ -10,13 +10,14 @@ import org.junit.Test
 /**
  * 客户端口径与昵称规则。
  *
- * 分值 / 上限在服务端也有一份（那边是权威）。这里钉住的是**界面文案与本地拦截**用的那份：
- * 两边改得不一样时，用户会看到「+10」却只加 5 分，或者本地以为还能加、服务端回 429。
+ * 分值 / 上限在服务端也有一份（那边是权威）。这里钉住的是**历史账本口径与本地拦截**：
+ * 2026-10-24 起界面不再展示分值，但 [ContributionAction.points] 仍要与服务端一致，
+ * 否则历史事件表两边记的数会漂；[ContributionAction.dailyCap] 则继续决定本地拦不拦。
  */
 class ContributionModelsTest {
 
     @Test
-    fun `五个动作的分值与每日上限`() {
+    fun `五个动作的分值与每日上限仍与历史账本一致`() {
         val expected = mapOf(
             ContributionAction.COURSE_IMPORT to (ContributionCategory.TIMETABLE to (10 to 1)),
             ContributionAction.ROOM_CELL_ADD to (ContributionCategory.CAMPUS to (5 to 5)),
@@ -64,8 +65,28 @@ class ContributionModelsTest {
     }
 
     @Test
-    fun `只有进度类动作有得分 其它字段不参与计算`() {
+    fun `分值只留在历史账本口径里`() {
         assertTrue(ContributionAction.entries.all { it.points > 0 })
         assertFalse(ContributionAction.fromWire("points") != null)
+    }
+
+    @Test
+    fun `榜单按昵称排序 并重编号`() {
+        val sorted = ContributionOrder.sortByName(
+            listOf(
+                ContributionEntry(9, "早八人", mine = true),
+                ContributionEntry(0, "313 路"),
+                ContributionEntry(3, "笔记搬运工"),
+            ),
+        )
+        // 数字在前、中文按拼音（bei < zao）；rank 与显示顺序一致，mine 跟着人走。
+        assertEquals(
+            listOf(
+                ContributionEntry(1, "313 路"),
+                ContributionEntry(2, "笔记搬运工"),
+                ContributionEntry(3, "早八人", mine = true),
+            ),
+            sorted,
+        )
     }
 }
