@@ -104,7 +104,11 @@ object NetworkLogStore {
      */
     fun exportLines(): List<String> = entries.value.map { e ->
         val status = e.status?.toString() ?: (e.error?.let { "ERR" } ?: "-")
-        "  ${e.method} $status ${e.durationMs}ms  ${redactUrl(e.url)}"
+        // 带上 error：屏幕上「开发者实验室 → 网络日志」本来就显示 `! 原因`，导出却把它丢了。
+        // 于是"HTTP 200 但内容被我们拒了"这种请求在导出里和成功请求长得一模一样 ——
+        // 2026-10-26 那份导出的节假日八连发就是这么被看成"全部成功"的。
+        val reason = e.error?.let { "  ← $it" }.orEmpty()
+        "  ${e.method} $status ${e.durationMs}ms  ${redactUrl(e.url)}$reason"
     }
 
     /** 需要脱敏的查询参数名（小写匹配） */

@@ -69,4 +69,21 @@ class NetworkLogExportTest {
         assertTrue(line, line.contains("ERR"))
         assertFalse(line, line.contains("zzz"))
     }
+
+    @Test
+    fun `HTTP 成功但内容被拒时原因要出现在导出里`() {
+        // 2026-10-26 那份导出的教训：节假日四个镜像全是 `GET 200`，
+        // 而真实情况是"200 但解析后 0 条"。屏幕上能看到 `! 原因`，导出看不到 ——
+        // 两边必须同一套信息，否则用户导出来的东西不足以定位。
+        NetworkLogStore.record(
+            "GET",
+            "https://cdn.jsdelivr.net/gh/NateScarlet/holiday-cn@master/2026.json",
+            200,
+            164,
+            error = "节假日数据不可用：解析到 0 条",
+        )
+        val line = NetworkLogStore.exportLines().single()
+        assertTrue("状态码仍要显示 200：$line", line.contains("200"))
+        assertTrue("要带上被拒的原因：$line", line.contains("解析到 0 条"))
+    }
 }

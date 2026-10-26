@@ -38,6 +38,8 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.CreditCard
@@ -180,6 +182,7 @@ import com.pocket.xiaoli.data.SchoolRegistry
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.data.promo.PromoSlot
 import com.pocket.xiaoli.data.promo.PromoAction
+import com.pocket.xiaoli.telemetry.Telemetry
 import com.pocket.xiaoli.ui.service.PromoBanner
 import com.pocket.xiaoli.di.AppContainer
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -763,6 +766,12 @@ fun TreasureBoxScreen(
                     // 二维码显示在这台手机上 —— 扫不了自己。先给一屏说清状况的入口页。
                     subPage = ServiceSubPage.SecondClass
                 },
+                // 校园跑（支付宝阳光跑）：一键打开签到小程序，省掉在操场排队等"开页面"。
+                // 这一格**只有配了直达链接的校区才渲染**（过滤在下面的 `sections`），
+                // 链接按校区配在 `CampusServiceRegistry.SCHOOL_RUN_ALIPAY`。
+                ServiceEntry("校园跑", "支付宝阳光跑 · 一键打开", Icons.Outlined.DirectionsRun, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsRun, accent = ServiceAccent.STUDY, serviceKey = CampusServiceKeys.SCHOOL_RUN, aliases = listOf("阳光跑", "跑步打卡", "乐跑", "体育")) {
+                    openCampusService(CampusServiceKeys.SCHOOL_RUN, "校园跑")
+                },
                 ServiceEntry("学习通", "网课 · 作业 · 考试", Icons.AutoMirrored.Outlined.MenuBook, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.MenuBook, accent = ServiceAccent.STUDY) {
                     // 登录过就直接进原生页（课程与待办都在里面），没登录才把人送去登录网页。
                     if (appContainer.hasLearningCookie(LearningPlatform.CHAOXING)) {
@@ -1002,9 +1011,17 @@ fun TreasureBoxScreen(
     val sections = remember(authoredSections, selectedCampus.id, dormInfo) {
         authoredSections.map { section ->
             section.copy(
-                entries = section.entries.sortedBy {
-                    serviceEntryCapability(it, selectedCampus, dormInfo).sortRank
-                }
+                entries = section.entries
+                    // 「校园跑」这类**纯直达格子**：没配链接就不出现。
+                    // 留着一格，点下去只会弹"暂未配置"——那是死格子，不是待接入。
+                    // （区别于健身房那种 INFO 格子：它有站内说明页，点开有内容。）
+                    .filterNot {
+                        it.serviceRegistryKey == CampusServiceKeys.SCHOOL_RUN &&
+                            serviceEntryCapability(it, selectedCampus, dormInfo) == CampusServiceCapability.INFO
+                    }
+                    .sortedBy {
+                        serviceEntryCapability(it, selectedCampus, dormInfo).sortRank
+                    }
             )
         }
     }
@@ -1284,7 +1301,11 @@ private fun ColumnScope.ServicesBody(
             campus = campus,
             dormInfo = dormInfo,
             onEdit = onEditQuick,
-            onServiceClick = { entry -> entry.onClick() },
+            onServiceClick = { entry ->
+                // 只记入口名（`ServiceEntry.key` 就是标题常量），不记任何内容。
+                Telemetry.featureUsed(entry.key)
+                entry.onClick()
+            },
         )
     }
 
@@ -1326,7 +1347,10 @@ private fun ColumnScope.ServicesBody(
                             ServiceGridCell(
                                 entry = display,
                                 modifier = Modifier.weight(1f),
-                                onClick = { display.onClick() },
+                                onClick = {
+                                    Telemetry.featureUsed(display.key)
+                                    display.onClick()
+                                },
                             )
                         }
                         // 末行不足一列时补空位，否则最后几个格子会被拉宽、与上面的列对不齐
@@ -1353,6 +1377,7 @@ private fun ColumnScope.ServicesBody(
                                 entry = display,
                                 modifier = Modifier.weight(1f),
                                 onClick = {
+                                    Telemetry.featureUsed(display.key)
                                     display.onClick()
                                 },
                             )

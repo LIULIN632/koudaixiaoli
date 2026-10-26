@@ -58,6 +58,16 @@
 # 公告那一层：prefs 里存的是 JSON 文本，解析走 Gson 反射读字段
 -keep class com.pocket.xiaoli.data.announcement.** { *; }
 
+# 节假日（holiday-cn）的响应模型 —— 2026-10-26 的日志导出里露出迹象：
+# 两年 × 四个镜像**全部 HTTP 200**，代码却把四个镜像全试完（= 每次都判定"解析后 0 条"）。
+# 原因**还没定**，两个候选：
+#   ① release 的 R8 把只被 Gson 反射赋值的模型优化掉了 —— 上面那条
+#      `-keepclassmembers { <fields>; }` 保得住字段名，保不住"静态看不见写入"的推断；
+#   ② 校园网把 200 换成了拦截页（开发机上同一 URL 解析是好的，39 条全过）。
+# 这条 keep 用来排除 ①（照 qzxy / announcement 的先例，代价是几个类不混淆）；
+# ②由 `HolidayRepository` 新加的"拒绝原因 + 响应前缀"日志判定，下次导出可见分晓。
+-keep class com.pocket.xiaoli.data.holiday.** { *; }
+
 # ── kotlinx-coroutines-android：主线程调度器是靠**类名**加载的 ──────────────
 # `Dispatchers.Main` 的工厂写在 jar 的 META-INF/services 里，加载方式是
 # `Class.forName("kotlinx.coroutines.android.AndroidDispatcherFactory")`。

@@ -136,7 +136,58 @@ object CampusServiceRegistry {
 
     /** 显式登记的 spec；没有则返回 null，由 resolver 用 serviceUrls 生成默认方案。 */
     fun specFor(campusId: String, key: String): CampusServiceSpec? =
-        CAMPUS_SPECS[campusId]?.get(key) ?: COMMON_SPECS[key]
+        if (key == CampusServiceKeys.SCHOOL_RUN) {
+            schoolRunSpec(campusId, SCHOOL_RUN_ALIPAY[campusId].orEmpty())
+        } else {
+            CAMPUS_SPECS[campusId]?.get(key) ?: COMMON_SPECS[key]
+        }
+
+    /**
+     * 支付宝「阳光跑 / 碰一下签到」小程序的直达链接，按校区 id 配。
+     *
+     * ## 这一格解决的是什么
+     *
+     * 操场那个「碰一碰」蓝环做的事就是**打开签到小程序**（支付宝官方口径：碰一下蓝环
+     * 进入相应签到小程序）。把同一条链接做成服务页的一格，排队等"开页面"的时间就省掉了。
+     *
+     * ⚠️ 这里**只放打开页面的链接，不放标签里的载荷**。碰一下的载荷带点位凭证，
+     * 仿真它等于伪造"到过这个点"——那条不做。如果服务端要那个凭证才认打卡，
+     * 这一格只是少翻几步路，不会替任何人跑一步。
+     *
+     * ## 怎么取这条链接
+     *
+     * 支付宝里打开阳光跑页 → 右上角「···」→ 复制链接，形如
+     * `alipays://platformapi/startapp?appId=2021xxxxxxx&page=…`。
+     *
+     * ## 空 = 这一格不出现
+     *
+     * 没配的校区不渲染（[TreasureBoxScreen] 按能力档位过滤），
+     * 免得留一格点了只会弹"暂未配置"的死格子。
+     */
+    private val SCHOOL_RUN_ALIPAY: Map<String, String> = mapOf(
+        // "ytlg_main" to "alipays://platformapi/startapp?appId=…",
+    )
+
+    /**
+     * 纯规则：校区 + 链接 → 这一格的 spec；链接为空给 **null**（不渲染）。
+     *
+     * 单独拆出来是为了能在 JVM 单测里把"没配就不出现"钉死 ——
+     * 现网配置为空，走 `specFor` 的那条分支在测试里永远跑不到。
+     */
+    internal fun schoolRunSpec(campusId: String, link: String): CampusServiceSpec? =
+        if (link.isBlank()) {
+            null
+        } else {
+            CampusServiceSpec(
+                id = CampusServiceKeys.SCHOOL_RUN,
+                name = "校园跑",
+                category = "study",
+                type = CampusServiceType.ALIPAY,
+                priority = 15,
+                provider = "支付宝阳光跑",
+                target = link,
+            )
+        }
 
     private val SERVICE_TITLES: Map<String, String> = mapOf(
         CampusServiceKeys.SMART_CAMPUS to "智慧校园",
@@ -157,6 +208,7 @@ object CampusServiceRegistry {
         CampusServiceKeys.UPGRADE to "专升本",
         CampusServiceKeys.EXAM to "考试",
         CampusServiceKeys.SECOND_CLASS to "到梦空间",
+        CampusServiceKeys.SCHOOL_RUN to "校园跑",
         CampusServiceKeys.TRANSIT_CODE to "烟台乘车码",
         CampusServiceKeys.GYM to "健身房",
         CampusServiceKeys.DRIVING_SCHOOL to "驾校",
@@ -181,10 +233,13 @@ object CampusServiceRegistry {
     }
     /** 是否在任意校区里有显式登记（UI 角标可用）。 */
     fun hasAnyExplicitSpec(key: String): Boolean =
-        COMMON_SPECS.containsKey(key) || CAMPUS_SPECS.values.any { it.containsKey(key) }
+        COMMON_SPECS.containsKey(key) || CAMPUS_SPECS.values.any { it.containsKey(key) } ||
+            (key == CampusServiceKeys.SCHOOL_RUN && SCHOOL_RUN_ALIPAY.values.any { it.isNotBlank() })
 
     fun specsFor(campusId: String): List<CampusServiceSpec> {
-        val explicit = CAMPUS_SPECS[campusId].orEmpty()
+        val explicit = CAMPUS_SPECS[campusId].orEmpty().toMutableMap()
+        // 校园跑是动态项（链接表里配了才有），不进 CAMPUS_SPECS 的字面量
+        specFor(campusId, CampusServiceKeys.SCHOOL_RUN)?.let { explicit[it.id] = it }
         return (COMMON_SPECS + explicit).values.sortedWith(compareBy({ it.priority }, { it.name }))
     }
 }

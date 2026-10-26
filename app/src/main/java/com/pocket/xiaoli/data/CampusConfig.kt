@@ -46,6 +46,8 @@ object CampusServiceKeys {
     const val UPGRADE = "upgrade"
     const val EXAM = "exam"
     const val SECOND_CLASS = "second_class"
+    /** 校园跑 / 阳光跑：支付宝小程序直达（见 `CampusServiceRegistry.SCHOOL_RUN_ALIPAY`） */
+    const val SCHOOL_RUN = "school_run"
     const val TRANSIT_CODE = "transit_code"
     const val GYM = "gym"
     const val DRIVING_SCHOOL = "driving_school"

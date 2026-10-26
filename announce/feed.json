@@ -9,17 +9,16 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 94,
-    "versionName": "0.1.93",
+    "versionCode": 95,
+    "versionName": "0.1.94",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.93/koudaixiaoli_v0.1.93.apk",
-    "sha256": "0c48f5634aecfddacb589651d3d00b9bcc356b86960cd7fff55970e30f5e3c09",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.94/koudaixiaoli_v0.1.94.apk",
+    "sha256": "2858bfa9233c55e734ae286ec98ae4b9464f7bae3274c576a09f7b2054271e7d",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "学习通可以网页登录了（登录状态只存本机），还能把学习通的作业同步进待办",
-      "日历导出的上课时间与课表对齐：以前这里另抄了一份近似节次表，个别节次差几分钟",
-      "校方网页在手机上只出电脑布局时，右上角可以切「桌面版」"
+      "新增「功能统计」：你点开的每个校园服务都会被计数（只记入口名，不记任何内容）",
+      "服务页点开照旧即时响应，统计在后台静默上报"
     ]
   },
   "endpoints": {
