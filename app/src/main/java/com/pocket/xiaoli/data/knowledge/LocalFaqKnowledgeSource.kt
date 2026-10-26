@@ -84,10 +84,13 @@ class LocalFaqKnowledgeSource : KnowledgeSource {
             ),
             KnowledgeDocument(
                 id = "faq_learning",
-                title = "学习通和智慧树怎么登录？",
-                body = "在我的 -> 学习平台里使用 App 内 WebView 登录学习通或智慧树，Cookie 加密保存在本机。自动同步接口还在接入中，可以先手动导入课程或考试提醒。",
+                title = "学习通怎么登录、作业怎么同步？",
+                body = "在「我的 → 绑定信息 → 学习通」用 App 内网页登录，Cookie 加密保存在本机，不上传。" +
+                    "登录后点同一张卡里的「同步作业到待办」，会把各门课程的作业导入待办（同一条不会重复加）。" +
+                    "只想看一眼的话走「服务 → 学习通」，那一页只读、不动你的待办。" +
+                    "智慧树（知到）没有可复用的登录态同步，用「服务 → 知到」打开官方网页。",
                 sourceLabel = SOURCE_LABEL,
-                tags = listOf("学习通", "智慧树"),
+                tags = listOf("学习通", "智慧树", "知到", "作业"),
             ),
             KnowledgeDocument(
                 id = "faq_last_import",

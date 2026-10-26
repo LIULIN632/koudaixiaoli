@@ -38,6 +38,10 @@ sealed interface ServiceSubPage {
 
     // ── 学习 / 教务 ──
     data object Learning : ServiceSubPage
+    /** 学习通账号页：课程与待办作业（原生，复用 WebView 登录后的 cookie）。 */
+    data object Chaoxing : ServiceSubPage
+    /** 到梦空间入口页：网页版只能电脑扫码，这一页负责把话说清 + 给可行的动作。 */
+    data object SecondClass : ServiceSubPage
     data object GradeQuery : ServiceSubPage
     data object SavedGrades : ServiceSubPage
     data object AcademicQuery : ServiceSubPage

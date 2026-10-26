@@ -24,6 +24,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.DesktopWindows
+import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,6 +59,15 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.util.ServiceUrlClassifier
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.invisibleTouchTarget
+
+/**
+ * 「桌面版」用的 UA。只改 UA 字符串，不引任何库；
+ * 目标是让那些只出了 ≥1200px 布局的校方系统（到梦空间网页版）能正常点，
+ * 而不是让手机 UA 下那个"能加载但缩成一团"的页面继续折磨人。
+ */
+private const val DESKTOP_USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/124.0.0.0 Safari/537.36"
 
 /**
  * 校园服务内置网页。
@@ -214,6 +225,7 @@ fun ServiceWebScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var currentUrl by remember { mutableStateOf(url) }
     var loginHintDismissed by remember { mutableStateOf(false) }
+    var desktopMode by remember { mutableStateOf(false) }
     val initialServiceCookie = remember(url) { CookieStore.getServiceCookies(url) }
     val showLoginHint = !loginHintDismissed && ServiceUrlClassifier.isLoginLikeUrl(currentUrl)
 
@@ -258,6 +270,16 @@ fun ServiceWebScreen(
                     }
                 },
                 actions = {
+                    // 桌面版开关：有些校方系统只出了 ≥1200px 的桌面布局（到梦空间就是），
+                    // 手机 UA 下它给的是"能加载但点不准"的一屏。默认关 —— 绝大多数服务页
+                    // 有自己的移动端页面，不该被我们改成桌面。
+                    IconButton(onClick = { desktopMode = !desktopMode }) {
+                        Icon(
+                            if (desktopMode) Icons.Outlined.DesktopWindows else Icons.Outlined.Smartphone,
+                            contentDescription = if (desktopMode) "切回手机版" else "用桌面版打开",
+                            tint = if (desktopMode) colors.accentMain else colors.textPrimary,
+                        )
+                    }
                     IconButton(onClick = { webView?.reload() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "刷新")
                     }
@@ -275,6 +297,14 @@ fun ServiceWebScreen(
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
+                // 只在 UA 真的变了时改 + 重载：update 每次重组都会跑，无条件 reload 会变成死循环刷新
+                update = { view ->
+                    val wanted = if (desktopMode) DESKTOP_USER_AGENT else null
+                    if (view.settings.userAgentString != wanted) {
+                        view.settings.userAgentString = wanted
+                        view.reload()
+                    }
+                },
                 factory = { ctx ->
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = true

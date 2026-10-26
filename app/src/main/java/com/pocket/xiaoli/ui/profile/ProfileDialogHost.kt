@@ -79,7 +79,7 @@ enum class ProfileQuickDialog {
  * @param platform 目标平台（超星 / 智慧树）
  * @param returnToBinding 面板关掉后回「绑定信息」页 —— 用户是从那儿点进来的，
  *   不该被丢回「我的」页首页
- * @param sync true = 打开作业同步面板；false = 打开平台管理/登录面板
+ * @param sync true = 打开作业同步面板；false = 直接进该平台的网页登录页
  */
 data class ProfileLearningRequest(
     val platform: LearningPlatform,
@@ -108,16 +108,17 @@ data class ProfileLearningRequest(
  * 1. `onOpenXxx` —— 父页要拉开某个面板（如身份卡的铅笔图标拉开改名框）
  * 2. `onNavigateXxx` —— 面板里点完要跳去别的东西（如检查更新里点"更新日志"）
  *
- * ## ⚠️ 学习平台（超星 / 智慧树）目前没有入口
+ * ## 学习平台（超星 / 智慧树）：点行直达网页登录，中间不再放面板
  *
- * `LearningWebSheet` / `LearningWebLoginScreen` / `LearningSyncDialog` 这一套**本来是完整的**，
- * 但它的入口原先挂在 `AccountBindingScreen` 的「管理学习平台 / 同步作业」上，
- * 而「绑定信息」页现在是**身份卡整卡点击**打开的 —— 那条路径还在，
- * 只是页内没有把用户引到学习平台的入口。也就是说：**能力在、入口断了**。
+ * 「绑定信息」页的学习平台卡里，每一行本身已经写清了平台、登录状态和动作
+ * （"登录" / "换绑"），所以点它**直接进 `LearningWebLoginScreen`**。
+ * 原先这里夹着一个 `LearningWebSheet`（标题 + Tab + 状态 + 「打开网页登录」按钮），
+ * 它的每一项都与那两行重复，只是多让用户点一次 —— 2026-10-26 删掉。
+ * 面板上唯一不重复的「清除登录状态」搬进了绑定页既有的「账号管理（危险操作）」组，
+ * 与解绑教务共用同一个二次确认框。
  *
- * 本次保持原状（只搬家、不改行为），没有替产品做决定；要恢复的话，
- * 设置页加一组「学习平台」把 [LearningWebSheet] 接上即可 ——
- * 这个文件的 `showLearningSheet` / `learningPlatform` 就是为它准备的。
+ * ⚠️ 登录态**只有一份**：由父页 `ProfileScreen` 从 `container` 读，本组件不再各存一份。
+ * 保存或清除 Cookie 后必须调 [onLearningCookieChanged]，否则返回绑定页时那一行的点还是旧的。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,6 +145,12 @@ fun ProfileDialogHost(
     pendingLearningRequest: ProfileLearningRequest? = null,
     onConsumeLearningRequest: () -> Unit = {},
     /**
+     * 学习平台登录态变了（保存 / 清除 Cookie）。
+     *
+     * 本组件不持登录态副本，改完 prefs 得让父页重读 —— 否则绑定页那一行的点还是旧的。
+     */
+    onLearningCookieChanged: () -> Unit = {},
+    /**
      * 本组件是否有面板开着 —— 父页把它并进 `hasSubPage`（用于藏底栏）。
      *
      * ⚠️ 这是**单向汇报**（host → 父页），返回键不走这条路：见下面 `BackHandler` 的说明。
@@ -165,8 +172,6 @@ fun ProfileDialogHost(
     val gson = remember { Gson() }
 
     // ── 面板开关：归本组件所有 ──
-    var showLearningSheet by remember { mutableStateOf(false) }
-    var learningPlatform by remember { mutableStateOf(LearningPlatform.CHAOXING) }
     var showLearningImport by remember { mutableStateOf(false) }
     var showLearningManualImport by remember { mutableStateOf(false) }
     var showLearningWebLogin by remember { mutableStateOf(false) }
@@ -191,13 +196,6 @@ fun ProfileDialogHost(
     var showCardAccountDialog by remember { mutableStateOf(false) }
     var showExpressPickup by remember { mutableStateOf(false) }
 
-    // ── 学习平台登录态：面板里的绑定点操作要立刻反映到徽标上 ──
-    // ⚠️ 这一组面板目前**没有入口**（详见文件头说明）：入口原先在「绑定信息」页里，
-    // 而那个页面现在只从身份卡整卡点击进入、页内没有再往学习平台引。
-    // 本次只搬家不改行为 —— 要恢复就在设置页加一组「学习平台」把它接上。
-    var chaoxingBound by remember { mutableStateOf(container.hasLearningCookie(LearningPlatform.CHAOXING)) }
-    var zhihuishuBound by remember { mutableStateOf(container.hasLearningCookie(LearningPlatform.ZHIHUISHU)) }
-
     /** 让父页（「我的」页 / 设置页）能拉开一次性面板 —— 见参数说明。 */
     LaunchedEffect(pendingQuickDialog) {
         when (pendingQuickDialog) {
@@ -218,9 +216,9 @@ fun ProfileDialogHost(
     LaunchedEffect(pendingLearningRequest) {
         val req = pendingLearningRequest ?: return@LaunchedEffect
         learningReturnToBinding = req.returnToBinding
-        learningPlatform = req.platform
         learningWebPlatform = req.platform
-        if (req.sync) showLearningImport = true else showLearningSheet = true
+        // `sync` 那条要的是"把作业搬进待办"；其余一律就是"我要登录" —— 直接进网页，不再过一层面板。
+        if (req.sync) showLearningImport = true else showLearningWebLogin = true
         onConsumeLearningRequest()
     }
 
@@ -239,7 +237,7 @@ fun ProfileDialogHost(
     // 2. 设置页排在更后面、它自己也可能处理返回，"该谁先"就变成靠排列巧合来保证。
     //
     // [onVisibilityChange] 只用于藏底栏，与返回键无关。
-    val anyPanelOpen = showLearningSheet || showLearningWebLogin ||
+    val anyPanelOpen = showLearningWebLogin ||
         showLearningImport || showLearningManualImport || showClearDialog ||
         showResetAllDialog ||
         showShareExportDialog ||
@@ -270,10 +268,6 @@ fun ProfileDialogHost(
             }
             showLearningManualImport -> showLearningManualImport = false
             showLearningImport -> showLearningImport = false
-            showLearningSheet -> {
-                showLearningSheet = false
-                if (learningReturnToBinding) { learningReturnToBinding = false; onOpenAccountBinding() }
-            }
         }
     }
 
@@ -494,30 +488,6 @@ fun ProfileDialogHost(
     //  面板
     // ═══════════════════════════════════════════
 
-    if (showLearningSheet) {
-        LearningWebSheet(
-            initialPlatform = learningPlatform,
-            chaoxingBound = chaoxingBound,
-            zhihuishuBound = zhihuishuBound,
-            onOpenWebLogin = { platform ->
-                showLearningSheet = false
-                learningWebPlatform = platform
-                showLearningWebLogin = true
-            },
-            onUnbind = { platform ->
-                container.deleteLearningCookie(platform)
-                if (platform == LearningPlatform.CHAOXING) chaoxingBound = false else zhihuishuBound = false
-                showLearningSheet = false
-                if (learningReturnToBinding) { learningReturnToBinding = false; onOpenAccountBinding() }
-                Toast.makeText(context, "${platform.label} 登录状态已清除", Toast.LENGTH_SHORT).show()
-            },
-            onDismiss = {
-                showLearningSheet = false
-                if (learningReturnToBinding) { learningReturnToBinding = false; onOpenAccountBinding() }
-            }
-        )
-    }
-
     if (showLearningWebLogin) {
         LearningWebLoginScreen(
             platform = learningWebPlatform,
@@ -526,7 +496,7 @@ fun ProfileDialogHost(
                     Toast.makeText(context, "未读取到登录状态，请先完成登录", Toast.LENGTH_LONG).show()
                 } else {
                     container.saveLearningCookie(learningWebPlatform, cookie)
-                    if (learningWebPlatform == LearningPlatform.CHAOXING) chaoxingBound = true else zhihuishuBound = true
+                    onLearningCookieChanged()
                     showLearningWebLogin = false
                     if (learningReturnToBinding) { learningReturnToBinding = false; onOpenAccountBinding() }
                     Toast.makeText(context, "${learningWebPlatform.label} 登录状态已保存", Toast.LENGTH_SHORT).show()

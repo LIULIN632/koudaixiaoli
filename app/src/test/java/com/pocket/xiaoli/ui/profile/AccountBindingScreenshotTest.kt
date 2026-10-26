@@ -50,7 +50,7 @@ import org.robolectric.annotation.GraphicsMode
  * |---|---|
  * | `80-binding-home-bound` | 主页面（全绑定）：状态卡 + 「账号管理」入口行 |
  * | `81-binding-home-fresh` | 主页面（全新用户）—— ⚠️ 此时入口行**不渲染**（`hasManageableAccount == false`），所以这一张只有状态卡 |
- * | `82-binding-home-mixed` | 主页面（混合态：导入失败 + 门户未登录 + 学习平台 1/2） |
+ * | `82-binding-home-mixed` | 主页面（混合态：导入失败 + 门户未登录 + 学习通已登录） |
  * | `83-binding-home-mixed-dark` | 同上，深色 |
  * | `84-binding-manage` | 二级页「账号管理」（4 条销毁性操作） |
  * | `85-binding-academic-form` | 二级页「教务账号」表单（已填 · 密码隐藏 · 初始密码捷径在 · 可保存） |
@@ -102,7 +102,6 @@ class AccountBindingScreenshotTest {
         val portalLoggedIn: Boolean?,
         val cardBound: Boolean,
         val chaoxing: Boolean,
-        val zhihuishu: Boolean,
         val managePage: Boolean = false,
     )
 
@@ -123,7 +122,6 @@ class AccountBindingScreenshotTest {
             portalLoggedIn = true,
             cardBound = true,
             chaoxing = true,
-            zhihuishu = true,
         ),
         // 全新用户：什么都没绑，且没有可管理的账号 → 入口行不渲染
         Case(
@@ -136,9 +134,8 @@ class AccountBindingScreenshotTest {
             portalLoggedIn = null,
             cardBound = false,
             chaoxing = false,
-            zhihuishu = false,
         ),
-        // 混合态：最有信息量的一屏（导入失败 + 已绑但未登录 + 学习平台只通一半）
+        // 混合态：最有信息量的一屏（导入失败 + 已绑但门户未登录 + 学习通已登录）
         Case(
             name = "82-binding-home-mixed",
             dark = false,
@@ -155,7 +152,6 @@ class AccountBindingScreenshotTest {
             portalLoggedIn = false,
             cardBound = false,
             chaoxing = true,
-            zhihuishu = false,
         ),
         // 同上，深色
         Case(
@@ -174,7 +170,6 @@ class AccountBindingScreenshotTest {
             portalLoggedIn = false,
             cardBound = false,
             chaoxing = true,
-            zhihuishu = false,
         ),
         // 二级页「账号管理」
         Case(
@@ -187,7 +182,6 @@ class AccountBindingScreenshotTest {
             portalLoggedIn = true,
             cardBound = true,
             chaoxing = true,
-            zhihuishu = true,
             managePage = true,
         ),
     )
@@ -349,8 +343,8 @@ class AccountBindingScreenshotTest {
             }
         }
 
-        composeRule.onNodeWithText("2 / 5").assertExists()
-        composeRule.onNodeWithText("还差 3 项：宿舍、校园卡、学习平台").assertExists()
+        composeRule.onNodeWithText("3 / 5").assertExists()
+        composeRule.onNodeWithText("还差 2 项：宿舍、校园卡").assertExists()
     }
 
     @Test
@@ -399,8 +393,14 @@ class AccountBindingScreenshotTest {
     private fun BindingHomePage(case: Case) {
         val skin = LocalSkin.current
         val colors = LocalPocketXiaoliColors.current
-        val hasManageableAccount =
-            case.isBound || case.portalLoggedIn == true || case.casBound || case.cardBound
+        val hasManageableAccount = AccountDangerStates(
+            campusName = campus.name,
+            jwBound = case.isBound,
+            portalLoggedIn = case.portalLoggedIn,
+            casBound = case.casBound,
+            cardBound = case.cardBound,
+            chaoxingBound = case.chaoxing,
+        ).hasManageableAccount
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -421,7 +421,6 @@ class AccountBindingScreenshotTest {
                 studentId = if (case.isBound) "2023123456789" else "",
                 lastImport = case.lastImport,
                 chaoxingBound = case.chaoxing,
-                zhihuishuBound = case.zhihuishu,
                 casBound = case.casBound,
                 casStudentId = if (case.casBound) "2023123456789" else "",
                 portalLoggedIn = case.portalLoggedIn,
@@ -456,37 +455,22 @@ class AccountBindingScreenshotTest {
                 ),
             verticalArrangement = Arrangement.spacedBy(skin.sectionGap),
         ) {
-            // 行文案与真实条件分支一致（isBound / portalLoggedIn / casBound / cardBound 全真）
+            // 行由**生产那个 builder** 给（全绑状态）：文案与条件分支不再靠人工对齐两份。
             AccountDangerCard(
-                rows = listOf(
-                    PendingDanger(
-                        title = "解绑教务账号",
-                        rowSubtitle = "删除本机保存的「${campus.name}」学号与密码",
-                        message = "将删除 ${campus.name} 在本机保存的学号和密码，确定吗？",
-                        confirmLabel = "确认解绑",
-                        onConfirm = {},
+                rows = accountDangerRows(
+                    states = AccountDangerStates(
+                        campusName = campus.name,
+                        jwBound = true,
+                        portalLoggedIn = true,
+                        casBound = true,
+                        cardBound = true,
+                        chaoxingBound = true,
                     ),
-                    PendingDanger(
-                        title = "退出今日校园登录态",
-                        rowSubtitle = "只清理本机的登录 Cookie，账号还在",
-                        message = "将清理本机保存的今日校园登录 Cookie，账号与密码仍留在本机。确定吗？",
-                        confirmLabel = "确认退出",
-                        onConfirm = {},
-                    ),
-                    PendingDanger(
-                        title = "删除今日校园账号",
-                        rowSubtitle = "删除本机保存的学号与密码",
-                        message = "将删除本机保存的今日校园学号与密码（教务账号不受影响）。确定吗？",
-                        confirmLabel = "确认删除",
-                        onConfirm = {},
-                    ),
-                    PendingDanger(
-                        title = "删除校园卡账号",
-                        rowSubtitle = "删除本机保存的手机号与密码",
-                        message = "将删除本机保存的易校园手机号与密码，校园余额页随即不可用。确定吗？",
-                        confirmLabel = "确认删除",
-                        onConfirm = {},
-                    ),
+                    onUnbindJw = {},
+                    onClearCasLogin = {},
+                    onDeleteCas = {},
+                    onDeleteCard = {},
+                    onClearChaoxingLogin = {},
                 ),
                 onPick = {},
             )

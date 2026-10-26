@@ -501,8 +501,12 @@ fun ProfileScreen(
     // 原 `appearanceMode` / `campusLayoutMode` 的订阅已移除：它们的消费者是「通用设置」页，
     // 而那一页 2026-10 已合并进设置页 —— 值由 ProfileSettingsScreen 自己订阅，
     // 父页再订一份只会多两次无谓重组。
-    var chaoxingBound by remember { mutableStateOf(container.hasLearningCookie(LearningPlatform.CHAOXING)) }
-    var zhihuishuBound by remember { mutableStateOf(container.hasLearningCookie(LearningPlatform.ZHIHUISHU)) }
+    // 学习通登录态：**这里是一份、prefs 是真源**。
+    // 用计数而不是直接 remember(Unit) 读一次：网页登录保存完 Cookie 回到这一页时，
+    // composable 没有重建，读不到的话那一行的点会一直停在"未登录"。
+    // 智慧树不在这里 —— 它撤出了绑定页（存的 Cookie 没有任何消费者）。
+    var learningRev by remember { mutableIntStateOf(0) }
+    val chaoxingBound = remember(learningRev) { container.hasLearningCookie(LearningPlatform.CHAOXING) }
     val unfinishedHomeworkCount by remember(allHomework, activeSchemeId) {
         derivedStateOf { allHomework.count { (it.schemeId == activeSchemeId || it.schemeId == 0L) && !it.completed } }
     }
@@ -691,20 +695,16 @@ fun ProfileScreen(
         AccountBindingScreen(
             container = container,
             chaoxingBound = chaoxingBound,
-            zhihuishuBound = zhihuishuBound,
-            // 「管理学习平台 / 去登录」把请求交给 [ProfileDialogHost]（它持有那些面板的开关），
+            // 点平台行 = 直接进那一家的网页登录页（请求交给持有开关的 [ProfileDialogHost]），
             // 并带上"关掉后回绑定信息页"的意图 —— 这样返回时用户还在他刚操作的那一页。
             onOpenLearningPlatform = { platform ->
                 pendingLearningRequest = ProfileLearningRequest(platform, returnToBinding = true)
                 showAccountBinding = false
             },
-            onManageLearning = {
-                pendingLearningRequest = ProfileLearningRequest(LearningPlatform.CHAOXING, returnToBinding = true)
-                showAccountBinding = false
-            },
             onSyncLearning = {
                 pendingLearningRequest = ProfileLearningRequest(LearningPlatform.CHAOXING, sync = true)
             },
+            onLearningCookieChanged = { learningRev++ },
             onBack = { showAccountBinding = false },
             onBoundChange = {
                 boundAccount = selectedCampus.jwBaseUrl?.let { container.loadCredential(it) }
@@ -832,12 +832,12 @@ fun ProfileScreen(
         val focusStats = remember(focusSessions, today) { FocusStats.focusStatsView(focusSessions) }
         val focusToday = remember(focusSessions, today) { FocusStats.statOf(focusSessions, today) }
 
-        // 身份卡只收一个"绑好了几项"的计数（教务 / 宿舍 / 学习平台，0..3），
+        // 身份卡只收一个"绑好了几项"的计数（教务 / 宿舍 / 学习通，0..3），
         // **一个具体值都不传** —— 见 ProfileHomeContent 与 ProfileIdentity.kt 的说明。
         val boundCount = listOf(
             boundAccount?.first?.isNotBlank() == true,
             dormInfo?.isBound == true,
-            chaoxingBound || zhihuishuBound,
+            chaoxingBound,
         ).count { it }
         ProfileHomeContent(
             boundCount = boundCount,
@@ -891,6 +891,7 @@ fun ProfileScreen(
         onConsumeQuickDialog = { pendingQuickDialog = null },
         pendingLearningRequest = pendingLearningRequest,
         onConsumeLearningRequest = { pendingLearningRequest = null },
+        onLearningCookieChanged = { learningRev++ },
         onVisibilityChange = { dialogsVisible = it },
     )
 

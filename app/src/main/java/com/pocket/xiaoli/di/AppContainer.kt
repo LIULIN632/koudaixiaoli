@@ -792,6 +792,17 @@ class AppContainer(context: Context) {
        credPrefs.edit().remove("learning_cookie_${platform.key}").apply()
     }
 
+    /**
+     * 最近一次**成功**拉取的时刻（毫秒）。只用来在界面上标"数据是几点拉的"，
+     * 不当缓存用 —— 学习通没有本地库，进来都是现拉。
+     */
+    fun saveLearningSyncAt(platform: LearningPlatform, at: Long) {
+       prefs.edit().putLong("learning_sync_at_${platform.key}", at).apply()
+    }
+
+    fun loadLearningSyncAt(platform: LearningPlatform): Long =
+       prefs.getLong("learning_sync_at_${platform.key}", 0L)
+
     // ── 趣智校园（洗澡 / 热水器）──
     //
     // 与教务凭据分文件存（QzxySessionStore 自带一份 EncryptedSharedPreferences）：

@@ -7,139 +7,29 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.CloudSync
-import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pocket.xiaoli.data.learning.LearningPlatform
-import com.pocket.xiaoli.ui.theme.AppearanceMode
-import com.pocket.xiaoli.ui.theme.LocalAppearanceMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
-import com.pocket.xiaoli.ui.theme.LocalSkin
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LearningWebSheet(
-    initialPlatform: LearningPlatform,
-    chaoxingBound: Boolean,
-    zhihuishuBound: Boolean,
-    onOpenWebLogin: (LearningPlatform) -> Unit,
-    onUnbind: (LearningPlatform) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
-    var selectedIndex by remember { mutableIntStateOf(if (initialPlatform == LearningPlatform.CHAOXING) 0 else 1) }
-    val platforms = listOf(LearningPlatform.CHAOXING, LearningPlatform.ZHIHUISHU)
-    val selected = platforms[selectedIndex]
-    val bound = if (selected == LearningPlatform.CHAOXING) chaoxingBound else zhihuishuBound
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = colors.surfaceCard
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = skin.spaceXl, end = 20.dp, bottom = 30.dp),
-            verticalArrangement = Arrangement.spacedBy(skin.spaceCompact)
-        ) {
-            Text(
-                text = "学习平台登录",
-                color = colors.textPrimary,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "登录在 App 内打开官方网页，登录成功后点右上角保存。Cookie 只加密保存在本机，不上传。",
-                color = colors.textSecondary,
-                fontSize = 12.sp
-            )
-
-            TabRow(selectedTabIndex = selectedIndex) {
-                platforms.forEachIndexed { index, platform ->
-                    Tab(
-                        selected = selectedIndex == index,
-                        onClick = { selectedIndex = index },
-                        text = { Text(platform.label, fontSize = 13.sp) }
-                    )
-                }
-            }
-
-            Text(
-                text = if (bound) "当前状态：已登录" else "当前状态：未登录",
-                color = if (bound) colors.accentMain else colors.textSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            Button(
-                onClick = { onOpenWebLogin(selected) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(skin.radiusCard),
-                colors = ButtonDefaults.buttonColors(containerColor = colors.accentMain)
-            ) {
-                Text(if (bound) "重新登录" else "打开网页登录")
-            }
-
-            if (bound) {
-                TextButton(
-                    onClick = { onUnbind(selected) },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Text("清除登录状态", color = colors.danger, fontSize = 12.sp)
-                }
-            }
-        }
-    }
-}
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -201,7 +91,9 @@ fun LearningWebLoginScreen(
                             onSaveCookie(cookie)
                         }
                     ) {
-                        Text("保存登录状态")
+                        // 右上角这个动作现在是这条流程里唯一"必须自己按一下"的地方
+                        // （原先那层面板里写着"登录成功后点右上角保存"）—— 用主色把权重给出来。
+                        Text("保存登录状态", color = colors.accentMain, fontWeight = FontWeight.Medium)
                     }
                 }
             )

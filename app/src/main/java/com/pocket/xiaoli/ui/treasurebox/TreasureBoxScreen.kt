@@ -217,6 +217,9 @@ import com.pocket.xiaoli.ui.theme.PocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalCampusLayoutMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
+import com.pocket.xiaoli.ui.assistant.copyToClipboard
+import com.pocket.xiaoli.ui.secondclass.SecondClassEntryScreen
+import com.pocket.xiaoli.ui.secondclass.SecondClassEntryState
 import com.pocket.xiaoli.ui.theme.miuixPress
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -480,6 +483,40 @@ fun TreasureBoxScreen(
         )
         return
     }
+    if (subPage == ServiceSubPage.Chaoxing) {
+        ChaoxingAccountPage(
+            container = appContainer,
+            onBack = { subPage = null },
+            onOpenWeb = { url, t ->
+                if (onOpenServiceWeb != null) onOpenServiceWeb(url, t) else openUrl(context, url)
+            },
+            onLogout = { subPage = null },
+        )
+        return
+    }
+    if (subPage == ServiceSubPage.SecondClass) {
+        val dreamUrl = selectedCampus.serviceUrls[CampusServiceKeys.SECOND_CLASS]
+            ?.takeIf { it.isNotBlank() } ?: "https://www.5idream.net/"
+        SecondClassEntryScreen(
+            state = SecondClassEntryState(webUrl = dreamUrl, schoolLabel = selectedCampus.name),
+            onBack = { subPage = null },
+            onOpenWeb = { url, t ->
+                if (onOpenServiceWeb != null) onOpenServiceWeb(url, t) else openUrl(context, url)
+            },
+            onCopyUrl = { copyToClipboard(context, dreamUrl) },
+            // 不猜包名（各家渠道包名不一致），用商店搜索：至少不会跳到一个不相干的 App
+            onOpenStore = {
+                try {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=到梦空间"))
+                    )
+                } catch (_: Exception) {
+                    openUrl(context, "https://www.5idream.net/download")
+                }
+            },
+        )
+        return
+    }
     if (subPage == ServiceSubPage.FoodPicker) {
         FoodPickerPage(onBack = { subPage = null })
         return
@@ -722,11 +759,18 @@ fun TreasureBoxScreen(
                     openCampusService(CampusServiceKeys.EVALUATION, "评教")
                 },
                 ServiceEntry("到梦空间", "第二课堂 · 活动报名", Icons.Outlined.EmojiEvents, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.EmojiEvents, accent = ServiceAccent.STUDY) {
-                    openCampusService(CampusServiceKeys.SECOND_CLASS, "到梦空间")
+                    // 不直开网页：那是个 min-width:1200px 的桌面站，而且登录只有扫码，
+                    // 二维码显示在这台手机上 —— 扫不了自己。先给一屏说清状况的入口页。
+                    subPage = ServiceSubPage.SecondClass
                 },
                 ServiceEntry("学习通", "网课 · 作业 · 考试", Icons.AutoMirrored.Outlined.MenuBook, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.MenuBook, accent = ServiceAccent.STUDY) {
-                    val url = LearningPlatform.CHAOXING.loginUrl
-                    if (onOpenServiceWeb != null) onOpenServiceWeb(url, "学习通") else openUrl(context, url)
+                    // 登录过就直接进原生页（课程与待办都在里面），没登录才把人送去登录网页。
+                    if (appContainer.hasLearningCookie(LearningPlatform.CHAOXING)) {
+                        subPage = ServiceSubPage.Chaoxing
+                    } else {
+                        val url = LearningPlatform.CHAOXING.loginUrl
+                        if (onOpenServiceWeb != null) onOpenServiceWeb(url, "学习通") else openUrl(context, url)
+                    }
                 },
                 ServiceEntry("知到", "智慧树 · 网课", Icons.Outlined.School, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.School, accent = ServiceAccent.STUDY) {
                     val url = LearningPlatform.ZHIHUISHU.loginUrl

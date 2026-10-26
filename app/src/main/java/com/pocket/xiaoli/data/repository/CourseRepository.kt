@@ -11,6 +11,7 @@ import com.pocket.xiaoli.data.entity.SchemeEntity
 import com.pocket.xiaoli.data.entity.TaskEntity
 import com.pocket.xiaoli.data.entity.TermEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
+import com.pocket.xiaoli.data.entity.defaultTimeSlots
 import kotlinx.coroutines.flow.Flow
 import com.pocket.xiaoli.data.dao.ExamDao
 import com.pocket.xiaoli.data.entity.ExamEntity
@@ -137,22 +138,7 @@ class CourseRepository(
     suspend fun deleteTeacher(name: String) = teacherDao.deleteTeacher(name)
     fun getDistinctTeacherNames(schemeId: Long): Flow<List<String>> = teacherDao.getDistinctTeacherNames(schemeId)
 
-    // 首次启动填充默认12节课时间段；课表页在时间段为空时调用
-    suspend fun initTimeSlots() {
-        val defaultSlots = listOf(
-            TimeSlotEntity(1, "08:00", "08:45"),
-            TimeSlotEntity(2, "08:55", "09:40"),
-            TimeSlotEntity(3, "10:00", "10:45"),
-            TimeSlotEntity(4, "10:55", "11:40"),
-            TimeSlotEntity(5, "13:30", "14:15"),
-            TimeSlotEntity(6, "14:25", "15:10"),
-            TimeSlotEntity(7, "15:30", "16:15"),
-            TimeSlotEntity(8, "16:25", "17:10"),
-            TimeSlotEntity(9, "18:30", "19:15"),
-            TimeSlotEntity(10, "19:25", "20:10"),
-            TimeSlotEntity(11, "20:20", "21:05"),
-            TimeSlotEntity(12, "21:15", "22:00")
-        )
-        dao.insertTimeSlots(defaultSlots)
-    }
+    // 首次启动填充默认12节课时间段；课表页在时间段为空时调用。
+    // 值来自 [defaultTimeSlots]（唯一真源），不要在这里再写一份字面量。
+    suspend fun initTimeSlots() = dao.insertTimeSlots(defaultTimeSlots)
 }

@@ -73,6 +73,96 @@ internal data class PendingDanger(
 )
 
 /**
+ * 「账号管理」这一组**该出现哪几条**：条件与文案都收在这一个函数里。
+ *
+ * 2026-10-26 抽出来的原因很具体：加"退出学习通登录态"这条之前，
+ * 行文案在**生产代码与快照测试里各写了一份**（测试注释还写着"行文案与真实条件分支一致"，
+ * 靠人工维持一致）。搬到这儿之后测试直接调这个函数，改文案只需改一处。
+ */
+internal data class AccountDangerStates(
+    /** 校区名，进「解绑教务」那条的文案。 */
+    val campusName: String,
+    val jwBound: Boolean,
+    /** null = 还没查过；只有确认已登录（true）才给"退出登录态"那条。 */
+    val portalLoggedIn: Boolean?,
+    val casBound: Boolean,
+    val cardBound: Boolean,
+    val chaoxingBound: Boolean,
+) {
+    /** 「账号管理」入口行在不在 —— 一条都没有时整组都不该露出来。 */
+    val hasManageableAccount: Boolean
+        get() = jwBound || portalLoggedIn == true || casBound || cardBound || chaoxingBound
+}
+
+internal fun accountDangerRows(
+    states: AccountDangerStates,
+    onUnbindJw: () -> Unit,
+    onClearCasLogin: () -> Unit,
+    onDeleteCas: () -> Unit,
+    onDeleteCard: () -> Unit,
+    onClearChaoxingLogin: () -> Unit,
+): List<PendingDanger> = buildList {
+    if (states.jwBound) {
+        add(
+            PendingDanger(
+                title = "解绑教务账号",
+                rowSubtitle = "删除本机保存的「${states.campusName}」学号与密码",
+                message = "将删除 ${states.campusName} 在本机保存的学号和密码，确定吗？",
+                confirmLabel = "确认解绑",
+                onConfirm = onUnbindJw,
+            )
+        )
+    }
+    if (states.portalLoggedIn == true) {
+        add(
+            PendingDanger(
+                title = "退出今日校园登录态",
+                rowSubtitle = "只清理本机的登录 Cookie，账号还在",
+                message = "将清理本机保存的今日校园登录 Cookie，账号与密码仍留在本机。确定吗？",
+                confirmLabel = "确认退出",
+                onConfirm = onClearCasLogin,
+            )
+        )
+    }
+    if (states.casBound) {
+        add(
+            PendingDanger(
+                title = "删除今日校园账号",
+                rowSubtitle = "删除本机保存的学号与密码",
+                message = "将删除本机保存的今日校园学号与密码（教务账号不受影响）。确定吗？",
+                confirmLabel = "确认删除",
+                onConfirm = onDeleteCas,
+            )
+        )
+    }
+    if (states.cardBound) {
+        add(
+            PendingDanger(
+                title = "删除校园卡账号",
+                rowSubtitle = "删除本机保存的手机号与密码",
+                message = "将删除本机保存的易校园手机号与密码，校园余额页随即不可用。确定吗？",
+                confirmLabel = "确认删除",
+                onConfirm = onDeleteCard,
+            )
+        )
+    }
+    // 学习通这条原先挂在中间面板的红字按钮上（点了就清、没有确认）；
+    // 面板删掉后归到这里 —— 同为"退出登录态"，就该过同一层二次确认。
+    // （智慧树 2026-10-26 撤出绑定页：它存的 Cookie 没有任何消费者，所以既不给登录入口也不给退出项。）
+    if (states.chaoxingBound) {
+        add(
+            PendingDanger(
+                title = "退出学习通登录态",
+                rowSubtitle = "只清理本机的 Cookie，账号还在",
+                message = "将清理本机保存的学习通登录 Cookie，作业同步随即不可用（已导入待办的作业不受影响）。确定吗？",
+                confirmLabel = "确认退出",
+                onConfirm = onClearChaoxingLogin,
+            )
+        )
+    }
+}
+
+/**
  * 「账号管理」整组：区块卡 + 若干销毁性操作行（行间分隔线，**不**逐条描边）。
  *
  * 抽成独立组件不只是为了复用，更是为了**让快照能渲生产代码本体**：

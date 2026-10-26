@@ -6,6 +6,8 @@ import android.content.Context
 import android.net.Uri
 import android.provider.CalendarContract
 import com.pocket.xiaoli.data.entity.CourseEntity
+import com.pocket.xiaoli.data.entity.defaultTimeSlots
+import java.time.LocalTime
 import java.util.*
 
 object CalendarExportUtil {
@@ -31,29 +33,22 @@ object CalendarExportUtil {
             arrayOf(calendarId.toString())
         )
 
-        // Time slot mapping: slot N → approximate time
-        // Typical university: slot 1 = 8:00, slot 2 = 8:55, slot 3 = 9:50, ...
-        val slotHour = mapOf(
-            1 to 8, 2 to 8, 3 to 10, 4 to 10, 5 to 11,
-            6 to 14, 7 to 14, 8 to 16, 9 to 16, 10 to 19,
-            11 to 19, 12 to 20
-        )
-        val slotMinute = mapOf(
-            1 to 0, 2 to 55, 3 to 0, 4 to 55, 5 to 50,
-            6 to 0, 7 to 55, 8 to 0, 9 to 55, 10 to 0,
-            11 to 55, 12 to 0
-        )
-        val durationMin = 45 // each slot = 45 min class
+        // 节次时间取自默认节次表（唯一真源）。⚠️ 这条路径拿不到用户的 time_slots，
+        // 所以自定义过节次的用户导出的是默认时间 —— 以前这里还另写了一份"近似表"
+        // （slot 5 = 11:50 之类），与默认节次表对不上，属于第二个真源，已删。
+        val slotByNumber = defaultTimeSlots.associateBy { it.slot }
 
         var count = 0
 
         for (course in courses) {
-            val startH = slotHour[course.startSlot] ?: 8
-            val startM = slotMinute[course.startSlot] ?: 0
-            val endSlots = course.endSlot - course.startSlot + 1
-            val endTotalMin = startH * 60 + startM + endSlots * durationMin
-            val endH = endTotalMin / 60
-            val endM = endTotalMin % 60
+            val startSlot = slotByNumber[course.startSlot] ?: defaultTimeSlots.first()
+            val endSlot = slotByNumber[course.endSlot] ?: defaultTimeSlots.last()
+            val start = parseTimeOrNull(startSlot.startTime) ?: LocalTime.of(8, 0)
+            val end = parseTimeOrNull(endSlot.endTime) ?: start.plusMinutes(45)
+            val startH = start.hour
+            val startM = start.minute
+            val endH = end.hour
+            val endM = end.minute
 
             // Calculate the first occurrence on the target day of week
             val cal = Calendar.getInstance().apply {

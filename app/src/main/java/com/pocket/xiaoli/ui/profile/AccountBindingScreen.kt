@@ -129,10 +129,10 @@ import java.util.Locale
 fun AccountBindingScreen(
     container: AppContainer,
     chaoxingBound: Boolean = false,
-    zhihuishuBound: Boolean = false,
     onOpenLearningPlatform: (LearningPlatform) -> Unit = {},
-    onManageLearning: () -> Unit = {},
     onSyncLearning: () -> Unit = {},
+    /** 网页登录保存完 Cookie 后回这里重读登录态（真源在 prefs，这里只是通知"变了"）。 */
+    onLearningCookieChanged: () -> Unit = {},
     onBack: () -> Unit,
     onBoundChange: () -> Unit = {},
 ) {
@@ -325,6 +325,18 @@ fun AccountBindingScreen(
     }
 
     /**
+     * 退出学习通登录态：只清本机 Cookie，账号本来就在超星那边。
+     *
+     * 原来这件事挂在「学习平台」面板里那个居中的红字按钮上（点了就清，没有确认）；
+     * 2026-10-26 把它并进页尾「账号管理（危险操作）」组，与其它退出/删除共用同一层二次确认。
+     */
+    fun clearChaoxingLogin() {
+        container.deleteLearningCookie(LearningPlatform.CHAOXING)
+        onLearningCookieChanged()
+        Toast.makeText(context, "已退出学习通登录态", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
      * 保存并登录：不打开网页，直接走原生 CAS（详见 [CasLogin]）。
      * 只有用户自己按下这个按钮才会用密码；需要验证码时不硬闯。
      *
@@ -445,7 +457,15 @@ fun AccountBindingScreen(
 
     // "有可管理的账号吗" —— 主页面入口与二级页那张卡共用同一个条件。
     // 用它把入口也一起挡掉：否则四个账号都没绑时，点进去会是一张空卡。
-    val hasManageableAccount = isBound || portalLoggedIn == true || casBound || cardBound
+    val dangerStates = AccountDangerStates(
+        campusName = campus.name,
+        jwBound = isBound,
+        portalLoggedIn = portalLoggedIn,
+        casBound = casBound,
+        cardBound = cardBound,
+        chaoxingBound = chaoxingBound,
+    )
+    val hasManageableAccount = dangerStates.hasManageableAccount
     BackHandler(enabled = activeSubPage != null) { subPage = null }
 
     // 验证成功 → 落盘 + 回状态清单。
@@ -506,7 +526,6 @@ fun AccountBindingScreen(
                 studentId = studentId,
                 lastImport = lastImport,
                 chaoxingBound = chaoxingBound,
-                zhihuishuBound = zhihuishuBound,
                 casBound = casBound,
                 casStudentId = casStudentId,
                 portalLoggedIn = portalLoggedIn,
@@ -738,33 +757,32 @@ fun AccountBindingScreen(
                     },
                 )
             }
-            // ── 学习平台 ──
+            // ── 学习通 ──
             // 排在最后：它与上面四个（教务 / 宿舍 / 今日校园 / 校园卡）互不相干 ——
-            // 学习平台只同步考试与作业，不参与任何登录链路，所以不占靠前的位置。
+            // 学习通只同步作业，不参与任何登录链路，所以不占靠前的位置。
+            //
+            // 2026-10-26 两笔改动：
+            // ① 点行**直接进网页登录页**。原先中间还有一层面板（标题 + 平台 Tab +
+            //    "当前状态" + 「打开网页登录」），那四项信息这一行卡里都有，用户只是白多点一下；
+            //    面板上唯一的「清除登录状态」搬到页尾危险操作组。
+            // ② **智慧树从这一页撤掉**。它的课程接口要 `uuid`（来自账号密码校验接口），
+            //    不是网页登录后能复用的 Cookie —— 存下来那份登录态全仓零消费者，
+            //    "已登录"那个点只是装饰。看网课走「服务 → 知到」，登录态由 WebView 自己记。
             BindingSectionCard(
                 visible = activeSubPage == BindSubPage.LEARNING,
                 icon = Icons.AutoMirrored.Outlined.MenuBook,
                 accent = ServiceAccent.STUDY,
-                title = "学习平台",
+                title = "学习通",
                 subtitle = "Cookie 加密保存在本机",
             ) {
-                LearningBindingRow(name = "学习通", bound = chaoxingBound) {
+                LearningBindingRow(bound = chaoxingBound) {
                     onOpenLearningPlatform(LearningPlatform.CHAOXING)
-                }
-                LearningBindingRow(name = "智慧树", bound = zhihuishuBound) {
-                    onOpenLearningPlatform(LearningPlatform.ZHIHUISHU)
                 }
                 TextButton(
                     onClick = onSyncLearning,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 ) {
-                    Text("从学习平台同步到待办", color = colors.accentMain, fontSize = 14.sp)
-                }
-                TextButton(
-                    onClick = onManageLearning,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Text("管理学习平台（考试 / 作业 / 收件箱）", color = colors.accentMain, fontSize = 14.sp)
+                    Text("同步作业到待办", color = colors.accentMain, fontSize = 14.sp)
                 }
             }
 
@@ -774,7 +792,7 @@ fun AccountBindingScreen(
             // 退出登录态与删今日校园在今日校园卡、删校园卡在校园卡卡），
             // 全是居中的 danger 文字按钮，长得像普通链接 —— 指头一滑就点到。
             //
-            // 现在聚到页尾、独立成组，并且**四条都过二次确认**（见 PendingDanger）：
+            // 现在聚到页尾、独立成组，并且**组内每一条都过二次确认**（行本身由 [accountDangerRows] 给）：
             // 这一组的语义就是"不可恢复"，那就不该有"点了就删"的例外。
             //
             // ⚠️ 组内**不逐条描边**。改造前四条各自一圈红框 = 一面红墙，
@@ -782,55 +800,16 @@ fun AccountBindingScreen(
             // 于是"点进去"与"点了就删"分不出来。现在：入口有框、执行无框（用分隔线），
             // 形状本身就在说明性质。
             if (hasManageableAccount) {
-                val dangerRows = buildList {
-                    if (isBound) {
-                        add(
-                            PendingDanger(
-                                title = "解绑教务账号",
-                                rowSubtitle = "删除本机保存的「${campus.name}」学号与密码",
-                                message = "将删除 ${campus.name} 在本机保存的学号和密码，确定吗？",
-                                confirmLabel = "确认解绑",
-                                onConfirm = { unbind() },
-                            )
-                        )
-                    }
-                    if (portalLoggedIn == true) {
-                        add(
-                            PendingDanger(
-                                title = "退出今日校园登录态",
-                                rowSubtitle = "只清理本机的登录 Cookie，账号还在",
-                                message = "将清理本机保存的今日校园登录 Cookie，账号与密码仍留在本机。确定吗？",
-                                confirmLabel = "确认退出",
-                                onConfirm = { clearCasLogin() },
-                            )
-                        )
-                    }
-                    if (casBound) {
-                        add(
-                            PendingDanger(
-                                title = "删除今日校园账号",
-                                rowSubtitle = "删除本机保存的学号与密码",
-                                message = "将删除本机保存的今日校园学号与密码（教务账号不受影响）。确定吗？",
-                                confirmLabel = "确认删除",
-                                onConfirm = { deleteCas() },
-                            )
-                        )
-                    }
-                    if (cardBound) {
-                        add(
-                            PendingDanger(
-                                title = "删除校园卡账号",
-                                rowSubtitle = "删除本机保存的手机号与密码",
-                                message = "将删除本机保存的易校园手机号与密码，校园余额页随即不可用。确定吗？",
-                                confirmLabel = "确认删除",
-                                onConfirm = { deleteCard() },
-                            )
-                        )
-                    }
-                }
                 AccountDangerCard(
                     visible = activeSubPage == BindSubPage.ACCOUNT_DANGER,
-                    rows = dangerRows,
+                    rows = accountDangerRows(
+                        states = dangerStates,
+                        onUnbindJw = { unbind() },
+                        onClearCasLogin = { clearCasLogin() },
+                        onDeleteCas = { deleteCas() },
+                        onDeleteCard = { deleteCard() },
+                        onClearChaoxingLogin = { clearChaoxingLogin() },
+                    ),
                     onPick = { pendingDanger = it },
                 )
             }
@@ -872,7 +851,7 @@ fun AccountBindingScreen(
  * |---|---|---|
  * | 身份 | 已保存的学校 + 本机保存的学号（脱敏） | 已绑定 / 未绑定 |
  * | 教务 | 校区教务类型 + **最近一次导入记录**（来源 / 结果 / 时间） | 已导入 / 导入失败 / 未导入 |
- * | 学习平台 | 学习通、智慧树各自的登录状态 | n/2 |
+ * | 学习通 | 本机是否存着它的登录 Cookie | 已登录 / 未登录 |
  *
  * 「什么时候验过」本机从来没有存过独立的"验证时间"字段，所以这里**不编一个**，
  * 直接引用 `AppContainer.lastImport` 那条真实记录 —— 成功导入过课表本身就是账号能用的证据。
@@ -886,7 +865,6 @@ internal fun BindingStatusCard(
     studentId: String,
     lastImport: LastImportInfo?,
     chaoxingBound: Boolean,
-    zhihuishuBound: Boolean,
     casBound: Boolean,
     casStudentId: String,
     portalLoggedIn: Boolean?,
@@ -910,7 +888,6 @@ internal fun BindingStatusCard(
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val schoolText = savedSchool.ifBlank { campus.schoolName.orEmpty() }.ifBlank { "未设置学校" }
-    val learningCount = (if (chaoxingBound) 1 else 0) + (if (zhihuishuBound) 1 else 0)
     // 五项的「绑好了没」，顺序与下面清单、与页面卡片顺序一致 ——
     // 它只回答"绑齐了没"，与"最近一次导入成功没"是两件事（后者归「教务」行的红点）。
     val bindItems = listOf(
@@ -918,7 +895,7 @@ internal fun BindingStatusCard(
         Triple("宿舍", dormLabel != null, ServiceAccent.LIFE),
         Triple("今日校园", casBound, ServiceAccent.INFO),
         Triple("校园卡", cardBound, ServiceAccent.PAYMENT),
-        Triple("学习平台", learningCount == 2, ServiceAccent.STUDY),
+        Triple("学习通", chaoxingBound, ServiceAccent.STUDY),
     )
     val boundCount = bindItems.count { it.second }
     val missing = bindItems.filterNot { it.second }.map { it.first }
@@ -1116,22 +1093,15 @@ internal fun BindingStatusCard(
 
                 HorizontalDivider(color = colors.borderDivider)
 
-                // ── 学习平台 ──
+                // ── 学习通 ──
                 ChecklistRow(
-                    // ⚠️ `== 2` 而不是 `>= 1`：改造前只通一个平台也会亮**蓝色实心点**
-                    //（= 全好），而同一行的文字明明写着"智慧树 未登录" —— 点与字互相打架
-                    //（基线 `82` 拍到了）。`BindState` 只有四态，没有"半通"这一态：
-                    // 对用户来说"没绑齐"要做的动作是同一个（去绑另一个），所以归 TODO 是对的，
-                    // 精确的差别由下面那行文字表达 —— 这正是 StateDot"点+文字"双通道的设计本意。
-                    state = if (learningCount == 2) BindState.OK else BindState.TODO,
+                    state = if (chaoxingBound) BindState.OK else BindState.TODO,
                     icon = Icons.AutoMirrored.Outlined.MenuBook,
                     accent = ServiceAccent.STUDY,
-                    title = "学习平台",
-                    // 两个平台是**平级**的，所以写成并列的两句话。
-                    // 改造前把"学习通"放在 value、"智慧树"放在 extra（低一级文字），
-                    // 读起来像"学习通是主、智慧树是附" —— 而它们并没有主次。
-                    detail = "学习通 ${if (chaoxingBound) "已登录" else "未登录"}" +
-                        " · 智慧树 ${if (zhihuishuBound) "已登录" else "未登录"}",
+                    title = "学习通",
+                    // 2026-10-26：这一项从"学习平台 n/2"改成一家的是/否 —— 智慧树撤出绑定页
+                    //（它的接口要 uuid、存的 Cookie 没人读），所以不再有"半通"那种状态。
+                    detail = if (chaoxingBound) "已登录 · 可同步作业到待办" else "未登录 · 登录后可同步作业",
                     onClick = { onNavigate(BindSubPage.LEARNING) },
                 )
             }
@@ -1588,15 +1558,17 @@ private fun formatImportTime(timestamp: Long): String =
     else SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
 
 /**
- * 「学习平台」的一张行卡：平台名 + 登录状态 + 去登录。
+ * 「学习通」那一行卡：登录状态 + 去登录。
  *
  * 2026-10 改：整行可点（此前只有右侧那个小文字按钮可点，命中区约 48×20dp），
  * 左侧补上一块与总览清单同款的分类图标，状态点 + 文字也沿用 [StateDot] ——
  * 这一页的所有"登录没登录"都用同一套语义，不该在最后一张卡里换一种说法。
+ *
+ * 2026-10-26：智慧树撤走之后这里只剩一家，平台名交给卡片标题，行里说的是"这件事怎么完成"
+ * （网页登录），不再重复一遍平台名。
  */
 @Composable
 private fun LearningBindingRow(
-    name: String,
     bound: Boolean,
     onLogin: () -> Unit,
 ) {
@@ -1635,16 +1607,15 @@ private fun LearningBindingRow(
                 verticalArrangement = Arrangement.spacedBy(skin.spaceMicro),
             ) {
                 // 与「我的」这一片所有行标题同号（15sp）
-                Text(name, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                Text("网页登录", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
                 // 状态标记改成「点 + 词」：与总览检查清单同一套语义（见 StateDot）。
-                // 改造前这里是一枚 pill（"已登录"），与总览里的 "n/2" 说法对不上 ——
+                // 改造前这里是一枚 pill（"已登录"），与总览里的说法对不上 ——
                 // 用户要读两遍才知道说的是同一件事。
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     StateDot(if (bound) BindState.OK else BindState.TODO)
                     Spacer(Modifier.width(skin.spaceXs))
                     Text(
-                        if (bound) "已登录 · Cookie 已加密保存在本机"
-                        else "未登录 · 登录后可同步考试 / 作业",
+                        if (bound) "已登录 · Cookie 已加密保存在本机" else "未登录 · 登录后可同步作业到待办",
                         fontSize = 12.sp,
                         // 这里承载的是"去登录能得到什么"，用次级色而不是最弱的一档
                         color = colors.textSecondary,
@@ -1687,7 +1658,7 @@ internal enum class BindSubPage(val title: String) {
     ACADEMIC("教务账号"),
     TODAY_CAMPUS("今日校园"),
     CAMPUS_CARD("校园卡（易校园）"),
-    LEARNING("学习平台"),
+    LEARNING("学习通"),
     DORM("宿舍绑定"),
     ACCOUNT_DANGER("账号管理"),
 }

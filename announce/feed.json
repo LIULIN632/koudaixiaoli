@@ -9,17 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 93,
-    "versionName": "0.1.92",
+    "versionCode": 94,
+    "versionName": "0.1.93",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.92/koudaixiaoli_v0.1.92.apk",
-    "sha256": "bbcbda292eeaaed304912abc8f773073fc183dac13d7ecb6026953132be0c550",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.93/koudaixiaoli_v0.1.93.apk",
+    "sha256": "0c48f5634aecfddacb589651d3d00b9bcc356b86960cd7fff55970e30f5e3c09",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "第一次打开会有一页简短的引导：选学校，或者先随便看看",
-      "服务页新增「淋浴预约」和「麦当劳蛋白榜」（把价格换算成每克蛋白多少钱来排）",
-      "绑定页的宿舍 / 账号表单拆成分步填写，一屏只问一件事"
+      "学习通可以网页登录了（登录状态只存本机），还能把学习通的作业同步进待办",
+      "日历导出的上课时间与课表对齐：以前这里另抄了一份近似节次表，个别节次差几分钟",
+      "校方网页在手机上只出电脑布局时，右上角可以切「桌面版」"
     ]
   },
   "endpoints": {

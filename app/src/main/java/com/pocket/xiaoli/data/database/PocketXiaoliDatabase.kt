@@ -19,6 +19,8 @@ import com.pocket.xiaoli.data.entity.CampusMapCorrectionEntity
 import com.pocket.xiaoli.data.entity.SchemeEntity
 import com.pocket.xiaoli.data.entity.TaskEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
+import com.pocket.xiaoli.data.entity.defaultTimeSlots
+import com.pocket.xiaoli.data.entity.matchesLegacyTimeSlots
 import com.pocket.xiaoli.data.entity.TeacherEntity
 import com.pocket.xiaoli.data.entity.TermEntity
 import com.pocket.xiaoli.data.dao.AssistantChatDao
@@ -36,7 +38,7 @@ import com.pocket.xiaoli.data.dao.ExamDao
 import com.pocket.xiaoli.data.entity.FocusSessionEntity
 import com.pocket.xiaoli.data.dao.FocusSessionDao
 
-@Database(entities = [CourseEntity::class, TimeSlotEntity::class, SchemeEntity::class, HomeworkEntity::class, TaskEntity::class, GoodItemEntity::class, TreeHoleEntity::class, TeacherEntity::class, SavedGradeEntity::class, SpecialWorkDayEntity::class, CampusMapCorrectionEntity::class, AssistantConversationEntity::class, AssistantMessageEntity::class, ExamEntity::class, AcademicSnapshotEntity::class, FocusSessionEntity::class, TermEntity::class], version = 20, exportSchema = true)
+@Database(entities = [CourseEntity::class, TimeSlotEntity::class, SchemeEntity::class, HomeworkEntity::class, TaskEntity::class, GoodItemEntity::class, TreeHoleEntity::class, TeacherEntity::class, SavedGradeEntity::class, SpecialWorkDayEntity::class, CampusMapCorrectionEntity::class, AssistantConversationEntity::class, AssistantMessageEntity::class, ExamEntity::class, AcademicSnapshotEntity::class, FocusSessionEntity::class, TermEntity::class], version = 21, exportSchema = true)
 abstract class PocketXiaoliDatabase : RoomDatabase() {
     abstract fun courseDao(): CourseDao
     abstract fun teacherDao(): TeacherDao
@@ -398,31 +400,61 @@ abstract class PocketXiaoliDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v20→v21：默认节次改成「上午 8:00 / 下午 14:00 / 晚上 19:00 起，每节 45 分钟」。
+         *
+         * 只改表内容、不改表结构。关键是**放过用户改过的节次表**：
+         * 「节次管理」里调过任意一节就整表不动 —— 为了追一个新默认值去覆盖用户数据，
+         * 比时间不对更糟。判据是纯函数 [matchesLegacyTimeSlots]
+         * （本项目没引 room-testing，迁移体在 JVM 里跑不起来，所以把判断抽出来单测）。
+         */
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val rows = db.query(
+                    "SELECT slot, startTime, endTime FROM time_slots ORDER BY slot ASC"
+                ).use { cursor ->
+                    buildList {
+                        while (cursor.moveToNext()) {
+                            add(
+                                TimeSlotEntity(
+                                    slot = cursor.getInt(0),
+                                    startTime = cursor.getString(1),
+                                    endTime = cursor.getString(2),
+                                )
+                            )
+                        }
+                    }
+                }
+                if (!matchesLegacyTimeSlots(rows)) return
+                db.execSQL("DELETE FROM time_slots")
+                defaultTimeSlots.forEach { slot ->
+                    db.execSQL(
+                        "INSERT INTO time_slots (slot, startTime, endTime) VALUES (?,?,?)",
+                        arrayOf<Any>(slot.slot, slot.startTime, slot.endTime),
+                    )
+                }
+            }
+        }
+
         /** Ensure default scheme exists on fresh installs (DB created at v4, no migration runs). */
         private val CALLBACK = object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 db.execSQL("INSERT OR IGNORE INTO schemes (id, name, sortOrder, termId) VALUES (0, '默认课表', 0, 0)")
                 db.execSQL("INSERT OR IGNORE INTO terms (id, name, startDate, totalWeeks, sortOrder) VALUES (0, '默认学期', '', 20, 0)")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (1, '08:00', '08:45')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (2, '08:55', '09:40')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (3, '10:00', '10:45')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (4, '10:55', '11:40')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (5, '13:30', '14:15')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (6, '14:25', '15:10')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (7, '15:30', '16:15')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (8, '16:25', '17:10')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (9, '18:30', '19:15')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (10, '19:25', '20:10')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (11, '20:20', '21:05')")
-                db.execSQL("INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (12, '21:15', '22:00')")
+                defaultTimeSlots.forEach { slot ->
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO time_slots (slot, startTime, endTime) VALUES (?,?,?)",
+                        arrayOf<Any>(slot.slot, slot.startTime, slot.endTime),
+                    )
+                }
             }
         }
 
         fun getInstance(context: Context): PocketXiaoliDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context, PocketXiaoliDatabase::class.java, "pocket_xiaoli.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
                     .addCallback(CALLBACK)
                     .build().also { INSTANCE = it }
             }
