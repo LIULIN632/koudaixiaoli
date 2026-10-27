@@ -180,6 +180,16 @@ object McProteinPlanner {
     }
 
     /**
+     * 「吃够 [targetGram] 克蛋白最少要花多少钱」，凑不出来给 null。
+     *
+     * 存在的理由：海报那句对比（早餐 ¥18 / 正餐 ¥23）原先是**手写进文案的**，
+     * 而快照会随版本更新 —— 文案和算法各留一份就是等它俩哪天不一致。
+     * 现在海报直接算，快照换了文案自己跟着变。
+     */
+    fun cheapestPrice(items: List<McProteinItem>, targetGram: Double): Double? =
+        cheapest(items, targetGram, budgetYuan = 0.0)?.totalPriceYuan
+
+    /**
      * 结果文案的纯函数（页面与测试共用）。
      *
      * 组合与金额分两行：正餐的组合名很长，挤在一行会把「42 g 蛋白」里的单位折到下一行，

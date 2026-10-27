@@ -274,4 +274,77 @@ class AppUpdateCheckerTest {
         assertNull(top)
         assertTrue("空通道应立即返回，实际 $cost ms", cost < 200)
     }
-}
+
+    /**
+     * 已经拿到「比本机新」的答案时，只再等 [DECISIVE_GRACE_MS] 收尾。
+     *
+     * 这是「点检查更新，明明有新版却还要等将近一秒」的那一秒：旧逻辑无论第一个
+     * 结果是什么都等满 900ms，而"已经能装了"这件事根本不需要再确认第二次。
+     */
+    @Test
+    fun pickNewest_拿到比本机新的版本后不再等满grace() = runBlocking {
+        val channel = Channel<Int>(Channel.UNLIMITED)
+        channel.send(100) // 本机 99，这个已经能让用户升级了
+
+        val started = System.currentTimeMillis()
+        val top = checker.pickNewest(
+            channel,
+            budgetMs = 2_000,
+            graceMs = 900,
+            versionOf = { it },
+            decisive = { it > 99 },
+            decisiveGraceMs = 120,
+        )
+        val cost = System.currentTimeMillis() - started
+        channel.close()
+
+        assertEquals(100, top)
+        assertTrue("已经能升级了不该再等 900ms，实际 $cost ms", cost < 600)
+    }
+
+    @Test
+    fun pickNewest_没有新版时才肯等满grace() = runBlocking {
+        val channel = Channel<Int>(Channel.UNLIMITED)
+        channel.send(99) // 等于本机版本，可能只是镜像还没同步
+
+        val started = System.currentTimeMillis()
+        val top = checker.pickNewest(
+            channel,
+            budgetMs = 2_000,
+            graceMs = 300,
+            versionOf = { it },
+            decisive = { it > 99 },
+            decisiveGraceMs = 50,
+        )
+        val cost = System.currentTimeMillis() - started
+        channel.close()
+
+        assertEquals(99, top)
+        assertTrue("「已是最新」这个结论必须等满 grace 才敢下，实际 $cost ms", cost >= 200)
+    }
+
+    /** 选了哪个渠道，那个渠道的镜像就排第一（它因此获得 700ms 头位，见 fetchFeedRacing）。 */
+    @Test
+    fun feedMirrors_按渠道把用户选的源排在第一() {
+        fun head(channel: String) = checker.feedMirrorsForTest(channel).first()
+
+        assertFalse("auto 不该让 GitHub 抢头位", head(AppUpdateChecker.CHANNEL_AUTO).contains("github"))
+        assertFalse("选 gitee 不该让 GitHub 抢头位", head(AppUpdateChecker.CHANNEL_GITEE).contains("github"))
+        assertTrue(
+            "选 github 应以 GitHub 为首，否则这个开关等于没有",
+            head(AppUpdateChecker.CHANNEL_GITHUB).contains("github"),
+        )
+    }
+
+    /** uto 不插队：没有偏好时并行竞速就是最优，任何等待都只会变慢。 */
+    @Test
+    fun headStart_自动模式不让任何人等() {
+        assertEquals(
+            0L,
+            checker.headStartMs(AppUpdateChecker.CHANNEL_AUTO),
+        )
+        assertTrue(
+            "明确选了渠道，那个源就该先跑",
+            checker.headStartMs(AppUpdateChecker.CHANNEL_GITHUB) > 0L,
+        )
+    }}

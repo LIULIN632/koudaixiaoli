@@ -58,6 +58,18 @@
 # 公告那一层：prefs 里存的是 JSON 文本，解析走 Gson 反射读字段
 -keep class com.pocket.xiaoli.data.announcement.** { *; }
 
+# 麦当劳蛋白榜的快照模型 —— **这条不是预防性的，是修一个真 bug**（2026-10-26 实测）。
+#
+# 现象：release 包里 `assets/mcd_protein.json` **确实在**（三个 APK 都验过），
+# 但页面报"数据文件缺失"。翻 `mapping.txt` 看到原因：
+#   `McProteinCatalogParser$WireCatalog` 被 R8 **水平合并**成了一个装 zxing / Compose
+#   静态字段的工具类，`WireItem` 整个类从映射里消失 —— 两个模型给 Gson 反射用的字段
+#   （store / city / items / name / price / protein …）一个都不剩。
+#   于是 release 里 `parse()` 永远返回 null，而 debug / 快照测试全绿（未混淆）。
+# `-keepclassmembers { <fields>; }` 只保"活下来的成员不改名"，保不住"整个类被合并掉"，
+# 所以照 entity / network / qzxy / announcement 的先例整包 keep。
+-keep class com.pocket.xiaoli.data.mcd.** { *; }
+
 # 节假日（holiday-cn）的响应模型 —— 2026-10-26 的日志导出里露出迹象：
 # 两年 × 四个镜像**全部 HTTP 200**，代码却把四个镜像全试完（= 每次都判定"解析后 0 条"）。
 # 原因**还没定**，两个候选：

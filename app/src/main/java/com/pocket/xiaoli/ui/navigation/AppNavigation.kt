@@ -3,6 +3,7 @@ package com.pocket.xiaoli.ui.navigation
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -57,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
@@ -126,6 +128,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.pocket.xiaoli.ui.theme.LocalSkin
+import com.pocket.xiaoli.ui.theme.Motion
 import com.pocket.xiaoli.ui.theme.tabContentAlpha
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -505,6 +508,20 @@ fun AppNavigation(initialDeepLink: String? = null) {
     // ui/navigation/BottomBarVisibility.kt —— **改这里之前先读那个文件。**
     val bottomBar = rememberBottomBarState(hasOpenSubPage, isTabRoute)
 
+    /**
+     * 底栏显隐的**进度**（1 = 完全露出，0 = 已收起）。
+     *
+     * 为什么不再用 `if (bottomBar.visible)` 直接切：那样栏体是"瞬间消失"，
+     * 而页面预留的底部空间（[LocalBottomBarInset]）同时从栏高跳到 0 ——
+     * 进 / 出二级页、收起键盘时都能看到内容**抖一下**。
+     * 现在栏体滑出 + 淡出，inset 乘的是同一个进度，两者走同一条曲线，不会各跳各的。
+     */
+    val barSlide by animateFloatAsState(
+        targetValue = if (bottomBar.visible) 1f else 0f,
+        animationSpec = tween(Motion.expand, easing = Motion.easing),
+        label = "bottomBarSlide",
+    )
+
     // ── 玻璃的采样源 ──
     // 只在真的选了玻璃时才录：录制会把整棵内容多画一遍到独立图层，不选的人不该付这个代价。
     val glassEnabled = bottomBarStyle == BottomBarStyle.LIQUID_GLASS
@@ -564,7 +581,7 @@ fun AppNavigation(initialDeepLink: String? = null) {
 
             // 页面据此预留底部空间：= 栏体高度，底栏隐藏时为 0dp（页面不必自己判断）
             CompositionLocalProvider(
-                LocalBottomBarInset provides if (bottomBar.visible) bottomBarInset else 0.dp,
+                LocalBottomBarInset provides bottomBarInset * barSlide,
                 LocalAppBackdrop provides samplingBackdrop,
                 LocalTextInputFocusReporter provides bottomBar.reportFocus,
                 LocalMascotLook provides mascotAppearance.assistantMascotLook,
@@ -951,11 +968,17 @@ fun AppNavigation(initialDeepLink: String? = null) {
             // ── 底栏浮层 ──
             // 叠在内容之上，而不是占 Scaffold 的槽位：内容因此能从栏背后滚过去，
             // 玻璃（以及将来的折射）才有采样源。
-            if (bottomBar.visible) {
+            // 收起时滑到屏外并淡出，**淡到底才不组合**（`barSlide > 0` 那层判断）：
+            // 早一步不组合会闪，晚一步玻璃层白采样一帧。
+            if (barSlide > 0.001f) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .graphicsLayer {
+                            alpha = barSlide
+                            translationY = (1f - barSlide) * bottomBarBodyPx
+                        }
                 ) {
                     // 外层让出系统手势区；里层才是真正的"栏体"，
                     // 所以这里量到的高度就是页面要预留的高度（不含手势区，避免与 Scaffold 的 padding 叠加）

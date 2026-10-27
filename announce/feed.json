@@ -9,16 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 95,
-    "versionName": "0.1.94",
+    "versionCode": 96,
+    "versionName": "0.1.95",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.94/koudaixiaoli_v0.1.94.apk",
-    "sha256": "2858bfa9233c55e734ae286ec98ae4b9464f7bae3274c576a09f7b2054271e7d",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.95/koudaixiaoli_v0.1.95.apk",
+    "sha256": "6c1f312cb5c2418dbf1f8945f7aa2321938f1d42f11bed2f6e20432f3ac2940e",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "新增「功能统计」：你点开的每个校园服务都会被计数（只记入口名，不记任何内容）",
-      "服务页点开照旧即时响应，统计在后台静默上报"
+      "检查更新更快：已经查到新版就不再干等那 0.9 秒",
+      "「更新渠道」真正生效了：选 Gitee 或 GitHub 会让那个源先跑；选「自动」仍然谁快用谁",
+      "三个选项文案改成说人话：谁快用谁 / 让它先跑"
     ]
   },
   "endpoints": {

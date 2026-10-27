@@ -6,6 +6,7 @@ import com.pocket.xiaoli.data.SelfHost
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
@@ -209,6 +210,17 @@ class AppUpdateChecker {
     @Volatile
     internal var lastWinnerUrl: String? = null
 
+    /**
+     * 非首选镜像要等多久才发车。
+     *
+     * uto **不等**：用户没表达偏好，这时候"谁快用谁"就是最优解，让任何一路
+     * 等 450ms 都只会变慢。只有用户明确选了 Gitee 或 GitHub 时才让那个源先跑，
+     * 这样"选了 GitHub"在他自己的网络里真的会更快——否则这个设置等于装饰。
+     */
+    internal fun headStartMs(channel: String): Long =
+        if (channel == CHANNEL_AUTO) 0L else CHANNEL_HEAD_START_MS
+    /** 只给测试看的镜像顺序快照：生产路径只该经 [fetchFeedRacing] 取链路。 */
+    internal fun feedMirrorsForTest(channel: String): List<String> = feedMirrors(channel)
     internal fun preferLastWinner(urls: List<String>): List<String> {
         val last = lastWinnerUrl ?: return urls
         val index = urls.indexOfFirst { stableKey(it) == last }
@@ -263,10 +275,21 @@ class AppUpdateChecker {
      * 「点检查更新」该有的手感：最坏耗时 = 最慢那个镜像，而不是它们的和。
      *
      * 失败时仍返回 [FeedFetch.Failed]，原因里带上是哪几个镜像挂了。
+     *
+     * **用户选的渠道真的有作用**（v0.1.95）：[feedMirrors] 排在第一的那条**立刻发车**，
+     * 其余镜像等 [CHANNEL_HEAD_START_MS] 再发。以前四条同时发车，"选 Gitee 还是
+     * GitHub"对检查耗时**没有任何影响**（谁快谁赢），用户会感觉这个开关是装饰品。
+     * 现在选了 GitHub 就让 GitHub 先跑 700ms —— 在你的网络里 GitHub 更快的话，
+     * 结果就是 GitHub 那个答案；700ms 内它没回来才让 Gitee 补位，两边都不吃亏。
+     *
+     * @param localVersionCode 本机 versionCode；拿到一个**比本机新**的答案时不再干等
+     *   满 [FRESH_GRACE_MS]（见 [pickNewest] 的 decisive），只留 [DECISIVE_GRACE_MS]
+     *   收一下几乎同时到达的第二名。传 0 表示不知道，退回旧行为。
      */
     suspend fun fetchFeedRacing(
         preferChannel: String = CHANNEL_AUTO,
         bustCache: Boolean = false,
+        localVersionCode: Int = 0,
     ): FeedFetch = coroutineScope {
         val startedAt = System.currentTimeMillis()
         val all = SelfHost.feedUrls(feedMirrors(preferChannel), bustCache)
@@ -274,8 +297,10 @@ class AppUpdateChecker {
         val urls = if (bustCache) all else all.filterNot { mirrorCoolingDown(it) }.ifEmpty { all }
         val errors = Collections.synchronizedList(mutableListOf<String>())
         val channel = Channel<Pair<String, FetchedFeed>>(Channel.UNLIMITED)
-        val jobs = urls.map { url ->
+        val jobs = urls.mapIndexed { index, url ->
             async(Dispatchers.IO) {
+                // 第一顺位（用户选的渠道）立刻发车，其余让出 700ms 的头位
+                if (index > 0) delay(headStartMs(preferChannel))
                 val doc = runCatching { fetchFeedAt(url, errors) }.getOrNull()
                 if (doc != null) {
                     markMirrorUp(url)
@@ -293,7 +318,14 @@ class AppUpdateChecker {
             channel.close()
         }
         val best = try {
-            pickNewest(channel, FETCH_BUDGET_MS, FRESH_GRACE_MS) { it.second.feed.versionCode }
+            pickNewest(
+                channel,
+                FETCH_BUDGET_MS,
+                FRESH_GRACE_MS,
+                versionOf = { it.second.feed.versionCode },
+                decisive = { localVersionCode > 0 && it.second.feed.versionCode > localVersionCode },
+                decisiveGraceMs = DECISIVE_GRACE_MS,
+            )
         } finally {
             closer.cancel()
             jobs.forEach { it.cancel() }
@@ -321,6 +353,12 @@ class AppUpdateChecker {
      * 采用更高者。
      */
     private val FRESH_GRACE_MS = 900L
+
+    /** 已经拿到「比本机新」的答案后，只再等这么点收尾（不再等满 grace） */
+    private val DECISIVE_GRACE_MS = 350L
+
+    /** 非首选渠道的镜像让出的头位：用户选的那个源先跑 700ms */
+    private val CHANNEL_HEAD_START_MS = 450L
 
     /** 失败镜像的冷却窗口：这段时间内的自动轮询不再碰它 */
     private val MIRROR_COOLDOWN_MS = 5 * 60 * 1000L
@@ -371,17 +409,28 @@ class AppUpdateChecker {
      * - 第一个结果到手后再等 [graceMs]，给「更慢但更新」的镜像一个机会。
      * - **通道关闭 = 所有镜像都回来了**，这时立刻收手：不存在"还会来"的结果，
      *   再等就是纯白等。
+     * - [decisive] 为真（通常意味着"这个版本已经比本机新"）时，只再等
+     *   [decisiveGraceMs] 收一下几乎同时到达的第二名，不再干等满 [graceMs]：
+     *   反正已经有可装的版本，慢镜像多给的只是"更新的新版"，下次检查照样能发现。
      */
     internal suspend fun <T : Any> pickNewest(
         channel: ReceiveChannel<T>,
         budgetMs: Long,
         graceMs: Long,
+        decisive: (T) -> Boolean = { false },
+        decisiveGraceMs: Long = graceMs,
         versionOf: (T) -> Int,
     ): T? = withTimeoutOrNull(budgetMs) {
         var top: T? = null
         var topVersion = Int.MIN_VALUE
         while (true) {
-            val wait = if (top == null) budgetMs else graceMs
+            val current = top
+            val wait = when {
+                current == null -> budgetMs
+                decisive(current) -> decisiveGraceMs
+                else -> graceMs
+            }
+            if (wait <= 0L) break
             val got = withTimeoutOrNull(wait) { channel.receiveCatching().getOrNull() } ?: break
             val version = versionOf(got)
             if (version > topVersion) {

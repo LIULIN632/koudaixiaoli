@@ -71,6 +71,43 @@ class McProteinScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/screenshots/343-mcd-protein-dark.png")
     }
 
+    /**
+     * 两种空态各说各的话（2026-10-26 修）。
+     *
+     * 真机报的是"数据文件缺失"，可 release 包里那个 json **确实在**（三个 APK 都查过）；
+     * 真正的原因是 R8 把 Gson 反射用的模型合并掉了，`parse()` 在正式包里永远返回 null。
+     * 旧文案只有一句"重装一次试试"—— 对这一类原因，重装一万次也不会好。
+     * 所以这里把两种原因分开，各留一张图，防止以后又被揉回一句含糊话。
+     */
+    @Test
+    fun `两种空态分别说清原因`() {
+        val failure = mutableStateOf(McProteinLoadFailure.MissingAsset)
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                McProteinIndexContent(
+                    catalog = null,
+                    failure = failure.value,
+                    initialSlot = McProteinSlot.BREAKFAST,
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("榜单数据没带进来").assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/352-mcd-empty-missing.png")
+
+        composeRule.runOnIdle { failure.value = McProteinLoadFailure.ParseFailed }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("榜单数据读不出内容").assertExists()
+        composeRule.onNodeWithText("重装同一个包不会好", substring = true).assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/353-mcd-empty-parse-failed.png")
+    }
+
     @Test
     fun `切到正餐出现正餐单品`() {
         composeRule.setContent {

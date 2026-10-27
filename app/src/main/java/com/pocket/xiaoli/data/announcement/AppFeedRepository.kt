@@ -141,7 +141,7 @@ class AppFeedRepository(
             // 并行竞速（Gitee raw / GitHub raw / contents API 同时发，版本最高者胜）：
             // 带 bustCache=true 打掉 CDN 边缘缓存（Gitee raw max-age=60、GitHub raw 300），
             // 否则发版后几分钟内点检查会读到旧 feed，被误判成「已是最新版本」。
-            checker.fetchFeedRacing(store.preferredChannel(), bustCache = true)
+            checker.fetchFeedRacing(store.preferredChannel(), bustCache = true, localVersionCode = versionCodeProvider())
         } catch (t: Throwable) {
             // 兜底：任何没被 catch 住的东西都不该让状态永远停在「正在检查」
             FeedFetch.Failed(

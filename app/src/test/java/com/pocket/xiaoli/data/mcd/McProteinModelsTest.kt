@@ -89,4 +89,27 @@ class McProteinModelsTest {
         assertEquals(McProteinSlot.DINNER, McProteinSlot.forClock(10, 30))
         assertEquals(McProteinSlot.BREAKFAST, McProteinSlot.forClock(0, 0))
     }
+
+    @Test
+    fun `海报那句对比由快照现算`() {
+        // 这两组数字原先是**手写进海报文案**的（"早餐 ¥18，正餐 ¥23"）。
+        // 现在海报调 cheapestPrice，快照一换文案自己跟着变；这条用例把当前快照的结论钉住，
+        // 下次更新数据时如果价格变了，这里会红 —— 那正是提醒你去核对，而不是让文案变假话。
+        assertEquals(
+            18.0,
+            McProteinPlanner.cheapestPrice(catalog.ranking(McProteinSlot.BREAKFAST), 27.0)!!,
+            1e-6,
+        )
+        assertEquals(
+            23.0,
+            McProteinPlanner.cheapestPrice(catalog.ranking(McProteinSlot.DINNER), 27.0)!!,
+            1e-6,
+        )
+    }
+
+    @Test
+    fun `目标为零或没有单品时不给价格`() {
+        assertEquals(null, McProteinPlanner.cheapestPrice(catalog.ranking(McProteinSlot.DINNER), 0.0))
+        assertEquals(null, McProteinPlanner.cheapestPrice(emptyList(), 27.0))
+    }
 }

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocket.xiaoli.BuildConfig
 import com.pocket.xiaoli.data.mcd.McProteinCatalog
 import com.pocket.xiaoli.data.mcd.McProteinCatalogParser
 import com.pocket.xiaoli.data.mcd.McProteinItem
@@ -70,26 +71,37 @@ import java.util.Locale
  * 2. **预算凑蛋白**：无界背包求"预算内最省钱地吃够目标蛋白"；
  * 3. **时段**：按门店时钟 10:30 自动选早餐/正餐，可手动切（不同门店可能差几分钟）。
  */
+/** 空态的两种原因。**"文件没进包"和"文件读到了但解析不出"必须分开说** ——
+ *  后者重装一万次也不会好，而原来的文案让人去重装。 */
+internal enum class McProteinLoadFailure { MissingAsset, ParseFailed }
+
 @Composable
 fun McProteinIndexPage(onBack: () -> Unit) {
     val context = LocalContext.current
-    val catalog = remember {
-        runCatching {
-            context.assets.open("mcd_protein.json").bufferedReader().use { it.readText() }
-        }.getOrNull()?.let(McProteinCatalogParser::parse)
+    val assetText = runCatching {
+        context.assets.open(ASSET_NAME).bufferedReader().use { it.readText() }
+    }.getOrNull()
+    val catalog = assetText?.let(McProteinCatalogParser::parse)
+    val failure = when {
+        catalog != null -> null
+        assetText == null -> McProteinLoadFailure.MissingAsset
+        else -> McProteinLoadFailure.ParseFailed
     }
     val initialSlot = remember {
         val now = LocalTime.now()
         McProteinSlot.forClock(now.hour, now.minute)
     }
-    McProteinIndexContent(catalog = catalog, initialSlot = initialSlot, onBack = onBack)
+    McProteinIndexContent(catalog = catalog, failure = failure, initialSlot = initialSlot, onBack = onBack)
 }
+
+private const val ASSET_NAME = "mcd_protein.json"
 
 @Composable
 internal fun McProteinIndexContent(
     catalog: McProteinCatalog?,
     initialSlot: McProteinSlot,
     onBack: () -> Unit,
+    failure: McProteinLoadFailure? = McProteinLoadFailure.MissingAsset,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -112,10 +124,19 @@ internal fun McProteinIndexContent(
         ) {
             if (catalog == null) {
                 item(key = "empty") {
+                    // 两种原因说两句不同的话：让人去重装能解决的那一种才提重装。
+                    val (title, message) = when (failure) {
+                        McProteinLoadFailure.ParseFailed -> "榜单数据读不出内容" to
+                            "文件在包里，但一条单品都没解析出来。这通常是打包时把数据模型裁掉了" +
+                            "（只在正式包里出现，测试包是好的）—— 重装同一个包不会好，请把这句反馈给开发者。"
+                        else -> "榜单数据没带进来" to
+                            "安装包里没有 $ASSET_NAME（当前 v${BuildConfig.VERSION_NAME}）。" +
+                            "多半是装到的包比这个功能早，换一个重新构建的包装就好。"
+                    }
                     ServiceEmptyCard(
                         icon = Icons.Outlined.Fastfood,
-                        title = "榜单数据没带进来",
-                        message = "安装包里的 mcd_protein.json 缺失或格式不对，重装一次试试。",
+                        title = title,
+                        message = message,
                         accent = ServiceAccent.LIFE,
                     )
                 }
@@ -160,6 +181,11 @@ internal fun McProteinIndexContent(
 @Composable
 private fun Hero(catalog: McProteinCatalog) {
     val skin = LocalSkin.current
+    // 那句对比**从快照现算**，不写死：原先是手抄的「早餐 ¥18，正餐 ¥23」，
+    // 快照一更新文案就会悄悄变成假话（而它看起来完全像真话）。
+    val targetGram = 27.0
+    val breakfast = McProteinPlanner.cheapestPrice(catalog.ranking(McProteinSlot.BREAKFAST), targetGram)
+    val dinner = McProteinPlanner.cheapestPrice(catalog.ranking(McProteinSlot.DINNER), targetGram)
     ServiceHeroCard(accent = ServiceAccent.LIFE) {
         Text(
             "每 1 元，能买多少克蛋白？",
@@ -170,7 +196,17 @@ private fun Hero(catalog: McProteinCatalog) {
         )
         Spacer(Modifier.height(skin.spaceXs))
         Text(
-            "同一家店凑 27 g 蛋白：早餐 ¥18，正餐 ¥23。",
+            text = if (breakfast == null || dinner == null) {
+                "同一份蛋白目标，早餐和正餐差多少？看下面的榜单自己比。"
+            } else {
+                String.format(
+                    Locale.CHINA,
+                    "同一家店凑 %.0f g 蛋白：早餐 ¥%.0f，正餐 ¥%.0f。",
+                    targetGram,
+                    breakfast,
+                    dinner,
+                )
+            },
             fontSize = 12.sp,
             lineHeight = 18.sp,
             color = Color.White.copy(alpha = 0.9f),

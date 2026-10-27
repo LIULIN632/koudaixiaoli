@@ -378,9 +378,9 @@ private fun UpdateContent(
             icon = Icons.Filled.Cloud,
             title = "更新渠道",
             options = listOf(
-                "自动（推荐）" to "auto",
-                "Gitee" to "gitee",
-                "GitHub" to "github",
+                "自动：谁快用谁" to "auto",
+                "Gitee：让它先跑" to "gitee",
+                "GitHub：让它先跑" to "github",
             ),
             selected = channel,
             onSelect = {
