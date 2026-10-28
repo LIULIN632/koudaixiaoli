@@ -599,6 +599,9 @@ fun AppNavigation(initialDeepLink: String? = null) {
                     .padding(hostPadding)
                     .consumeWindowInsets(hostPadding)
                     .imePadding()
+                    // 页内二级页开合时滑一下（服务页那 28 个分支是早退结构，只能在路由层做，
+                    // 理由与方向语义见 SubPageEnter.kt）
+                    .subPageEnter(shouldSlideOnSubPage(currentRouteTemplate, hasOpenSubPage))
                     .glassSource(samplingBackdrop),
             // 转场按「是否切换到同级 Tab」区分，见文件末尾 routeTransitions() 的说明
             enterTransition = { routeTransitions(initialState, targetState).enter },

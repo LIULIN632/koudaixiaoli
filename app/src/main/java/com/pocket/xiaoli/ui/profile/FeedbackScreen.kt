@@ -2,57 +2,20 @@ package com.pocket.xiaoli.ui.profile
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.outlined.MailOutline
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.BuildConfig
 import com.pocket.xiaoli.data.contribution.ContributionAction
-import com.pocket.xiaoli.data.feedback.FeedbackCategory
 import com.pocket.xiaoli.data.feedback.FeedbackDraft
 import com.pocket.xiaoli.data.feedback.FeedbackFormatter
 import com.pocket.xiaoli.data.feedback.FeedbackLimits
@@ -61,8 +24,7 @@ import com.pocket.xiaoli.data.feedback.FeedbackStore
 import com.pocket.xiaoli.data.feedback.SubmitGate
 import com.pocket.xiaoli.data.feedback.SubmitOutcome
 import com.pocket.xiaoli.di.AppContainer
-import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
-import com.pocket.xiaoli.ui.theme.LocalSkin
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -99,12 +61,26 @@ private const val FEEDBACK_REPO = "LIULIN632/koudaixiaoli"
  * 「附带设备信息」默认**关**。不勾时正文里只有用户自己写的字。
  * 只有「直接发送」会附带一条设备号哈希的匿名标识（见 [FeedbackStore.anonId]），
  * 复制 / 邮件 / GitHub 不碰它。
+ *
+ * ## 2026-10-28 这轮美化改了什么（以及为什么）
+ *
+ * 原先这一页是**全 App 唯一没走设置页语言的地方**：Material3 原生 `Switch`、
+ * 三种按钮样式（实心 / 半宽描边 / 文字）叠在一起，四个渠道各长得不一样，
+ * 而它们做的是同一件事。这轮把它们归口：
+ *
+ * - 「附带设备信息」→ [SettingsSwitchItem]（图标块 + MIUIX 开关 + 「?」），与别的开关行同一形态；
+ * - 四个渠道 → [FeedbackChannelTile] 2×2 格（边界 + MIUIX 按压下沉），说明只写"这条比别条好在哪"；
+ * - 「我提过的」→ 状态做成胶囊（待重发 / 有回复 / 等回复用三种语义色），回复正文做成带色条的引用块，
+ *   整条可点并有按压反馈，并补上**什么时候提的**（`atMillis` 一直在账本里，以前从不显示）；
+ * - 底部隐私承诺 → 带锁图标的小卡，仍然常驻可见（这是承诺，不是复述性小字，不能收进气泡）。
+ *
+ * ⚠️ 全部视觉块都拆成了 `internal` 的纯内容（吃数据 + 回调，不碰 `AppContainer`）——
+ * 不是洁癖，是因为 `FeedbackContent` 的第一个参数是真 DI 容器，Robolectric 里造不出来，
+ * 不拆就**一张基线都录不了**（`AccountBindingScreenshotTest` 的 KDoc 记过同一件事）。
  */
 @Composable
 internal fun ColumnScope.FeedbackContent(container: AppContainer) {
     val context = LocalContext.current
-    val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
     val scope = rememberCoroutineScope()
     val store = remember { FeedbackStore(context) }
     val contribution = remember(container) { container.contributionRepository }
@@ -216,365 +192,141 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
         if (replyReady) loadReplies(force = false)
     }
 
-    // ── 写什么 ──
-    SettingsCard {
-        Column(
-            modifier = Modifier.padding(horizontal = skin.spaceLg, vertical = skin.spaceMd),
-            verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
-        ) {
-            Text(
-                "哪里不对？",
-                color = colors.textPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceXs)) {
-                FeedbackCategory.entries.forEach { category ->
-                    FilterChip(
-                        selected = draft.category == category,
-                        onClick = { draft = draft.copy(category = category) },
-                        label = { Text(category.label, fontSize = 13.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = colors.accentMain.copy(alpha = 0.16f),
-                            selectedLabelColor = colors.accentMain,
-                        ),
-                    )
-                }
-            }
-            OutlinedTextField(
-                value = draft.content,
-                onValueChange = {
-                    if (it.length <= FeedbackLimits.MAX_CONTENT_LENGTH) draft = draft.copy(content = it)
-                },
-                enabled = !sending,
-                placeholder = { Text("说说遇到了什么：点哪儿、看到了什么、你本来想干嘛", color = colors.textTertiary) },
-                minLines = 5,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = colors.accentMain,
-                    cursorColor = colors.accentMain,
-                ),
-            )
-            if (draft.content.length > FeedbackLimits.MAX_CONTENT_LENGTH - 200) {
-                Text(
-                    "${draft.content.length} / ${FeedbackLimits.MAX_CONTENT_LENGTH}",
-                    modifier = Modifier.align(Alignment.End),
-                    color = if (draft.content.length >= FeedbackLimits.MAX_CONTENT_LENGTH) {
-                        colors.accentMain
-                    } else {
-                        colors.textTertiary
-                    },
-                    fontSize = 11.sp,
-                )
-            }
-            OutlinedTextField(
-                value = draft.contact,
-                onValueChange = {
-                    if (it.length <= FeedbackLimits.MAX_CONTACT_LENGTH) draft = draft.copy(contact = it)
-                },
-                enabled = !sending,
-                placeholder = { Text("联系方式（选填，想收到回复就留）", color = colors.textTertiary) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = colors.accentMain,
-                    cursorColor = colors.accentMain,
-                ),
-            )
-        }
-    }
-
-    // ── 带不带环境 ──
-    SettingsSectionHeader("附带信息")
-    SettingsCard {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = skin.spaceLg, vertical = skin.spaceMd),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("附带设备信息", color = colors.textPrimary, fontSize = 15.sp)
-                Text(
-                    "只在你勾选时带上，不勾就只发你写的字",
-                    color = colors.textTertiary,
-                    fontSize = 12.sp,
-                )
-            }
-            Switch(
-                checked = draft.includeDiagnostics,
-                onCheckedChange = { draft = draft.copy(includeDiagnostics = it) },
-            )
-        }
-        if (draft.includeDiagnostics) {
-            Text(
-                diagnostics,
-                modifier = Modifier.padding(horizontal = skin.spaceLg).padding(bottom = skin.spaceMd),
-                color = colors.textSecondary,
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-            )
-        }
-    }
-
-    // ── 怎么发 ──
-    SettingsSectionHeader("发出去")
-    val enabled = draft.isSendable && !sending
-    Column(verticalArrangement = Arrangement.spacedBy(skin.spaceXs)) {
-        if (remoteReady) {
-            Button(
-                onClick = {
-                    when (val gate = store.submitGate()) {
-                        is SubmitGate.Cooling -> Toast.makeText(
-                            context,
-                            "刚提交过，${gate.secondsLeft} 秒后再试",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-
-                        SubmitGate.DailyLimit -> Toast.makeText(
-                            context,
-                            "今天已经提了 ${FeedbackLimits.DAILY_MAX} 条，明天再来吧",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-
-                        SubmitGate.Ok -> {
-                            val (now, ticket) = openTicket()
-                            store.markSubmitAttempt(now)
-                            val snapshot = draft
-                            val anonId = store.anonId()
-                            scope.launch {
-                                sending = true
-                                val outcome = FeedbackRemote.submit(context, snapshot, ticket, diagnostics, anonId)
-                                sending = false
-                                when (outcome) {
-                                    SubmitOutcome.Sent -> {
-                                        store.markSent(ticket)
-                                        contribution.record(ContributionAction.FEEDBACK_SEND)
-                                        draft = draft.copy(content = "", contact = "")
-                                        Toast.makeText(context, "已发送 · 工单 $ticket", Toast.LENGTH_SHORT).show()
-                                    }
-
-                                    is SubmitOutcome.Retryable -> {
-                                        val queued = store.enqueue(
-                                            FeedbackStore.Pending(
-                                                ticketId = ticket,
-                                                category = snapshot.category,
-                                                content = snapshot.content.trim(),
-                                                contact = snapshot.contact.trim(),
-                                                includeDiagnostics = snapshot.includeDiagnostics,
-                                                atMillis = now,
-                                                diagnostics = diagnostics.takeIf { snapshot.includeDiagnostics },
-                                            )
-                                        )
-                                        if (queued) draft = draft.copy(content = "", contact = "")
-                                        Toast.makeText(
-                                            context,
-                                            if (queued) {
-                                                "网络不通，已存本机，下次进这页自动重发 · 工单 $ticket"
-                                            } else {
-                                                "本地待发已满，请先复制内容手动发出去"
-                                            },
-                                            Toast.LENGTH_LONG,
-                                        ).show()
-                                    }
-
-                                    is SubmitOutcome.Rejected -> Toast.makeText(
-                                        context,
-                                        outcome.reason,
-                                        Toast.LENGTH_LONG,
-                                    ).show()
-                                }
-                                syncLocalState()
-                            }
-                        }
-                    }
-                },
-                enabled = enabled,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (sending) {
-                    CircularProgressIndicator(modifier = Modifier.padding(2.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Filled.Send, null, modifier = Modifier.padding(end = 6.dp))
-                    Text("直接发送")
-                }
-            }
-        }
-
-        Button(
-            onClick = { copyToClipboard(body(), "已复制，粘贴到微信 / QQ 发给开发者就行") },
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
-            colors = if (remoteReady) {
-                ButtonDefaults.buttonColors(
-                    containerColor = colors.surfaceAlt,
-                    contentColor = colors.textPrimary,
-                )
-            } else {
-                ButtonDefaults.buttonColors()
-            },
-        ) {
-            Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.padding(end = 6.dp))
-            Text("复制反馈内容")
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceXs)) {
-            OutlinedButton(
-                onClick = {
-                    val (now, ticket) = openTicket()
-                    val url = FeedbackFormatter.mailtoUrl(FEEDBACK_MAIL, draft, ticket, now, diagnostics)
-                    runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(url))) }
-                        .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
-                        .onFailure { copyToClipboard(body(), "没找到邮件 App，已复制内容") }
-                },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(Icons.Outlined.MailOutline, null, modifier = Modifier.padding(end = 4.dp))
-                Text("邮件", fontSize = 14.sp)
-            }
-            OutlinedButton(
-                onClick = {
-                    val (now, ticket) = openTicket()
-                    val url = FeedbackFormatter.issueUrl(FEEDBACK_REPO, draft, ticket, now, diagnostics)
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                        .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
-                        .onFailure { copyToClipboard(body(), "打不开浏览器，已复制内容") }
-                },
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(Icons.Filled.OpenInNew, null, modifier = Modifier.padding(end = 4.dp))
-                Text("GitHub", fontSize = 14.sp)
-            }
-        }
-
-        TextButton(
-            onClick = {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, body())
-                }
-                runCatching {
-                    context.startActivity(Intent.createChooser(intent, "分享反馈"))
-                }
-                    .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
-                    .onFailure { copyToClipboard(body(), "没有可分享的应用，已复制内容") }
-            },
-            enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("通过其他应用分享", fontSize = 14.sp)
-        }
-    }
-
-    // ── 提过的 ──
-    if (history.isNotEmpty()) {
-        SettingsSectionHeader("我提过的")
-        SettingsCard {
-            history.forEachIndexed { index, entry ->
-                if (index > 0) SettingsDivider()
-                val queued = pending[entry.ticketId]
-                val reply = replies[entry.ticketId]
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            // 排队中的草稿只存了全文在队列里，复制预览等于丢字。
-                            val text = if (queued != null) {
-                                "${queued.category.label}：${queued.content}\n工单 ${entry.ticketId}"
-                            } else {
-                                "${entry.category.label}：${entry.preview}\n工单 ${entry.ticketId}"
-                            }
-                            copyToClipboard(text, if (queued != null) "已复制全文" else "已复制这条")
-                        }
-                        .padding(horizontal = skin.spaceLg, vertical = skin.spaceSm),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            entry.category.label,
-                            color = colors.accentMain,
-                            fontSize = 12.sp,
-                            modifier = Modifier
-                                .border(1.dp, colors.accentMain.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 1.dp),
-                        )
-                        Text(
-                            "  ${entry.ticketId}",
-                            color = colors.textTertiary,
-                            fontSize = 11.sp,
-                        )
-                    }
-                    Text(
-                        entry.preview.ifBlank { "（空）" },
-                        color = colors.textSecondary,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    when {
-                        queued != null -> Text(
-                            if (queued.blocked) "发送失败 · 点这条复制全文，手动发出去" else "待联网重发 · 点这条复制全文",
-                            color = colors.textTertiary,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
-
-                        reply != null -> {
-                            Text(
-                                if (reply.at.isBlank()) "回复" else "回复 · ${reply.at}",
-                                color = colors.accentMain,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(top = 2.dp),
-                            )
-                            Text(
-                                reply.text,
-                                color = colors.textSecondary,
-                                fontSize = 12.sp,
-                                lineHeight = 17.sp,
-                                maxLines = 4,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-
-                        entry.ticketId in sentIds -> Text(
-                            "已发送 · 等回复",
-                            color = colors.textTertiary,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
-                    }
-                }
-            }
-        }
-        if (replyReady && sentIds.isNotEmpty()) {
-            TextButton(
-                onClick = {
-                    scope.launch {
-                        checkingReplies = true
-                        loadReplies(force = true)
-                        checkingReplies = false
-                    }
-                },
-                enabled = !checkingReplies,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (checkingReplies) "正在检查…" else "检查回复", fontSize = 13.sp)
-            }
-        }
-    }
-
-    Text(
-        "反馈只在你按下按钮的那一刻才离开这台手机 —— 平时一个字节都不会往外发。" +
-            "「直接发送」会另附一条设备号哈希出的匿名标识（不含学号），用来把同一台设备的多条反馈串起来。",
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.surfaceAlt, RoundedCornerShape(skin.radiusChip))
-            .padding(skin.spaceMd),
-        color = colors.textTertiary,
-        fontSize = 12.sp,
-        lineHeight = 18.sp,
+    FeedbackFormCard(
+        draft = draft,
+        sending = sending,
+        onDraftChange = { draft = it },
     )
+
+    FeedbackAttachCard(
+        diagnostics = diagnostics,
+        included = draft.includeDiagnostics,
+        onToggle = { draft = draft.copy(includeDiagnostics = it) },
+    )
+
+    FeedbackSendSection(
+        remoteReady = remoteReady,
+        enabled = draft.isSendable && !sending,
+        sending = sending,
+        onSend = {
+            when (val gate = store.submitGate()) {
+                is SubmitGate.Cooling -> Toast.makeText(
+                    context,
+                    "刚提交过，${gate.secondsLeft} 秒后再试",
+                    Toast.LENGTH_SHORT,
+                ).show()
+
+                SubmitGate.DailyLimit -> Toast.makeText(
+                    context,
+                    "今天已经提了 ${FeedbackLimits.DAILY_MAX} 条，明天再来吧",
+                    Toast.LENGTH_SHORT,
+                ).show()
+
+                SubmitGate.Ok -> {
+                    val (now, ticket) = openTicket()
+                    store.markSubmitAttempt(now)
+                    val snapshot = draft
+                    val anonId = store.anonId()
+                    scope.launch {
+                        sending = true
+                        val outcome = FeedbackRemote.submit(context, snapshot, ticket, diagnostics, anonId)
+                        sending = false
+                        when (outcome) {
+                            SubmitOutcome.Sent -> {
+                                store.markSent(ticket)
+                                contribution.record(ContributionAction.FEEDBACK_SEND)
+                                draft = draft.copy(content = "", contact = "")
+                                Toast.makeText(context, "已发送 · 工单 $ticket", Toast.LENGTH_SHORT).show()
+                            }
+
+                            is SubmitOutcome.Retryable -> {
+                                val queued = store.enqueue(
+                                    FeedbackStore.Pending(
+                                        ticketId = ticket,
+                                        category = snapshot.category,
+                                        content = snapshot.content.trim(),
+                                        contact = snapshot.contact.trim(),
+                                        includeDiagnostics = snapshot.includeDiagnostics,
+                                        atMillis = now,
+                                        diagnostics = diagnostics.takeIf { snapshot.includeDiagnostics },
+                                    )
+                                )
+                                if (queued) draft = draft.copy(content = "", contact = "")
+                                Toast.makeText(
+                                    context,
+                                    if (queued) {
+                                        "网络不通，已存本机，下次进这页自动重发 · 工单 $ticket"
+                                    } else {
+                                        "本地待发已满，请先复制内容手动发出去"
+                                    },
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+
+                            is SubmitOutcome.Rejected -> Toast.makeText(
+                                context,
+                                outcome.reason,
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                        syncLocalState()
+                    }
+                }
+            }
+        },
+        onCopy = { copyToClipboard(body(), "已复制，粘贴到微信 / QQ 发给开发者就行") },
+        onMail = {
+            val (now, ticket) = openTicket()
+            val url = FeedbackFormatter.mailtoUrl(FEEDBACK_MAIL, draft, ticket, now, diagnostics)
+            runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(url))) }
+                .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
+                .onFailure { copyToClipboard(body(), "没找到邮件 App，已复制内容") }
+        },
+        onIssue = {
+            val (now, ticket) = openTicket()
+            val url = FeedbackFormatter.issueUrl(FEEDBACK_REPO, draft, ticket, now, diagnostics)
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
+                .onFailure { copyToClipboard(body(), "打不开浏览器，已复制内容") }
+        },
+        onShare = {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, body())
+            }
+            runCatching { context.startActivity(Intent.createChooser(intent, "分享反馈")) }
+                .onSuccess { contribution.record(ContributionAction.FEEDBACK_SEND) }
+                .onFailure { copyToClipboard(body(), "没有可分享的应用，已复制内容") }
+        },
+    )
+
+    if (history.isNotEmpty()) {
+        FeedbackHistorySection(
+            entries = history,
+            pending = pending,
+            replies = replies,
+            sentIds = sentIds,
+            canCheck = replyReady && sentIds.isNotEmpty(),
+            checking = checkingReplies,
+            onCopyEntry = { entry ->
+                // 排队中的草稿只存了全文在队列里，复制预览等于丢字。
+                val queued = pending[entry.ticketId]
+                val text = if (queued != null) {
+                    "${queued.category.label}：${queued.content}\n工单 ${entry.ticketId}"
+                } else {
+                    "${entry.category.label}：${entry.preview}\n工单 ${entry.ticketId}"
+                }
+                copyToClipboard(text, if (queued != null) "已复制全文" else "已复制这条")
+            },
+            onCheckReplies = {
+                scope.launch {
+                    checkingReplies = true
+                    loadReplies(force = true)
+                    checkingReplies = false
+                }
+            },
+        )
+    }
+
+    FeedbackPrivacyNote()
 }

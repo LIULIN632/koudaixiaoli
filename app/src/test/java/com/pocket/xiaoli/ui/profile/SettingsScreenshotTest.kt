@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.pocket.xiaoli.data.announcement.AppFeedRepository
 import com.pocket.xiaoli.ui.components.MiuixSettingsScaffold
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
@@ -290,6 +291,80 @@ class SettingsScreenshotTest {
                                 hint = "课前自动发一条提醒。",
                             )
                         }
+                    }
+                }
+            }
+        }
+        cases.forEach { case ->
+            current.value = case
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/screenshots/${case.first}")
+        }
+    }
+
+    /**
+     * 「设置 → 更新」整页，按**检查结果**拍三张（常态 / 有新版·内测 / 这一轮没查上）。
+     *
+     * 这一页 2026-10-28 重排过：动作（检查更新、更新日志）提到第一张卡，三个开关归进
+     * 「自动检查」。它的新行为全在「检查更新」那行的小字上，而小字是
+     * `AppFeedRepository.State.checkTrace()` 算的 —— **算错时编译与单测都不会红**：
+     * 把「你选了稍后提醒」显示成「已是最新」、把内测包写成正式版，只有看图才发现。
+     *
+     * 内容拆成 [UpdatePageContent] 才拍得到：本体要 `AppContainer`（Room / prefs / WorkManager），
+     * 与 `RecommendSheetBody`、`SettingsHomeContent` 同一个理由。
+     *
+     * ⚠️ 只拍浅色：这组要钉的是"小字说没说清 + 两段层次"，明暗节奏已由 175/176 钉住。
+     * ⚠️ 图里的版本号是测试自己造的（`1.2.2` / `1.2.3`），**不读 `BuildConfig`** ——
+     *   基线里不许写会随发版漂的值（见 `memory/04-ui-verification.md` 八·补）。
+     */
+    @Test
+    fun `更新页三种结果截图`() {
+        // 65 分钟前：足够落到"1 小时前查过"这一档，又离换档点足够远，不会因为跑测慢半分钟就换字
+        val checkedAt = System.currentTimeMillis() - 65 * 60_000
+        val cases = listOf(
+            "354-update-normal.png" to AppFeedRepository.State(
+                loaded = true,
+                lastCheckedAt = checkedAt,
+                latestVersionCode = 122,
+                latestVersionName = "1.2.2",
+            ),
+            "355-update-new-beta.png" to AppFeedRepository.State(
+                loaded = true,
+                updateAvailable = true,
+                newerVersionExists = true,
+                updateIsBeta = true,
+                lastCheckedAt = checkedAt,
+                latestVersionCode = 123,
+                latestVersionName = "1.2.3",
+            ),
+            "356-update-failed.png" to AppFeedRepository.State(
+                loaded = true,
+                lastCheckedAt = checkedAt,
+                latestVersionCode = 122,
+                latestVersionName = "1.2.2",
+                error = "检查失败：Gitee raw 返回 504（read timed out）",
+            ),
+        )
+        val current = mutableStateOf(cases.first())
+        composeRule.setContent {
+            val (_, state) = current.value
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                CompositionLocalProvider(LocalProfileRowPadding provides 14.dp) {
+                    SettingsSubPageScaffold(title = "更新", onBack = {}) {
+                        UpdatePageContent(
+                            feedState = state,
+                            backgroundCheck = true,
+                            channel = if (state.updateIsBeta) "gitee" else "auto",
+                            betaEnabled = state.updateIsBeta,
+                            onToggleBackground = {},
+                            onChannel = {},
+                            onToggleBeta = {},
+                            onCheckUpdate = {},
+                            onChangelog = {},
+                        )
                     }
                 }
             }

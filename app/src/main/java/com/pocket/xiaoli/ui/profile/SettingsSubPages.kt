@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.BuildConfig
+import com.pocket.xiaoli.data.announcement.AppFeedRepository
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.notification.AppFeedScheduler
 import com.pocket.xiaoli.data.legal.AgreementText
@@ -357,6 +358,13 @@ private fun AboutContent(
 // 这三项改造前**分散在三个不同的组**里（自动检查更新在「功能开关」、
 // 检查更新与更新日志各自在「关于」）。聚到一页之后，
 // "我要更新"这一个念头只需要进一页。
+//
+// 组内再分两段（2026-10-28）：**动作在上、开关在下**。原先「检查更新」压在
+// 渠道/内测/后台三个开关底下（第四行），而进这一页的人绝大多数就是来点它的。
+//
+// ⚠️ 内容拆成 [UpdatePageContent]（吃状态、不碰容器）才截得到图 —— 与
+// `RecommendSheetBody`、`SettingsHomeContent` 同一个理由：本体要 `AppContainer`
+// （Room / prefs / WorkManager），Robolectric 里渲不出来就只能靠真机验收。
 @Composable
 private fun UpdateContent(
     container: AppContainer,
@@ -372,67 +380,61 @@ private fun UpdateContent(
     var channel by remember { mutableStateOf(appFeedStore.preferredChannel()) }
     var betaEnabled by remember { mutableStateOf(appFeedStore.betaEnabled()) }
     val context = LocalContext.current
+    // 进行中和结论都从仓库状态里读，不另存一份 —— 免得两处状态对不上
+    val feedState by container.appFeedRepository.state.collectAsStateWithLifecycle()
+
+    UpdatePageContent(
+        feedState = feedState,
+        backgroundCheck = backgroundCheck,
+        channel = channel,
+        betaEnabled = betaEnabled,
+        onToggleBackground = {
+            val next = !backgroundCheck
+            backgroundCheck = next
+            appFeedStore.setBackgroundEnabled(next)
+            if (next) AppFeedScheduler.schedule(context) else AppFeedScheduler.cancel(context)
+        },
+        onChannel = {
+            channel = it
+            appFeedStore.setPreferredChannel(it)
+        },
+        onToggleBeta = {
+            val next = !betaEnabled
+            betaEnabled = next
+            appFeedStore.setBetaEnabled(next)
+            // 两个通道的块本来就在同一份 feed 里，所以不用重新联网 —— 重算一遍渲染就立刻见效
+            container.appFeedRepository.reapplyChannel()
+        },
+        onCheckUpdate = onCheckUpdate,
+        onChangelog = onChangelog,
+    )
+}
+
+/** [UpdateContent] 的全部内容，状态与动作全部由外面给（这样才拍得到快照）。 */
+@Composable
+internal fun UpdatePageContent(
+    feedState: AppFeedRepository.State,
+    backgroundCheck: Boolean,
+    channel: String,
+    betaEnabled: Boolean,
+    onToggleBackground: () -> Unit,
+    onChannel: (String) -> Unit,
+    onToggleBeta: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    onChangelog: () -> Unit,
+) {
     SettingsCard {
-        // 照岱宗盒子的做法：这一行不跳页，点了就地弹气泡菜单选。
-        SettingsMenuChoiceItem(
-            icon = Icons.Filled.Cloud,
-            title = "更新渠道",
-            options = listOf(
-                "自动：谁快用谁" to "auto",
-                "Gitee：让它先跑" to "gitee",
-                "GitHub：让它先跑" to "github",
-            ),
-            selected = channel,
-            onSelect = {
-                channel = it
-                appFeedStore.setPreferredChannel(it)
-            },
-            accent = ServiceAccent.QUERY,
-        )
-        SettingsDivider()
-        // 内测通道：读 feed.json 的 beta 块（比 stable 新的那一版）。
-        // 名字刻意不叫「测试版」也不叫「抢先版」—— 前者像 bug 多的意思，后者像付费功能。
-        SettingsSwitchItem(
-            icon = Icons.Filled.BugReport,
-            title = "加入内测",
-            subtitle = "先拿还没全量发布的版本试；出问题的概率比正式版高，随时可以关掉",
-            checked = betaEnabled,
-            onToggle = {
-                val next = !betaEnabled
-                betaEnabled = next
-                appFeedStore.setBetaEnabled(next)
-                // 两个通道的块本来就在同一份 feed 里，所以不用重新联网 —— 重算一遍渲染就立刻见效
-                container.appFeedRepository.reapplyChannel()
-            },
-            accent = ServiceAccent.PAYMENT,
-        )
-        SettingsDivider()
-        SettingsSwitchItem(
-            icon = Icons.Filled.NotificationsActive,
-            title = "后台检查版本与公告",
-            subtitle = "每 15 分钟检查一次；关掉后只在打开 App 时检查",
-            checked = backgroundCheck,
-            onToggle = {
-                val next = !backgroundCheck
-                backgroundCheck = next
-                appFeedStore.setBackgroundEnabled(next)
-                if (next) AppFeedScheduler.schedule(context) else AppFeedScheduler.cancel(context)
-            },
-            accent = ServiceAccent.INFO,
-        )
-        SettingsDivider()
         // 点它就**直接开始查**，不再先弹一个空面板（岱宗的「立即检查更新」就是这样）。
-        // 结果：没新版给一句 Toast，有新版直接拉起底部气泡并开始下载。
-        // 「正在检查」从仓库状态里读，不再另存一份 —— 免得两处状态对不上。
-        val feedState by container.appFeedRepository.state.collectAsStateWithLifecycle()
+        // 小字是**这一轮的结论 + 有多新鲜**（`AppFeedRepository.State.checkTrace`）：
+        // 结果原先只走一条两秒就消失的 Toast，页面上不留痕迹，用户只能反复点。
         SettingsMenuItem(
             icon = Icons.Filled.SystemUpdate,
             title = "检查更新",
-            // 副标题只承担"进行中"这个瞬时状态；常态下不写小字，行为说明收进「?」。
-            subtitle = if (feedState.checking) "正在检查…" else null,
+            subtitle = feedState.checkTrace().takeIf { it.isNotBlank() },
             onClick = { if (!feedState.checking) onCheckUpdate() },
             accent = ServiceAccent.QUERY,
-            hint = "查到新版会先问你，再下载。",
+            // 问号里的内容跟着状态走：平时是行为说明，这一轮有毛病时换成毛病原文
+            hint = feedState.checkHint,
         )
         SettingsDivider()
         SettingsMenuItem(
@@ -440,6 +442,48 @@ private fun UpdateContent(
             title = "更新日志",
             onClick = onChangelog,
             accent = ServiceAccent.INFO,
+        )
+    }
+
+    SettingsSectionHeader("自动检查")
+    SettingsCard {
+        SettingsSwitchItem(
+            icon = Icons.Filled.NotificationsActive,
+            title = "后台检查版本与公告",
+            checked = backgroundCheck,
+            onToggle = onToggleBackground,
+            accent = ServiceAccent.INFO,
+            hint = "每 15 分钟查一次，有新版本发一条通知。关掉后只在打开 App 时查，" +
+                "停机公告也可能晚一步才看到。",
+        )
+        SettingsDivider()
+        // 照岱宗盒子的做法：这一行不跳页，点了就地弹气泡菜单选。
+        // 选项只写名字（0.1.95 那轮加的「：让它先跑」是复述 —— 行尾本来就显示当前选中的
+        // 那一个，弹层里选中的那条也高着，同一件事不必说三遍），行为差异收进「?」。
+        SettingsMenuChoiceItem(
+            icon = Icons.Filled.Cloud,
+            title = "更新渠道",
+            options = listOf("自动" to "auto", "Gitee" to "gitee", "GitHub" to "github"),
+            selected = channel,
+            onSelect = onChannel,
+            accent = ServiceAccent.QUERY,
+            hint = "两个仓放的是同一份包，这里只决定先问哪一个。选「自动」是两个同时问、" +
+                "谁快用谁；选 Gitee 或 GitHub 是让那个先跑，另一个仍然兜底。" +
+                "国内网络下 Gitee 通常更快。",
+        )
+        SettingsDivider()
+        // 内测通道：读 feed.json 的 beta 块（比 stable 新的那一版）。
+        // 名字刻意不叫「测试版」也不叫「抢先版」—— 前者像 bug 多的意思，后者像付费功能。
+        // 小字只留这一句风险提示：它是"开之前必须知道"的那一件事，其余解释进「?」。
+        SettingsSwitchItem(
+            icon = Icons.Filled.BugReport,
+            title = "加入内测",
+            subtitle = "出问题的概率比正式版高",
+            checked = betaEnabled,
+            onToggle = onToggleBeta,
+            accent = ServiceAccent.PAYMENT,
+            hint = "先拿还没全量发布的版本试。装错了随时关掉，退回正式版重下一份就行；" +
+                "内测包坏了不会影响你的课表与账号数据。",
         )
     }
 }

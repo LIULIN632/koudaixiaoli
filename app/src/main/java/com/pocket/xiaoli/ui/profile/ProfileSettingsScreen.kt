@@ -823,9 +823,12 @@ internal fun SettingsDivider() {
  * 现在按 [ServiceAccent] 取色（与「服务」页、AI 设置首页同一套色板）：
  * 教务蓝 / 学习紫 / 生活绿 / 信息粉 / 查询青 / 缴费橙。色板本身随主题色相旋转，
  * 换主题不会跟配色打架；「纯净」与「极简」下退回中性底 + 主色图标，保持克制。
+ *
+ * ⚠️ `internal` 而不是 `private`：反馈页的渠道格（`FeedbackChannelTile`）用的就是这一枚，
+ * 图标块在设置行与格子里长得不一样是破相的开始。
  */
 @Composable
-private fun SettingsIcon(icon: ImageVector, accent: ServiceAccent?) {
+internal fun SettingsIcon(icon: ImageVector, accent: ServiceAccent?) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val colorful = currentIconPresentation().colorful

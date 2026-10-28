@@ -10,6 +10,7 @@ import com.pocket.xiaoli.network.FeedFetch
 import com.pocket.xiaoli.network.ReleaseGate
 import com.pocket.xiaoli.network.needsAck
 import com.pocket.xiaoli.util.AppVersion
+import com.pocket.xiaoli.util.relativeSinceLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -92,6 +93,16 @@ class AppFeedRepository(
          * 出问题时无从排查（也收不到"这是你自己选的"这层心理预期）。
          */
         val updateIsBeta: Boolean = false,
+        /**
+         * 确实有比本机新的包，只是**可能被「稍后提醒」压住了**（所以 [updateAvailable] 是 false）。
+         *
+         * 单独一个字段，是因为「已是最新」这句话必须有它才配说：抽屉里已经因为这处
+         * 缺信息修过一次（见 `AppUpdateSheet.checkNow`），把「你选了稍后提醒」显示成
+         * 「已是最新版本」是同一类谎。
+         */
+        val newerVersionExists: Boolean = false,
+        /** 这个构建允不允许应用内自更新（`-Pfdroid=true` = false，包交给商店推）。 */
+        val updatesEnabled: Boolean = !BuildConfig.FDROID,
     ) {
         val showRedDot: Boolean get() = unread > 0 || updateAvailable
         val hasAnything: Boolean get() = announcements.isNotEmpty() || updateAvailable || error != null
@@ -103,6 +114,51 @@ class AppFeedRepository(
          * 写四遍 `if` 早晚有一处忘改（内测用户看到"正式版"字样就是这么来的）。
          */
         val updateBadge: String get() = if (updateIsBeta) " · 内测版" else ""
+
+        /**
+         * 「检查更新」那行行尾「?」里的正文：**平时是行为说明，这一轮有毛病时换成毛病原文**。
+         *
+         * 小字只放得下一句结论（"这次没查上"），而真正有用的是**为什么**——哪个镜像、HTTP 几、
+         * 什么异常。这句以前只进一条两秒的 Toast，用户想回头看就得去导日志；挂在问号上之后，
+         * 反馈给作者时他自己就能念出来。
+         *
+         * [error] 非空有两种：真的没查上，和"镜像还在返回旧数据"（手里那份缓存更新）。
+         * 两种都不该被"查到新版会先问你"这种常态说明盖掉，所以这里不分类，统一说"这一轮的毛病"。
+         */
+        val checkHint: String
+            get() = error?.let { "这一轮的毛病：$it" } ?: "查到新版会先问你，再下载。"
+
+        /**
+         * 「设置 → 更新 → 检查更新」那一行的小字：**这一轮的结论 + 它有多新鲜**。
+         *
+         * ## 为什么要占这一行
+         *
+         * 检查的结果原先只走一条 Toast，两秒就没了。用户点了、Toast 被别的通知压掉、
+         * 或者只是怀疑「刚才那一下到底查没查」，页面上**一点痕迹都不留** —— 于是只能
+         * 再点一次、再点一次。这一行把结论钉在原地，随时回来看都算数。
+         *
+         * ## 顺序即优先级（每一处都是踩过的坑）
+         *
+         * | 先 | 后 | 为什么不能反 |
+         * |---|---|---|
+         * | 正在检查 | 一切 | 失败时 `loaded` 也是 false，早先把「失败」显示成「正在检查…」，用户永远等不到结果 |
+         * | 发现新版 | 这次没查上 | [error] 装的是"这一轮的毛病"（失败原因，或"镜像还在返回旧数据"）；手里那份新版是真读回来的，不该被一句"没查上"盖掉 |
+         * | 这次没查上 | 由商店更新 | F-Droid 版查失败也是失败了，说"交给商店"等于把问题藏起来 |
+         * | 发现新版 | 已是最新 | [updateAvailable] 会被「稍后提醒」压成 false，所以判"有新版"只认 [newerVersionExists]，被压住的那种单独说一句 |
+         *
+         * 「已是最新」只在**这一轮真的核对过版本**时才说：`latestVersionCode <= 0` 表示这份 feed
+         * 压根不带版本信息（只推公告），那时宁可不写字 —— 凭没有的数据下"已是最新"的结论，
+         * 和抽屉里那句假「已是最新版本」是同一种谎。时间口径与修课快照共用 [relativeSinceLabel]。
+         */
+        fun checkTrace(now: Long = System.currentTimeMillis()): String = when {
+            checking -> "正在检查…"
+            !newerVersionExists && error != null -> "这次没查上，可再点一次"
+            !updatesEnabled -> "版本由应用商店更新"
+            newerVersionExists && !updateAvailable -> "新版 v$latestVersionName$updateBadge（你选了稍后提醒）"
+            newerVersionExists -> "发现新版 v$latestVersionName$updateBadge"
+            lastCheckedAt <= 0L || latestVersionCode <= 0 -> ""
+            else -> "已是最新 · ${relativeSinceLabel(lastCheckedAt, "查过", now)}"
+        }
     }
 
     /**
@@ -372,6 +428,9 @@ internal object AppFeedView {
             loaded = loaded,
             // 只有"真的在推这个包"时才标内测：灰度把 beta 版压掉之后已经没有包可装了
             updateIsBeta = betaBlock != null && gated.hasApp,
+            // 不经 `updatesEnabled`、也不经「稍后提醒」：这就是"数据上有更新的东西"这件事本身
+            newerVersionExists = hasApp,
+            updatesEnabled = updatesEnabled,
         )
     }
 }

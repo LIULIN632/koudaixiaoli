@@ -181,11 +181,13 @@ internal class AppUpdatePromptController(
                             // 缓存还在、但这一轮没联上：不能报「已是最新」
                             val failure = feedState.error
                                 ?.let { "检查失败：$it（显示的是上次结果）" }
-                            Toast.makeText(
-                                appContext,
-                                failure ?: "已是最新版本 v$currentVersionName",
-                                if (failure != null) Toast.LENGTH_LONG else Toast.LENGTH_SHORT,
-                            ).show()
+                            // 「已是最新版本」**不再弹 Toast**：这是全 App 唯一的手动检查入口
+                            // （设置 → 更新 那一行），而那一行的小字会当场改成
+                            // 「已是最新 · 刚查过」—— 同一句结论说两遍，Toast 还更先消失。
+                            // 失败仍然要说：小字只能说"这次没查上"，原因得让用户听见。
+                            if (failure != null) {
+                                Toast.makeText(appContext, failure, Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                 } else {

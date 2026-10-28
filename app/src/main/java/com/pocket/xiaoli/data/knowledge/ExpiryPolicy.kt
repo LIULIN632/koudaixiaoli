@@ -43,13 +43,22 @@ object ExpiryPolicy {
      * 而通知类往往提前发布（放假安排提前一周），排除掉反而是坏答案。
      */
     fun decide(document: KnowledgeDocument, today: LocalDate): Decision {
-        val expire = document.effectiveTo ?: return Decision.Include
-        if (expire == NO_EXPIRY || !today.isAfter(expire)) return Decision.Include
-        if (document.expiryKind == ExpiryKind.HARD) return Decision.Exclude
-        return Decision.IncludeExpired(
-            expiredOn = expire,
-            daysAgo = ChronoUnit.DAYS.between(expire, today),
+        // 判定规则在共享核心 `com.pocket.xiaoli.core.knowledge.expiryDecision` 里，
+        // 与 Windows 桌面端同一份。这边只做「桌面/安卓模型 ↔ 共享层」的映射。
+        val decision = com.pocket.xiaoli.core.knowledge.expiryDecision(
+            effectiveToIso = document.effectiveTo?.toString(),
+            hardExpiry = document.expiryKind == ExpiryKind.HARD,
+            todayEpochDay = today.toEpochDay(),
         )
+        return when (decision) {
+            com.pocket.xiaoli.core.knowledge.ExpiryDecision.Include -> Decision.Include
+            com.pocket.xiaoli.core.knowledge.ExpiryDecision.Exclude -> Decision.Exclude
+            is com.pocket.xiaoli.core.knowledge.ExpiryDecision.IncludeExpired ->
+                Decision.IncludeExpired(
+                    expiredOn = LocalDate.parse(decision.expiredOnIso),
+                    daysAgo = decision.daysAgo,
+                )
+        }
     }
 
     /**
@@ -71,5 +80,5 @@ object ExpiryPolicy {
 
     /** 过期提醒文案。放在正文最前面，模型与用户都会先看到它。 */
     fun notice(daysAgo: Long, expiredOn: LocalDate): String =
-        "⚠️ 此安排已于 $expiredOn 过期（$daysAgo 天前），最新安排请以官方为准。\n\n"
+        com.pocket.xiaoli.core.knowledge.expiryNotice(expiredOn.toString(), daysAgo)
 }

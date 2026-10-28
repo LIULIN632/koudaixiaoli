@@ -4,8 +4,7 @@ import com.google.gson.Gson
 import com.pocket.xiaoli.data.entity.AcademicSnapshotEntity
 import com.pocket.xiaoli.network.AcademicCourseItem
 import com.pocket.xiaoli.network.AcademicTypeInfo
-import java.time.Instant
-import java.time.ZoneId
+import com.pocket.xiaoli.util.relativeSinceLabel
 
 /**
  * 存进 [AcademicSnapshotEntity] 的 JSON 形状。
@@ -151,16 +150,6 @@ data class AcademicSnapshot(
     val courses: List<AcademicCourseItem>,
 ) {
     /** 「更新于 …」：只给相对时间，不报绝对时刻（后者对用户没意义，还要处理时区） */
-    fun updatedLabel(now: Long = System.currentTimeMillis()): String {
-        if (updatedAt <= 0L) return ""
-        val minutes = (now - updatedAt) / 60_000
-        return when {
-            minutes < 1 -> "刚更新"
-            minutes < 60 -> "${minutes} 分钟前更新"
-            minutes < 60 * 24 -> "${minutes / 60} 小时前更新"
-            minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前更新"
-            else -> Instant.ofEpochMilli(updatedAt).atZone(ZoneId.systemDefault())
-                .toLocalDate().toString() + " 更新"
-        }
-    }
+    fun updatedLabel(now: Long = System.currentTimeMillis()): String =
+        relativeSinceLabel(updatedAt, "更新", now)
 }

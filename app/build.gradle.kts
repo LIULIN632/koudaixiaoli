@@ -241,10 +241,13 @@ tasks.register("verifyComposeAlignment") {
         fun resolved(configName: String): Map<String, String> {
             val cfg = configurations.findByName(configName)
                 ?: throw GradleException("找不到 configuration: $configName")
-            return cfg.resolvedConfiguration.resolvedArtifacts
-                .map { it.moduleVersion.id }
+            // 读**依赖图**而不是 `resolvedArtifacts`：后者要求 Gradle 选定一个 artifact 变体，
+            // 而 `:core` 是 KMP 模块（`androidApiElements` 的五个变体都不带 BuildTypeAttr），
+            // 一解析 artifact 就会「无法在多个变体间选择」。版本比对只需要坐标，不需要字节。
+            return cfg.incoming.resolutionResult.allComponents
+                .mapNotNull { it.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier }
                 .filter { it.group.startsWith("androidx.compose") }
-                .associate { "${it.group}:${it.name}" to it.version }
+                .associate { "${it.group}:${it.module}" to it.version }
         }
 
         val compile = resolved("releaseCompileClasspath")
@@ -315,6 +318,8 @@ tasks.register("renameApk") {
 }
 
 dependencies {
+    // 阶段 1：与 Windows 桌面端共用的纯 Kotlin 核心（课表周次 / 默认节次 / 课名简称）
+    implementation(project(":core"))
     // Compose BOM
     //
     // ⚠️ 这个版本号**不能随便改小**，它必须 ≥ MIUIX 强制要求的那一套 Compose。

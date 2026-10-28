@@ -74,7 +74,12 @@ object CalendarUtils {
      * 寒假点「按校历校准」会去校准一个早已过完的学期（单测 `activeTermFallsForwardToTheNextTerm` 抓的就是这个）。
      */
     fun teachingEndOf(term: CalendarTerm): LocalDate =
-        term.start.plusWeeks((term.teachingWeeks + EXAM_WEEKS).toLong()).minusDays(1)
+        LocalDate.ofEpochDay(
+            com.pocket.xiaoli.core.calendar.WeekCalendarCore.teachingEndEpochDay(
+                startEpochDay = term.start.toEpochDay(),
+                teachingWeeks = term.teachingWeeks,
+            ),
+        )
 
     /**
      * 该日期归属的学期。

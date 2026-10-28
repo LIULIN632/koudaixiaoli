@@ -1,12 +1,8 @@
-package com.pocket.xiaoli.data.model
+package com.pocket.xiaoli.core.campus
 
-import com.pocket.xiaoli.data.CampusConfig
-import com.pocket.xiaoli.data.CampusServiceKeys
-import com.pocket.xiaoli.data.service.CampusServiceCatalog
-import com.pocket.xiaoli.data.service.ServiceChannel
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.Test
 
 class DormServiceRouterTest {
 

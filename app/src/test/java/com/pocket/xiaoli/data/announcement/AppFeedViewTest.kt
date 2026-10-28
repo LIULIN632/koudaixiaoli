@@ -445,4 +445,105 @@ class AppFeedViewTest {
         assertTrue(state.updateAvailable)
         assertEquals(41, state.latestVersionCode)
     }
+
+    // ── 「检查更新」那一行的小字 ─────────────────────────────────────────
+    //
+    // Toast 两秒就没，这一句是页面上**唯一留下来**的结果，所以每一句都必须对得上
+    // "这一轮到底查到了什么"。下面按 [AppFeedRepository.State.checkTrace] 的优先级逐条钉，
+    // 顺序本身就是被测对象（把它改成"先说结果、后说进行中"，第一条就会红）。
+
+    private val newerFeed = AppReleaseFeed(
+        versionCode = 41,
+        versionName = "0.1.41",
+        apkUrl = "https://example.com/a.apk",
+    )
+
+    @Test
+    fun `正在检查时不提前说任何结果`() {
+        val state = build(newerFeed, currentVersionCode = 40).copy(checking = true)
+
+        assertEquals("正在检查…", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `查到新版就说发现新版 内测包带上后缀`() {
+        val stable = build(newerFeed, currentVersionCode = 40).checkTrace(1_000_000L)
+        val beta = build(betaFeed, currentVersionCode = 40, betaEnabled = true).checkTrace(1_000_000L)
+
+        assertEquals("发现新版 v0.1.41", stable)
+        assertEquals("发现新版 v0.1.41-beta · 内测版", beta)
+    }
+
+    @Test
+    fun `被稍后提醒压住的新版不能说成已是最新`() {
+        // 用户上次点了「稍后提醒」：updateAvailable 被压成 false，但包确实更新
+        val state = build(newerFeed, currentVersionCode = 40, snoozedVersionCode = 41)
+
+        assertFalse(state.updateAvailable)
+        assertTrue("所以判「有新版」必须认另一个字段", state.newerVersionExists)
+        assertEquals("新版 v0.1.41（你选了稍后提醒）", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `这一轮没查上时不谎称已是最新`() {
+        val state = build(feed = null, loaded = false, error = "检查失败：网络不通")
+
+        assertEquals("这次没查上，可再点一次", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `镜像回退时手里那份新版优先`() {
+        // error 里装的是"镜像还在返回旧数据"，但缓存那份新版是真读回来的
+        val state = build(newerFeed, currentVersionCode = 40, error = "镜像还在返回旧数据（vc 40 < 41）")
+
+        assertEquals("发现新版 v0.1.41", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `F-Droid 版把更新交给商店`() {
+        val state = build(newerFeed, updatesEnabled = false)
+
+        assertEquals("版本由应用商店更新", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `确实没有新版时报出什么时候查的`() {
+        // 本机就是 40，feed 也只有 40：这才是唯一能说"已是最新"的场合
+        val feed = AppReleaseFeed(versionCode = 40, versionName = "0.1.40")
+        val state = build(feed, currentVersionCode = 40, lastCheckedAt = 1_000_000L - 5 * 60_000)
+
+        assertEquals("已是最新 · 5 分钟前查过", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `feed 不带版本信息时不下已是最新的结论`() {
+        // 只推公告的那份 feed（versionCode 没填）没有核对过任何版本，说"已是最新"就是凭空下结论
+        val state = build(
+            AppReleaseFeed(versionCode = 0, versionName = "", announcements = listOf(announcement("a"))),
+            currentVersionCode = 40,
+        )
+
+        assertEquals("", state.checkTrace(1_000_000L))
+    }
+
+    @Test
+    fun `问号里带的是这一轮的毛病原文`() {
+        // 小字只放得下一句结论，"为什么失败"必须有个地方能查到 —— 否则只能导日志
+        val failed = build(feed = null, loaded = false, error = "检查失败：Gitee raw 返回 504（read timed out）")
+
+        assertTrue(failed.checkHint.contains("504"))
+        assertTrue(failed.checkHint.startsWith("这一轮的毛病：检查失败"))
+    }
+
+    @Test
+    fun `没毛病时问号还是那句行为说明`() {
+        val ok = build(newerFeed, currentVersionCode = 40)
+
+        assertEquals("查到新版会先问你，再下载。", ok.checkHint)
+        // 镜像回退那种"半毛病"也要说出来：用户看到的版本号是缓存里的，不是这一轮读到的
+        assertTrue(
+            build(newerFeed, currentVersionCode = 40, error = "镜像还在返回旧数据").checkHint
+                .startsWith("这一轮的毛病：镜像"),
+        )
+    }
 }

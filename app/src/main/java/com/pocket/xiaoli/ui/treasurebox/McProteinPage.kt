@@ -32,7 +32,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.pocket.xiaoli.BuildConfig
 import com.pocket.xiaoli.data.mcd.McProteinCatalog
 import com.pocket.xiaoli.data.mcd.McProteinCatalogParser
 import com.pocket.xiaoli.data.mcd.McProteinItem
@@ -130,8 +129,7 @@ internal fun McProteinIndexContent(
                             "文件在包里，但一条单品都没解析出来。这通常是打包时把数据模型裁掉了" +
                             "（只在正式包里出现，测试包是好的）—— 重装同一个包不会好，请把这句反馈给开发者。"
                         else -> "榜单数据没带进来" to
-                            "安装包里没有 $ASSET_NAME（当前 v${BuildConfig.VERSION_NAME}）。" +
-                            "多半是装到的包比这个功能早，换一个重新构建的包装就好。"
+                            "安装包里没有 $ASSET_NAME。多半是装到的包比这个功能早，换一个重新构建的包装就好。"
                     }
                     ServiceEmptyCard(
                         icon = Icons.Outlined.Fastfood,
