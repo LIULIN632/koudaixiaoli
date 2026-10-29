@@ -204,6 +204,11 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
         onToggle = { draft = draft.copy(includeDiagnostics = it) },
     )
 
+    CrashReportSection(
+        remoteReady = remoteReady,
+        onSent = { contribution.record(ContributionAction.FEEDBACK_SEND) },
+    )
+
     FeedbackSendSection(
         remoteReady = remoteReady,
         enabled = draft.isSendable && !sending,

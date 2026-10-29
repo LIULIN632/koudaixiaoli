@@ -324,4 +324,44 @@ class StudyStatsTest {
         assertEquals(1, badges[CourseFilter.PASSED])
         assertEquals(1, badges[CourseFilter.SHORT_CREDIT])
     }
+
+    // ── 学分差额（树行与「学分构成」那张卡共用的一条规则）──
+
+    @Test
+    fun creditGapJudgesOverEarnedBeforeFull() {
+        // 真实数据：「通识选修课程模块」已获 10.0 / 要求 8.0。
+        // 先算 required - earned 会得到负数并落进"没有缺口"⇒ 超修在界面上完全隐身。
+        val gap = creditGap("10.0", "8.0")
+        assertEquals(CreditGapKind.OVER, gap?.kind)
+        assertEquals("超 2.0", gap?.label)
+    }
+
+    @Test
+    fun creditGapNamesZeroEarnedSeparately() {
+        // 0% 的条只剩轨道，图上与一条分隔线难分 —— 这一档必须有自己的话
+        assertEquals(CreditGapKind.NONE, creditGap("0.0", "19.0")?.kind)
+        assertEquals("还没开始", creditGap("0.0", "19.0")?.label)
+    }
+
+    @Test
+    fun creditGapNeverLeaksFloatTail() {
+        // 53.5 - 49.5 在 Float 里带尾巴，界面只能出现一位小数
+        assertEquals("差 4.0", creditGap("49.5", "53.5")?.label)
+    }
+
+    @Test
+    fun creditGapTreatsExactFullAsFullNotZeroGap() {
+        // 解析层会保留 `未获得学分 0.0`（那是学校给的结论）⇒ 按数值判，不许出现"差 0.0"
+        assertEquals(CreditGapKind.FULL, creditGap("16.0", "16.0")?.kind)
+        assertEquals("已满", creditGap("16.0", "16.0")?.label)
+    }
+
+    @Test
+    fun creditGapSaysUnlimitedOnlyWhenSchoolActuallySaidZero() {
+        // 要求 0.0 = 学校不设要求（真实数据：其他选修课程）；要求整串缺失（老部署）
+        // 是"没数据"，那时连"不限"都不该说。
+        assertEquals(CreditGapKind.UNLIMITED, creditGap("4.0", "0.0")?.kind)
+        assertNull(creditGap("4.0", ""))
+        assertNull(creditGap("", ""))
+    }
 }

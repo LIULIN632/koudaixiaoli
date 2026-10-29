@@ -107,4 +107,18 @@ class GradeDistributionTest {
     fun `distribution is not empty when at least one score parses`() {
         assertFalse(GradeDistribution.of(listOf(grade("60"))).isEmpty)
     }
+
+    /**
+     * `ofScores` 是分档的**入口层**：成绩档案（`SavedGradeEntity`）与教务修课明细
+     * （一列文本分数）都汇到它。两边必须给出同一个分布 —— 否则"同一份分数在两个页面
+     * 各画一张图"会开始悄悄漂开。
+     */
+    @Test
+    fun `ofScores matches of for the same score texts`() {
+        val texts = listOf("95", "83", "55", "优秀", "")
+        assertEquals(
+            GradeDistribution.of(texts.map { grade(it) }),
+            GradeDistribution.ofScores(texts),
+        )
+    }
 }

@@ -124,10 +124,12 @@ class AcademicQueryPrivacyTest {
         // 判据仍是"两档数字都在（正好两处）、且不出现『还差』"。
         composeRule.onAllNodesWithText("10.0", substring = true).assertCountEquals(2)
         composeRule.onAllNodesWithText("还差", substring = true).assertCountEquals(0)
+        // 差额搬到进度条右端之后，"补齐"这一档要说"已满"而不是干脆没话
+        composeRule.onNodeWithText("已满").assertExists()
     }
 
     @Test
-    fun `真缺学分时显示还差多少`() {
+    fun `真缺学分时条右端说差多少`() {
         renderRow(
             AcademicTypeInfo(
                 name = "专业必修",
@@ -138,7 +140,7 @@ class AcademicQueryPrivacyTest {
             )
         )
 
-        composeRule.onNodeWithText("还差 6.0 学分").assertExists()
+        composeRule.onNodeWithText("差 6.0").assertExists()
     }
 
     @Test
@@ -155,7 +157,9 @@ class AcademicQueryPrivacyTest {
         )
 
         composeRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(0f, 0f..1f))).assertExists()
-        composeRule.onNodeWithText("还差 19.0 学分").assertExists()
+        // 0% 的条只剩轨道，在图上和一条分隔线几乎分不开 —— 所以这一档必须有字。
+        // （真实出处：「专业核心课程模块」0.0 / 19.0，渲 24 节点的真树才看出来。）
+        composeRule.onNodeWithText("还没开始").assertExists()
     }
 
     @Test
@@ -169,7 +173,42 @@ class AcademicQueryPrivacyTest {
             )
         )
 
-        composeRule.onAllNodesWithText("还差", substring = true).assertCountEquals(0)
+        composeRule.onAllNodesWithText("差 0", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithText("已满").assertExists()
+    }
+
+    @Test
+    fun `超修的模块说超了多少而不是刚好满`() {
+        // 真实数据：「通识选修课程模块」已获 10.0 / 要求 8.0。
+        // 改造前它和"刚好修满"在界面上**完全一样**（满格绿条、没有药丸）——
+        // 超修是学生会拿来问"我这块能不能少修一门"的信息，不该被抹平。
+        renderRow(
+            AcademicTypeInfo(
+                name = "通识选修课程模块", id = "m2",
+                requiredCredit = "8.0", earnedCredit = "10.0", missedCredit = "0.0",
+            )
+        )
+
+        composeRule.onNodeWithText("超 2.0").assertExists()
+        composeRule.onNodeWithText("已满").assertDoesNotExist()
+    }
+
+    @Test
+    fun `要求零分母说不限而不是零百分比`() {
+        // 真实数据：「其他选修课程」已获 4.0 / 要求 0.0 —— 学校的意思是"不设要求"。
+        // 照抄成「4.0 / 0.0」会被读成 0%，与事实正好相反。
+        renderRow(
+            AcademicTypeInfo(
+                name = "其他选修课程", id = "m3",
+                requiredCredit = "0.0", earnedCredit = "4.0", missedCredit = "0.0",
+            )
+        )
+
+        // 「已获」与「/ 要求」是两个节点，所以只能验后半句
+        composeRule.onNodeWithText(" / 不限", substring = true).assertExists()
+        composeRule.onNodeWithText("4.0", substring = true).assertExists()
+        // 没有分母就没有进度：不画条、也不给一个假的百分比
+        composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0f, 0f..1f))).assertCountEquals(0)
     }
 
     // ── 展开/收起（2026-10 用户要求能收起来；随后又把"课程类型"与"课程明细"合并成一棵树） ──

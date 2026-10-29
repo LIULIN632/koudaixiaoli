@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -257,6 +258,11 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
                 }
                 if (composition.size >= 2) {
                     item { CreditCompositionBar(composition) }
+                }
+                // 成绩分布同样吃**全量 courses**（理由与上面那条一样）：筛选改的是"看哪些行"，
+                // 已经出的那些分不会因为筛一下就变。
+                if (courses.isNotEmpty()) {
+                    item { AcademicGradeCard(courses) }
                 }
                 if (types.isNotEmpty()) {
                     item {
@@ -893,8 +899,14 @@ internal fun AcademicTypeRow(
                 fontWeight = FontWeight.SemiBold,
                 color = colors.textPrimary,
             )
+            // 要求学分是 `0.0` 时学校说的是"这块不设要求"（真实数据：其他选修课程
+            // 已获 4.0 / 要求 0.0）。照抄成「4.0 / 0.0」会被读成 0% —— 与事实正好相反。
             Text(
-                text = " / ${type.requiredCredit.ifBlank { "—" }}",
+                text = " / " + when {
+                    type.requiredCredit.isBlank() -> "—"
+                    (type.requiredCredit.trim().toFloatOrNull() ?: 1f) <= 0f -> "不限"
+                    else -> type.requiredCredit
+                },
                 fontSize = 12.sp,
                 color = colors.textTertiary,
             )
@@ -932,37 +944,51 @@ internal fun AcademicTypeRow(
             //   · **修满 → 绿**：这块过没过，颜色直接给结论；
             //   · **其余 → 主色**。
             val metallic = type.depth == 0
-            ProgressTrack(
-                progress = ratio,
-                // 总进度条更厚（7dp）：金属质感靠"高光 + 阴影 + 渐变"三层，5dp 太薄撑不住
-                //（渲图对比过 —— 5dp 上那 1dp 高光几乎看不见，金属感出不来）；
-                // 各类型保持 3/5dp，横杠多了也不至于变成一堵墙。
-                height = if (metallic) 7.dp else if (type.depth >= 3) 3.dp else 5.dp,
-                brush = if (metallic) {
-                    Brush.horizontalGradient(listOf(MetallicGoldStart, MetallicGoldEnd))
-                } else {
-                    Brush.horizontalGradient(
-                        listOf(
-                            if (ratio >= 1f) colors.success else accentColor(),
-                            if (ratio >= 1f) colors.success else accentColor(),
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProgressTrack(
+                    modifier = Modifier.weight(1f),
+                    progress = ratio,
+                    // 总进度条更厚（7dp）：金属质感靠"高光 + 阴影 + 渐变"三层，5dp 太薄撑不住
+                    //（渲图对比过 —— 5dp 上那 1dp 高光几乎看不见，金属感出不来）；
+                    // 各类型保持 3/5dp，横杠多了也不至于变成一堵墙。
+                    height = if (metallic) 7.dp else if (type.depth >= 3) 3.dp else 5.dp,
+                    brush = if (metallic) {
+                        Brush.horizontalGradient(listOf(MetallicGoldStart, MetallicGoldEnd))
+                    } else {
+                        Brush.horizontalGradient(
+                            listOf(
+                                if (ratio >= 1f) colors.success else accentColor(),
+                                if (ratio >= 1f) colors.success else accentColor(),
+                            )
                         )
+                    },
+                    track = if (ratio <= 0f) colors.borderDivider else colors.surfaceHighlight,
+                    // 金属质感只给总进度：它要"像一条实心金属"，各类型仍是平面填充（一页里
+                    // 十几条立体阴影会变成噪音）。
+                    highlight = metallic,
+                )
+                // 差额写在条的**右端**（改造前它是一枚独占一行的药丸）：一个节点少一行高，
+                // 真实 24 节点的树省下来的是将近一屏。判档规则在 `creditGap`，
+                // 与「学分构成」那张卡共用 —— 超修 / 还没开始 这两件事两处都得说得出。
+                creditGap(type.earnedCredit, type.requiredCredit)?.let { gap ->
+                    Spacer(Modifier.width(skin.spaceSm))
+                    Text(
+                        gap.label,
+                        fontSize = 11.sp,
+                        color = creditGapColor(gap.kind),
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(62.dp),
                     )
-                },
-                track = if (ratio <= 0f) colors.borderDivider else colors.surfaceHighlight,
-                // 金属质感只给总进度：它要"像一条实心金属"，各类型仍是平面填充（一页里
-                // 十几条立体阴影会变成噪音）。
-                highlight = metallic,
-            )
+                }
+            }
         }
-        // 「还差」按**数值**判 0，不按字符串：解析层现在会保留 `0.0`
-        //（那是学校给的结论），字符串比较 `!= "0"` 会漏掉它 ⇒ 修满的模块显示「还差 0.0 学分」。
-        //
-        // 呈现上做成**药丸**而不是又一行灰字：这是整页唯一需要用户"去做点什么"的信息
-        //（哪块还差多少），压成弱化色等于把它藏起来。
-        val missedCredit = type.missedCredit.toFloatOrNull() ?: 0f
+        // 门次的缺口按**数值**判 0，不按字符串：解析层会保留 `0`（那是学校给的结论），
+        // 字符串比较 `!= "0"` 会漏掉它 ⇒ 门次够了还喊"还差 0 门"。
+        // ⚠️ 学分的缺口**不再做药丸**：这一行标题已经摆着「49.5 / 53.5」、条的右端又写着
+        // 「差 4.0」，同一件事说三遍就是用户反复报的那种重复。药丸只留门次这一档 ——
+        // 它是另一个数（要求门次 vs 到达门次），标题行里没有。
         val missedGates = type.missedCount.toIntOrNull() ?: 0
         val pills = buildList {
-            if (missedCredit > 0f) add("还差 ${type.missedCredit} 学分")
             if (missedGates > 0) add("还差 $missedGates 门")
         }
         // 门次 / 课程门数这类**上下文**仍然是弱化小字：它们回答"为什么够/不够"，
@@ -1023,10 +1049,11 @@ private fun ProgressTrack(
     brush: Brush,
     track: Color,
     highlight: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(3.dp)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(height)
             .then(if (highlight) Modifier.shadow(1.5.dp, shape) else Modifier)

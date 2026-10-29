@@ -3,6 +3,7 @@ package com.pocket.xiaoli.ui.treasurebox
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.network.AcademicCourseItem
 import com.pocket.xiaoli.network.AcademicTypeInfo
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.infocard.GradeDistribution
+import com.pocket.xiaoli.ui.components.infocard.GradeDistributionChart
 import com.pocket.xiaoli.ui.components.infocard.color
 import com.pocket.xiaoli.ui.components.infocard.scoreBandOf
 import com.pocket.xiaoli.ui.theme.Divider
@@ -76,28 +80,55 @@ private object CourseColumns {
     val status: Dp = 46.dp
 }
 
+/**
+ * 绩点列的**出场门槛**，量的是**卡片内边距之后**的那一档可用宽。
+ *
+ * 一门课的课名长到 20 字是常态（「毛泽东思想和中国特色社会主义理论体系概论」）。
+ * 360dp 真机上页面左右各 16dp、卡片左右各 12dp，剩下 304dp 里四列数字加状态色条
+ * 吃掉 193dp，课程名只剩 111dp ≈ 每行 8 个字 —— 两行装不下，长课名会被省略号裁掉，
+ * 而这一行最主要的东西恰恰是课名。
+ *
+ * 门槛就按"课名至少留 120dp（两行 20 字）"倒推：11 + 182 + 120 = 313dp。
+ *
+ * ⚠️ 快照机（1080×2340 @ 440dpi ⇒ 393dp 宽）上，树里缩进 20dp 的那张表实测
+ * `maxWidth = 312.4dp` —— **只差 0.6dp** 落在门槛外，所以 `143` 那张图里没有绩点列，
+ * 而同一台机器上不缩进的 `363` 有（332.4dp）。这不是错列，是这条规则本来就会给的两种结果。
+ *
+ * 窄屏让掉的是**绩点**：它由成绩按学校换算表推得（90→4.0、85→3.7…），
+ * 是这一页唯一"看着成绩就知道"的一列；学分、成绩、状态都不可替代。
+ */
+private val gradePointColumnMinWidth: Dp = 313.dp
+
 @Composable
 internal fun AcademicCourseTable(courses: List<AcademicCourseItem>) {
     if (courses.isEmpty()) return
     val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
     AppCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(horizontal = skin.spaceMd)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = skin.spaceSm, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("课程", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = colors.textTertiary, modifier = Modifier.weight(1f))
-                TableLabel("学分", CourseColumns.credit)
-                TableLabel("成绩", CourseColumns.score)
-                TableLabel("绩点", CourseColumns.gradePoint)
-                TableLabel("状态", CourseColumns.status)
-            }
-            HorizontalDivider(color = Divider, thickness = 0.5.dp)
-            courses.forEach { course ->
-                AcademicCourseRow(course)
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                // 表头与数据行读**同一个**开关：漏一处就是"表头有绩点、行里没有"的错列。
+                val showGradePoint = maxWidth >= gradePointColumnMinWidth
+                // ⚠️ 这层 Column 不能省：BoxWithConstraints 的作用域是 **BoxScope**，
+                // 直接把表头行 / 分隔线 / 数据行摊在里面，它们会**全部叠在同一位置**
+                //（第一版就是这么红的：整张表塌成两行高，四行课的文字互相压着）。
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = skin.spaceSm, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("课程", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = LocalPocketXiaoliColors.current.textTertiary, modifier = Modifier.weight(1f))
+                        TableLabel("学分", CourseColumns.credit)
+                        TableLabel("成绩", CourseColumns.score)
+                        if (showGradePoint) TableLabel("绩点", CourseColumns.gradePoint)
+                        TableLabel("状态", CourseColumns.status)
+                    }
+                    HorizontalDivider(color = Divider, thickness = 0.5.dp)
+                    courses.forEach { course ->
+                        AcademicCourseRow(course, showGradePoint)
+                    }
+                }
             }
         }
     }
@@ -115,8 +146,48 @@ private fun TableLabel(text: String, width: Dp) {
     )
 }
 
+/**
+ * 这门课**对外显示的那个分数**。
+ *
+ * 教务一行里同时有「成绩」与「最大成绩」两列（补考/重修后前者是原始分、后者是取高分），
+ * 表格行、脚注里的"原 X"、以及成绩分布图都读这一个口径 ——
+ * 三处各写一遍 `maxGrade.ifBlank { score }`，早晚会有一处漏掉补考。
+ */
+internal fun AcademicCourseItem.headlineGrade(): String = maxGrade.ifBlank { score }
+
+/**
+ * 成绩分布：把这一页所有**已经出分**的课分档。
+ *
+ * 不做筛选是有意的 —— 在修 / 未修的课没有分数，[GradeDistribution.ofScores] 解析不出来
+ * 就自然不计入，图尾那句"共 N 门有分数记录"说的就是这个 N。
+ * 手动再挑"已修"反而会把"未过但有 51 分"那门课从图上抹掉。
+ */
+internal fun gradeDistributionOf(courses: List<AcademicCourseItem>): GradeDistribution =
+    GradeDistribution.ofScores(courses.map { it.headlineGrade() })
+
+/**
+ * 成绩分布卡（学分构成条回答"还差多少"，这张回答"已修的这些分长什么样"）。
+ *
+ * 平均分 78 可能是"全都 78"，也可能是"一半 95 一半 60" —— 这一页此前只有前者，
+ * 所以画的是**已有的** [GradeDistributionChart]（成绩档案页同一张），不新造图。
+ */
 @Composable
-private fun AcademicCourseRow(item: AcademicCourseItem) {
+internal fun AcademicGradeCard(courses: List<AcademicCourseItem>) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    val distribution = remember(courses) { gradeDistributionOf(courses) }
+    if (distribution.isEmpty) return
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(horizontal = skin.spaceLg, vertical = skin.spaceMd)) {
+            Text("成绩分布", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Spacer(Modifier.height(skin.spaceSm))
+            GradeDistributionChart(distribution)
+        }
+    }
+}
+
+@Composable
+private fun AcademicCourseRow(item: AcademicCourseItem, showGradePoint: Boolean) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val tone = item.statusTone()
@@ -126,7 +197,7 @@ private fun AcademicCourseRow(item: AcademicCourseItem) {
         CourseStatusTone.FAILED -> colors.danger
         CourseStatusTone.UNTAKEN -> colors.textTertiary
     }
-    val headline = item.maxGrade.ifBlank { item.score }
+    val headline = item.headlineGrade()
     // 补考/重修与"成绩≠最大成绩"是同一类信息（这门课不止一次），压成成绩下面的一行小字，
     // 而不是再开一列 —— 列数一多，课程名就先被挤没了，而那才是这行最主要的东西。
     val footnotes = buildList {
@@ -190,7 +261,9 @@ private fun AcademicCourseRow(item: AcademicCourseItem) {
                 Text(footnotes, fontSize = 9.sp, color = colors.textTertiary, maxLines = 1)
             }
         }
-        TableValue(item.gradePoint.ifBlank { "—" }, CourseColumns.gradePoint, 12.sp, colors.textSecondary)
+        if (showGradePoint) {
+            TableValue(item.gradePoint.ifBlank { "—" }, CourseColumns.gradePoint, 12.sp, colors.textSecondary)
+        }
         Box(modifier = Modifier.width(CourseColumns.status), contentAlignment = Alignment.CenterEnd) {
             if (item.status.isNotBlank()) {
                 Text(
@@ -222,6 +295,89 @@ private fun TableValue(text: String, width: Dp, size: TextUnit, color: Color) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+// ── 学分差额（树行与构成条共用一条规则）─────────────────────────────
+//
+// 「已获 / 要求」这一对数，页面上有三处要下结论：树里那行的条右端、构成条图例的右端、
+// 以及（改造前）树里那枚「还差 X 学分」药丸。三处各写一遍 `required - earned`
+// 迟早有一处判反 —— 收成一条规则，三处读它。
+
+/** 差额的结论档位。 */
+internal enum class CreditGapKind {
+    /** 已获超过要求（超修） */
+    OVER,
+
+    /** 一分没有 */
+    NONE,
+
+    /** 还差一点 */
+    GAP,
+
+    /** 刚好修满 */
+    FULL,
+
+    /** 学校没给要求学分（`0.0`）—— 没有分母，谈不上进度 */
+    UNLIMITED,
+}
+
+/** 一个档位 + 一句人话（`label` 就是它，五档都会说话）。 */
+internal data class CreditGap(val kind: CreditGapKind, val label: String)
+
+/**
+ * 浮点比较容差：教务给的是 `49.5` 这种一位小数，0.05 足够挡住累加误差，
+ * 又不会把"真的差 0.05 学分"糊掉。
+ */
+private const val CREDIT_EPS = 0.05f
+
+/**
+ * 纯函数：把「已获 / 要求」两个文本分数压成一句结论。
+ *
+ * 判断顺序是有讲究的，两条都出过真实数据：
+ *
+ * - **超修必须先判**。真实数据里「通识选修课程模块」是 `已获 10.0 / 要求 8.0`，
+ *   先算 `required - earned` 得到负数 → 落进"没有缺口"分支 ⇒ 超修在界面上**完全隐身**，
+ *   和"刚好修满"长得一模一样（改造前就是这样，渲真实 24 节点树才看出来）。
+ * - **一分没有要单列**。「专业核心课程模块」`0.0 / 19.0`：0% 的条只剩轨道，
+ *   在页面上和一条分隔线几乎分不开，光靠图形说不清"这块完全没开始"。
+ * - **要求为 0 / 拿不到 = 没有分母**：不编百分比，只说"不限"。
+ */
+internal fun creditGap(earnedCredit: String, requiredCredit: String): CreditGap? {
+    val earned = earnedCredit.trim().toFloatOrNull()
+    val required = requiredCredit.trim().toFloatOrNull()
+    // 要求学分**整串没有**（老部署的页面没这一项）与**学校给了 0.0** 是两件事：
+    // 前者是没数据，什么都别说；后者是学校明说"这块不设要求"。
+    if (required == null) return null
+    if (required <= 0f) {
+        return if (earned != null && earned > 0f) CreditGap(CreditGapKind.UNLIMITED, "不限") else null
+    }
+    val got = earned ?: 0f
+    return when {
+        got > required + CREDIT_EPS -> CreditGap(CreditGapKind.OVER, "超 ${creditText(got - required)}")
+        got <= CREDIT_EPS -> CreditGap(CreditGapKind.NONE, "还没开始")
+        required - got <= CREDIT_EPS -> CreditGap(CreditGapKind.FULL, "已满")
+        else -> CreditGap(CreditGapKind.GAP, "差 ${creditText(required - got)}")
+    }
+}
+
+/** 学分统一一位小数（教务原文就是 `53.5` 这种，别让浮点尾巴露出来）。 */
+internal fun creditText(value: Float): String = "%.1f".format(value)
+
+/**
+ * 差额结论的语义色。
+ *
+ * ⚠️ "一分没有"**不给 danger**：培养方案里某块还没开始是正常进度，不是故障
+ *（`ShortfallPill` 的 KDoc 为同一件事记过一条：这一页把"没修满"画成红色会被读成出错了）。
+ * 五档里只有超修 / 修满是绿，缺口与没开始都是橙，"不限"是弱化灰。
+ */
+@Composable
+internal fun creditGapColor(kind: CreditGapKind?): Color {
+    val colors = LocalPocketXiaoliColors.current
+    return when (kind) {
+        CreditGapKind.OVER, CreditGapKind.FULL -> colors.success
+        CreditGapKind.GAP, CreditGapKind.NONE -> colors.warning
+        else -> colors.textTertiary
+    }
 }
 
 // ── 学分构成条 ───────────────────────────────────────────────────────────
@@ -260,7 +416,9 @@ private val segmentPalette = listOf(
  * - 只取 `depth == 1`（平台层）。叶子层的和会重复计入父层，加起来就不是 100% 了；
  * - **拿不到要求学分的节点直接跳过**（真实数据里「其他选修课程」是 `已获 4.0 / 要求 0.0`），
  *   按 0 宽画就是把它从毕业要求里抹掉，按平均宽画更是编数据；
- * - 已获**封顶到要求**：超修是好事，但让一段超过 100% 会把后面的段挤没。
+ * - **只有算实心比例时**才把已获封顶到要求（超修那段会把后面的段挤没）。
+ *   ⚠️ 曾经连 `earned` 一起封顶，于是「通识选修 10.0 / 要求 8.0」在图例里显示成
+ *   `8.0 / 8.0 已满` —— **把学校给的数改小了**，超修这件事整页都没地方说。
  */
 internal fun creditSegments(types: List<AcademicTypeInfo>): List<CreditSegment> {
     val platforms = types.filter { it.depth == 1 }
@@ -271,7 +429,7 @@ internal fun creditSegments(types: List<AcademicTypeInfo>): List<CreditSegment> 
         CreditSegment(
             name = type.name,
             required = required,
-            earned = (type.earnedCredit.trim().toFloatOrNull() ?: 0f).coerceIn(0f, required),
+            earned = type.earnedCredit.trim().toFloatOrNull() ?: 0f,
             accent = segmentPalette[index % segmentPalette.size],
         )
     }.filterNotNull()
@@ -358,18 +516,25 @@ internal fun CreditCompositionBar(segments: List<CreditSegment>) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "${"%.1f".format(segment.earned)} / ${"%.1f".format(segment.required)}",
+                        "${creditText(segment.earned)} / ${creditText(segment.required)}",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textSecondary,
+                        // 与课程表同一条规矩：数字列**定宽 + 右对齐**。
+                        // 左对齐时「49.5 / 53.5」与「0.0 / 19.0」起点齐、终点不齐，
+                        // 两行的"差多少"就各站各的位置，扫不下去。
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(88.dp),
                     )
                     Spacer(Modifier.width(skin.spaceSm))
-                    val gap = segment.required - segment.earned
+                    // 与树里那一行读同一条规则（`creditGap`），两处不会各说各话
+                    val gap = creditGap(creditText(segment.earned), creditText(segment.required))
                     Text(
-                        if (gap > 0.05f) "差 ${"%.1f".format(gap)}" else "已满",
+                        gap?.label.orEmpty(),
                         fontSize = 11.sp,
-                        color = if (gap > 0.05f) colors.warning else colors.success,
-                        modifier = Modifier.width(50.dp),
+                        color = creditGapColor(gap?.kind),
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(62.dp),
                     )
                 }
             }

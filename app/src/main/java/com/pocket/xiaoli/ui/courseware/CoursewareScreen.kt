@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.widget.FrameLayout
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pocket.xiaoli.data.courseware.Courseware
 import com.pocket.xiaoli.data.courseware.CoursewareServer
@@ -141,6 +142,11 @@ internal fun CoursewareScreen(item: Courseware, onBack: () -> Unit) {
                     AndroidView(
                         modifier = Modifier.fillMaxSize(),
                         factory = { ctx ->
+                            // WebView 的构造与首帧都在这里：机型上没有 WebView 提供者、
+                            // 或内核版本过低时这里会直接抛（`WebViewFactory$Missing`、
+                            // `UnsatisfiedLinkError` 都见过）。以前没有这层 catch，
+                            // 用户看到的就是「点一下整个 App 没了」，也拿不到是哪一类。
+                            runCatching {
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 // WebGL 要 DOM storage；缓存关掉，与服务的 no-store 对齐
@@ -165,6 +171,14 @@ internal fun CoursewareScreen(item: Courseware, onBack: () -> Unit) {
                                     }
                                 }
                                 loadUrl(url)
+                            }
+                            }.getOrElse { t ->
+                                // 把类名露出来：下次用户点「发送崩溃日志」，这一行会进工单，
+                                // 比"课件打不开"有用得多。
+                                failure = "课件视图起不来：" + t.javaClass.simpleName +
+                                    (t.message?.let { "（$it）" } ?: "")
+                                loading = false
+                                FrameLayout(ctx)
                             }
                         },
                     )

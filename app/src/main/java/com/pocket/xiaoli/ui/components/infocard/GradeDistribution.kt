@@ -38,20 +38,19 @@ data class GradeDistribution(
     val maxCount: Int get() = buckets.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
 
     companion object {
+        /** 成绩档案那一侧的入口（[SavedGradeEntity.totalScore] 是一列文本分数）。 */
+        fun of(grades: List<SavedGradeEntity>): GradeDistribution =
+            ofScores(grades.map { it.totalScore })
+
         /**
-         * 按分数分档。
+         * 从**一列分数文本**分档 —— 分数从哪来（成绩档案的 `totalScore`、教务明细的「最大成绩」）
+         * 不关分档的事，所以这一层才是规则本体，[of] 只是它的一个取数适配器。
          *
-         * 档位与 [ScoreBand] 对齐（优秀 / 及格 / 不及格），但把 60–89 再拆成
-         * 「良好」与「及格」 —— 分布图上合成一档会看不出中段的情况。
-         *
-         * 无法解析的分数（空、"—"、等级制）**跳过**，不计入任何桶，
-         * 也不影响 [scored]。
+         * 非数字（空串、"—"、"合格"/"优秀"这类等级制）一律跳过：
+         * 硬猜成 60 或 85 都会在分布条上画出一门不存在的课。
          */
-        fun of(grades: List<SavedGradeEntity>): GradeDistribution {
-            val scores = grades.mapNotNull { it.totalScore.trim().toFloatOrNull() }
-            if (scores.isEmpty()) {
-                return GradeDistribution(buckets = SPECS.map { GradeBucket(it.label, 0, it.band) }, scored = 0)
-            }
+        fun ofScores(rawScores: List<String>): GradeDistribution {
+            val scores = rawScores.mapNotNull { it.trim().toFloatOrNull() }
             val buckets = SPECS.map { spec ->
                 GradeBucket(
                     label = spec.label,
@@ -71,6 +70,10 @@ private class BucketSpec(
     val matches: (Float) -> Boolean,
 )
 
+/**
+ * 四档规则。档位与 [ScoreBand] 对齐（优秀 / 及格 / 不及格），但把 60–89 再拆成
+ * 「80-89」与「60-79」 —— 分布图上合成一档会看不出中段的情况。
+ */
 private val SPECS = listOf(
     BucketSpec("90+", ScoreBand.EXCELLENT) { it >= 90f },
     BucketSpec("80-89", ScoreBand.PASS) { it in 80f..89.99f },

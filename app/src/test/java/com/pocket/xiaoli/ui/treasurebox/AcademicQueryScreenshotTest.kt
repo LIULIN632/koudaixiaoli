@@ -113,6 +113,88 @@ class AcademicQueryScreenshotTest {
         ),
     )
 
+    /**
+     * **真实**培养方案（烟台理工 · 工程管理，24 个节点）—— 学分与层级照抄
+     * `参考/课程.txt`（用户导出的教务页面原文），不是编的小样。
+     *
+     * 为什么非得用真实形状：这一轮要改的是「平台 / 模块 / 课程类型**三级各长什么样**」，
+     * 四行小样里每级只有一两个节点，看不出三件事 ——
+     * ① 二十几条横杠叠在一起是不是一堵墙；② 数字列对不对得齐（`95.0 / 170` 与
+     * `4.0 / 0.0` 的斜杠根本不在一条线上）；③ **超修**（通识选修 10.0 / 要求 8.0）
+     * 和"刚好修满"在界面上有没有区别。
+     *
+     * 两个同名节点（通识必修与通识选修下各一个「身心健康类课程」）也照抄了 ——
+     * 它是"分组必须按 id 不能按名字"那条规矩的真实出处。
+     */
+    private val realTypes = listOf(
+        AcademicTypeInfo("主修", "root", "170.0", "95.0", "75.0"),
+        AcademicTypeInfo("通识教育平台", "p1", "53.5", "49.5", "4.0", requiredCount = "35", reachedCount = "29", missedCount = "6", parentId = "root", depth = 1),
+        AcademicTypeInfo("通识必修课程模块", "m1", "45.5", "39.5", "6.0", parentId = "p1", depth = 2),
+        AcademicTypeInfo("思想政治类课程", "t1", "18.0", "17.0", "1.0", requiredCount = "14", reachedCount = "12", missedCount = "2", parentId = "m1", depth = 3),
+        AcademicTypeInfo("语言与工具类课程", "t2", "16.0", "16.0", "0.0", parentId = "m1", depth = 3),
+        AcademicTypeInfo("身心健康类课程", "t3", "5.5", "1.5", "4.0", parentId = "m1", depth = 3),
+        AcademicTypeInfo("国防军事类课程", "t4", "2.0", "2.0", "0.0", parentId = "m1", depth = 3),
+        AcademicTypeInfo("职业规划类课程", "t5", "4.0", "3.0", "1.0", parentId = "m1", depth = 3),
+        // 超修：已获 10.0 > 要求 8.0（模块下两条叶子同样超）
+        AcademicTypeInfo("通识选修课程模块", "m2", "8.0", "10.0", "0.0", parentId = "p1", depth = 2),
+        AcademicTypeInfo("美育类课程", "t6", "2.0", "4.0", "0.0", parentId = "m2", depth = 3),
+        AcademicTypeInfo("身心健康类课程", "t7", "2.0", "2.0", "0.0", parentId = "m2", depth = 3),
+        // 学校没给要求学分（0.0）却给了已获 4.0 —— 没有分母就没有进度
+        AcademicTypeInfo("其他选修课程", "m3", "0.0", "4.0", "0.0", parentId = "p1", depth = 2),
+        AcademicTypeInfo("学科专业教育平台", "p2", "76.5", "36.5", "40.0", parentId = "root", depth = 1),
+        AcademicTypeInfo("学科基础课程模块", "m4", "45.5", "36.5", "9.0", parentId = "p2", depth = 2),
+        AcademicTypeInfo("专业核心课程模块", "m5", "19.0", "0.0", "19.0", parentId = "p2", depth = 2),
+        AcademicTypeInfo("专业任选课程模块", "m6", "4.0", "0.0", "4.0", parentId = "p2", depth = 2),
+        AcademicTypeInfo("专业限选课程模块", "m7", "8.0", "0.0", "8.0", parentId = "p2", depth = 2),
+        AcademicTypeInfo("方向一数字建造", "t8", "8.0", "0.0", "8.0", parentId = "m7", depth = 3),
+        AcademicTypeInfo("方向二全过程造价管理", "t9", "8.0", "0.0", "8.0", parentId = "m7", depth = 3),
+        AcademicTypeInfo("实践教育平台", "p3", "40.0", "9.0", "31.0", parentId = "root", depth = 1),
+        AcademicTypeInfo("综合素质教育模块", "m8", "2.0", "2.0", "0.0", parentId = "p3", depth = 2),
+        AcademicTypeInfo("专业实验实践课程模块", "m9", "34.0", "7.0", "27.0", parentId = "p3", depth = 2),
+        AcademicTypeInfo("创新创业实践教育模块", "m10", "4.0", "0.0", "4.0", parentId = "p3", depth = 2),
+    )
+
+    /** 每个**叶子节点**各给一门已修课：让树按生产默认态渲染（父展开、叶子收起、不喊"暂无明细"）。 */
+    private val realCourses = realTypes
+        .filter { it.id != "root" && realTypes.none { child -> child.parentId == it.id } }
+        .map { type ->
+            AcademicCourseItem(
+                typeName = type.name, typeId = type.id, courseName = "示例课程",
+                credit = "2.0", nature = "必修", maxGrade = "83", score = "83", status = "已修",
+            )
+        }
+
+    /** 渲真实树的一段（`from`/`to` 是节点下标切片）；父节点展开、叶子收起 = 生产默认。 */
+    private fun renderRealTree(from: Int, to: Int, file: String, dark: Boolean = false) {
+        val slice = realTypes.subList(from, to)
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = dark,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalPocketXiaoliColors.current.surfaceBase)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    LazyColumn {
+                        academicTreeSections(
+                            types = slice,
+                            courses = realCourses,
+                            // 生产默认：有子节点的展开（一眼看到整棵树），叶子收起（课程按需再展开）
+                            isExpanded = { id -> slice.any { it.parentId == id } },
+                            onToggle = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onRoot().captureRoboImage(file)
+    }
+
     private fun renderPage(dark: Boolean = false) {
         composeRule.setContent {
             PocketXiaoliTheme(
@@ -154,6 +236,10 @@ class AcademicQueryScreenshotTest {
                         item {
                             // 2026-10-28 新增：学分构成条（段宽=要求学分，实心=已获）
                             CreditCompositionBar(creditSegments(types))
+                        }
+                        item {
+                            // 2026-10-29 新增：成绩分布（构成条说"还差多少"，这张说"已修的分长什么样"）
+                            AcademicGradeCard(courses)
                         }
                         item {
                             AcademicFilterBar(
@@ -205,9 +291,38 @@ class AcademicQueryScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/screenshots/142-academic-page-dark.png")
     }
 
+    /**
+     * 「还差 N 门」只说一遍。
+     *
+     * ⚠️ 这里**不**走 `renderPage()`：这一条是**每一行自己**的约定（药丸与它右边那行小字），
+     * 而整页很长 —— 上面多一张卡就把这行推到折叠线以下，`LazyColumn` 不再组合它，
+     * 断言就从"抓到重复"变成"抱怨找不到节点"。2026-10-29 挂上成绩分布卡时正是这样红的。
+     */
     @Test
     fun `还差门数只说一遍`() {
-        renderPage()
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalPocketXiaoliColors.current.surfaceBase)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    LazyColumn {
+                        academicTreeSections(
+                            types = types,
+                            courses = courses,
+                            isExpanded = { true },
+                            onToggle = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
 
         // 药丸里一处（「还差 6 门」）；下面那行上下文里**不该**再出现一次。
         // 美化时这里曾经是两处 —— 正是用户反复报的"重复信息"。
@@ -284,7 +399,7 @@ class AcademicQueryScreenshotTest {
      * 视口内的项，表格落在折叠线以下时 `assertIsDisplayed` 与 `assertExists` 都会红 ——
      * 那种红是布局位置问题，不是这张表的问题。
      */
-    /** 渲这张表；`narrow` = 套一层 360dp 的宽度约束（页边距与卡片内边距都在表内部）。 */
+    /** 渲这张表；`narrow` = 套一层 328dp 的宽度约束（= 360dp 真机去掉页面左右 16dp 后剩下的那一档）。 */
     private fun setTable(narrow: Boolean = false) {
         composeRule.setContent {
             PocketXiaoliTheme(
@@ -298,7 +413,7 @@ class AcademicQueryScreenshotTest {
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     if (narrow) {
-                        Box(modifier = Modifier.width(360.dp).fillMaxHeight()) { AcademicCourseTable(courses) }
+                        Box(modifier = Modifier.width(328.dp).fillMaxHeight()) { AcademicCourseTable(courses) }
                     } else {
                         AcademicCourseTable(courses)
                     }
@@ -326,16 +441,92 @@ class AcademicQueryScreenshotTest {
     }
 
     /**
-     * 课程表的 **360dp 窄屏**版。
+     * 课程表的**窄屏**版：328dp = 360dp 真机上页面左右各 16dp 之后剩下的那一档。
      *
-     * 列宽是**定值**（学分 40 / 成绩 54 / 绩点 42 / 状态 46 = 182dp），剩下的都归课程名 ——
-     * 360dp 上课程名只剩约 105dp，长课名会不会折成三行、把行高优势吃回去，
-     * 只有渲出来才看得出来（数字列本身不会被挤，它们右对齐且留白在左边）。
+     * ⚠️ 上一版这里套的是 360dp，而测试机（393dp）去掉左右 16dp 后本来就有 361dp 可用 ——
+     * 约束几乎没生效，这张基线和宽屏那张**长得一模一样**，等于没测。
+     * 现在按真机换算后的内容宽来，窄屏才真的会触发"让掉绩点列"。
+     *
+     * 守的是两件事：① 窄屏让位的是绩点（由成绩推得），学分/成绩/状态一门都不能少；
+     * ② 表头与数据行**同时**让位 —— 只让一边就是"表头有绩点、行里没有"的错列。
      */
     @Test
-    fun `课程表 360dp 窄屏`() {
+    fun `课程表 窄屏让掉绩点列`() {
         setTable(narrow = true)
+
+        composeRule.onAllNodesWithText("绩点").assertCountEquals(0)
+        composeRule.onNodeWithText("学分").assertIsDisplayed()
+        composeRule.onNodeWithText("成绩").assertIsDisplayed()
+        composeRule.onNodeWithText("状态").assertIsDisplayed()
+        // 让位之后课名才写得下：这一行最主要的东西就是它
+        composeRule.onNodeWithText("思想道德修养与法律基础").assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/screenshots/364-academic-course-table-narrow.png")
+    }
+
+    /**
+     * 成绩分布卡：把这一页**已经出分**的课分档（构成条回答"还差多少学分"，这张回答"已修的分长什么样"）。
+     *
+     * 两条只有这张图能守住的约定：
+     * ① 取的是「最大成绩」那一列 —— 夹具里挂科那门 `成绩 51 / 最大成绩 55`，
+     *    读错列时分布会跟着错（换一门 61/55 就从 `<60` 跳到 `60-79`）；
+     * ② 在修 / 未修的两门**不占档位**，图尾那句"共 N 门有分数记录"就是这一卡的口径，
+     *    它替用户回答了"为什么四档加起来比课程总数少"。
+     */
+    @Test
+    fun `成绩分布卡只数已出分的课`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalPocketXiaoliColors.current.surfaceBase)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) { AcademicGradeCard(courses) }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(2, gradeDistributionOf(courses).scored)
+        composeRule.onNodeWithText("共 2 门有分数记录").assertIsDisplayed()
+        composeRule.onNodeWithText("<60").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/365-academic-grade-distribution.png")
+    }
+
+    /**
+     * 真实树的**上半段**（主修 → 通识教育平台 → 必修/选修模块与其课程类型）。
+     *
+     * 存在的理由：这一页此前的基线全在折叠线以上，**树本体一张图都没有** ——
+     * 而"二十几条横杠是不是变成一堵墙""超修看不看得出来"只有渲整段才看得出来。
+     */
+    @Test
+    fun `真实树 上半段 平台与模块`() {
+        renderRealTree(0, 12, "src/test/screenshots/366-academic-tree-upper.png")
+    }
+
+    /** 真实树的**下半段**（学科专业教育平台 / 实践教育平台）：整块 0 分的模块与超修模块都在这一段。 */
+    @Test
+    fun `真实树 下半段 专业与实践平台`() {
+        renderRealTree(12, realTypes.size, "src/test/screenshots/367-academic-tree-lower.png")
+    }
+
+    /**
+     * 真实树的**深色**两半（2026-10-29 补）。
+     *
+     * 为什么值得单独出图：差额标签是新加的，五档里有三档靠语义色说话
+     *（超修/已满 = 绿、差/还没开始 = 橙）。橙色压在深色卡底上够不够醒目，
+     * `ThemeContrastTest` 只能算对比度数值，"读起来像不像警告色"还是得看像素。
+     */
+    @Test
+    fun `真实树 深色 上半段`() {
+        renderRealTree(0, 12, "src/test/screenshots/369-academic-tree-upper-dark.png", dark = true)
+    }
+
+    @Test
+    fun `真实树 深色 下半段`() {
+        renderRealTree(12, realTypes.size, "src/test/screenshots/370-academic-tree-lower-dark.png", dark = true)
     }
 
     /** 学分构成条：段宽按**要求学分**，所以拿不到分母的节点必须整段不参与（不是画成 0 宽）。 */
@@ -356,6 +547,38 @@ class AcademicQueryScreenshotTest {
             "叶子层（depth 2）同样不参与",
             segments.none { it.name == "思想政治类课程" },
         )
+    }
+
+    /** 超修的那一段：实心比例可以封顶，**显示值不能替学校改数**。 */
+    @Test
+    fun `超修的段不把学校给的数改小`() {
+        val over = listOf(
+            AcademicTypeInfo(name = "通识教育平台", id = "p1", depth = 1, requiredCredit = "53.5", earnedCredit = "49.5"),
+            AcademicTypeInfo(name = "通识选修课程模块", id = "p2", depth = 1, requiredCredit = "8.0", earnedCredit = "10.0"),
+        )
+
+        val segments = creditSegments(over)
+
+        // 曾经这里写的是 `coerceIn(0f, required)` ⇒ 图例显示「8.0 / 8.0 已满」，
+        // 学校给的 10.0 被界面改小了，超修这件事整页都没地方说。
+        assertEquals(10.0f, segments[1].earned, 0.01f)
+        // 但画实心时仍然封顶：超修那段不能把后面的段挤没
+        assertEquals(1f, segments[1].ratio!!, 0.01f)
+
+        // 顺手渲一张：图例右端该说"超 2.0"（与树里那一行同一个词）
+        composeRule.setContent {
+            PocketXiaoliTheme(appearanceMode = AppearanceMode.RAINBOW, skinStyle = SkinStyle.VIVID) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalPocketXiaoliColors.current.surfaceBase)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) { CreditCompositionBar(segments) }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("超 2.0").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/368-academic-credit-composition-over.png")
     }
 
     @Test
