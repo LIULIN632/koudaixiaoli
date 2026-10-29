@@ -531,6 +531,9 @@ internal fun LazyListScope.academicTreeSections(
                 expanded = expanded,
                 onToggle = { onToggle(type.id) },
                 platformAccent = platformAccents[type.id],
+                // 模块层借父平台的段色：它自己不进构成条，颜色只能从上一级继承
+                //（`parentId` 空串 = 顶层，查不到 → null，正好）
+                parentAccent = platformAccents[type.parentId],
             )
         }
         if (typeCourses.isEmpty() && !hideEmptyHint && !hasChildren) {
@@ -804,16 +807,17 @@ private fun CreditStatsHeader() {
  * 只靠缩进是不够的 —— 2026-10 渲了真实 23 个节点看过：四级**字号字重完全一样**，
  * 屏幕上就是"一串往右挪了 12dp 的行"，分不出谁属于谁。所以这里给每一级三样东西：
  *
- * | 层级 | 字号 / 字重 | 颜色 | 左侧色条 |
+ * | 层级 | 字号 / 字重 | 颜色 | 容器 / 左侧色条 |
  * |---|---|---|---|
- * | 0 主修（总计） | 16sp ExtraBold | 主色 | 无 |
- * | 1 平台 | 14.5sp Bold | textPrimary | 3dp 主色 |
- * | 2 模块 | 13.5sp SemiBold | textPrimary | 2dp textTertiary |
+ * | 0 主修（总计） | 16sp ExtraBold | 主色 | 无 —— 直接坐在页面底色上，就是这一页的标题 |
+ * | 1 平台 | 14.5sp Bold | textPrimary | **淡色卡**：底与描边取它在「学分构成」条里的段色 |
+ * | 2 模块 | 13.5sp SemiBold | textPrimary | **白卡** + 3dp 左侧色条（借**父平台**的段色） |
  * | 3 课程类型 | 13sp Normal | textPrimary | 无 |
  *
- * 为什么不给每级配不同颜色：这套配色要跟着 **8 套主题 × 明暗** 走，
- * 多加几种"层级色"必然有一半主题下对比度不达标（`ThemeContrastTest` 一直在守这条）。
- * 字号/字重/色条是**不依赖色相**的层级信号，换主题不会失效。
+ * 颜色在这里只回答"**是哪一块**"，不回答"**是哪一级**"——后者由字号、字重和有没有卡片承担。
+ * 这么分工的原因：这套配色要跟着 **8 套主题 × 明暗** 走，为四级各造一种"层级色"必然有一半
+ * 主题下对比度不达标（`ThemeContrastTest` 一直在守这条）；而"平台段色"是**已有令牌**
+ * （[ServiceAccent] 那一套），跟着主题色相转，不需要新造颜色。
  */
 private data class HierarchyStyle(
     val fontSize: TextUnit,
@@ -829,8 +833,9 @@ private fun hierarchyStyle(depth: Int): HierarchyStyle {
     val colors = LocalPocketXiaoliColors.current
     return when (depth) {
         0 -> HierarchyStyle(16.sp, FontWeight.ExtraBold, accentColor(), 0.dp, null, 0.dp)
-        1 -> HierarchyStyle(14.5.sp, FontWeight.Bold, colors.textPrimary, 3.dp, accentColor(), 10.dp)
-        2 -> HierarchyStyle(13.5.sp, FontWeight.SemiBold, colors.textPrimary, 2.dp, colors.textTertiary, 10.dp)
+        // 平台层**不画左侧色条**：它整行就是一张段色卡，再插一根同色条只是重复
+        1 -> HierarchyStyle(14.5.sp, FontWeight.Bold, colors.textPrimary, 0.dp, null, 10.dp)
+        2 -> HierarchyStyle(13.5.sp, FontWeight.SemiBold, colors.textPrimary, 3.dp, colors.textTertiary, 10.dp)
         else -> HierarchyStyle(13.sp, FontWeight.Normal, colors.textPrimary, 0.dp, null, 10.dp)
     }
 }
@@ -853,30 +858,35 @@ internal fun AcademicTypeRow(
     onToggle: () -> Unit,
     /** 平台层（depth 1）在上方「学分构成」那张条里的段色；其余层级传 null。 */
     platformAccent: ServiceAccent? = null,
+    /** 父平台的段色：模块层（depth 2）借它画左侧色条，表示"我挂在上面那个平台底下"。 */
+    parentAccent: ServiceAccent? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val style = hierarchyStyle(type.depth)
-    // 平台层整行跟着它的段色走（左侧色条 + 进度条），与上方构成条对得上
+    // 平台层整张卡跟着它的段色走（底色 + 描边），与上方构成条对得上
     val platformTint = platformAccent?.let { serviceAccentColor(it) }
+    // 模块层自己不进构成条，所以借**父平台**的段色当左侧色条：同一平台的模块是同一个颜色
+    val groupTint = parentAccent?.let { serviceAccentColor(it) }
     val earned = type.earnedCredit.trim().toFloatOrNull()
     val required = type.requiredCredit.trim().toFloatOrNull()
     val ratio = if (required != null && required > 0f && earned != null) {
         (earned / required).coerceIn(0f, 1f)
     } else null
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = (type.depth * style.indentPerDepth.value).dp)
-            .padding(top = 6.dp)
-    ) {
+    // 平台层与模块层各自成一张卡；叶子级不成卡（一屏十几张卡会变成一堵墙）。
+    val carded = type.depth == 1 || type.depth == 2
+    // 卡里那一整块（标题行 + 进度条 + 药丸行）两种外壳共用，只换最外面那层
+    val body: @Composable ColumnScope.() -> Unit = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .then(
-                    if (expandable) {
+                    // 成卡的行**不在行上挂点击**：整张卡才是按钮（见下面 `AppCard(onClick =)`），
+                    // 行上再挂一个就变成"卡里套一个按钮"，点进度条那一行仍然没反应。
+                    // 叶子级没有卡，所以它仍由这一行自己承担点击。
+                    if (expandable && !carded) {
                         Modifier.toggleable(value = expanded, role = Role.Button, onValueChange = { onToggle() })
                     } else {
                         Modifier
@@ -884,14 +894,15 @@ internal fun AcademicTypeRow(
                 )
                 .heightIn(min = 44.dp)
         ) {
-            // 左侧层级色条：平台 = 它在构成条里的段色，模块 = textTertiary 2dp，其余不画
+            // 左侧层级色条：只有模块级画（借父平台的段色，表示"我挂在那个平台底下"）；
+            // 平台级整行就是一张段色卡，再插一根同色条只是重复。
             if (style.barColor != null) {
                 Box(
                     modifier = Modifier
                         .width(style.barWidth)
                         .height(18.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(platformTint ?: style.barColor)
+                        .background(groupTint ?: style.barColor)
                 )
                 Spacer(Modifier.width(skin.spaceSmall))
             }
@@ -936,7 +947,8 @@ internal fun AcademicTypeRow(
         // ⚠️ v0.1.18 曾限制成"只画到模块级"，理由是"13 个课程类型各来一条横杠会把层级压平"。
         // 但那次同时加的字号阶梯 + 左侧层级色条已经承担了层级，进度条不必再让位；
         // 而"这块修满没有"恰恰是这一页最该一眼看到的东西（用户直接问过"为啥有的类型没有进度条"）。
-        // 叶子级用更细的条（3dp vs 5dp）：横杠多了也不至于变成一堵墙。
+        // 叶子级 2026-10-29 从 3dp 加粗到 5dp（用户："各类课程进度条可以加粗"）——
+        // 3dp 在 5dp 的模块条旁边细到几乎看不见，"这一类修了多少"反而最不好读。
         //
         // ⚠️ 分母缺失（要求学分为空 / 0）时**仍然不画**：没有分母就谈不上进度，
         // 补一条 0% 或 100% 都是**编数据**（真实数据里「其他选修课程」正是这种：
@@ -949,43 +961,32 @@ internal fun AcademicTypeRow(
         //（`surfaceHighlight` 在页面底色上几乎不可见，等于没画）。
         if (ratio != null) {
             Spacer(Modifier.height(skin.spaceSmall))
-            // 三种填充三个含义（2026-10 用户要求"别只用一种颜色"）：
-            //   · **总进度（根节点）→ 金属金**：一页里同时有"总进度"和"各类型进度"，
-            //     同形状的条分不清哪条是总计；
-            //   · **修满 → 绿**：这块过没过，颜色直接给结论；
+            // 填充色三档（2026-10-29 按用户要求重排）：
+            //   · **修满 → 绿**：这块过没过，颜色直接给结论，压过下面两档；
+            //   · **平台层 → 金属金**：金色原先给"主修"总计那条，但总计本来就是全页字号最大、
+            //     字重最重的一行，不需要再靠颜色抢；平台是这一页真正要横向对比的几块，
+            //     给它们同一档金属色，"看到金色就是平台级"反而成了层级信号。
             //   · **其余 → 主色**。
-            val metallic = type.depth == 0
+            val metallic = type.depth == 1
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ProgressTrack(
                     modifier = Modifier.weight(1f),
                     progress = ratio,
-                    // 总进度条更厚（7dp）：金属质感靠"高光 + 阴影 + 渐变"三层，5dp 太薄撑不住
-                    //（渲图对比过 —— 5dp 上那 1dp 高光几乎看不见，金属感出不来）；
-                    // 各类型保持 3/5dp，横杠多了也不至于变成一堵墙。
                     height = when {
+                        // 总计最厚（8dp）：金属质感靠"高光 + 阴影 + 渐变"三层，条太薄撑不住
+                        //（渲图对比过 —— 5dp 上那 1dp 高光几乎看不见，金属感出不来）
+                        type.depth == 0 -> 8.dp
                         metallic -> 7.dp
-                        type.depth == 1 -> 6.dp
-                        type.depth >= 3 -> 3.dp
-                        else -> 4.dp
+                        else -> 5.dp
                     },
                     brush = when {
-                        metallic -> Brush.horizontalGradient(listOf(MetallicGoldStart, MetallicGoldEnd))
-                        // 修满一律转绿："这块过没过"比"这块叫什么颜色"更要紧
                         ratio >= 1f -> Brush.horizontalGradient(listOf(colors.success, colors.success))
-                        platformTint != null -> Brush.horizontalGradient(
-                            listOf(platformTint, lerp(platformTint, Color.Black, 0.18f)),
-                        )
+                        metallic -> Brush.horizontalGradient(listOf(MetallicGoldStart, MetallicGoldEnd))
                         else -> Brush.horizontalGradient(listOf(accentColor(), accentColor()))
                     },
-                    track = when {
-                        ratio <= 0f -> colors.borderDivider
-                        // 平台层的轨道也染同一档淡调：整条（实心 + 缺口）都是这个平台的颜色
-                        type.depth == 1 && platformTint != null ->
-                            lerp(colors.surfaceHighlight, platformTint, 0.20f)
-                        else -> colors.surfaceHighlight
-                    },
-                    // 金属质感只给总进度：它要"像一条实心金属"，各类型仍是平面填充（一页里
-                    // 十几条立体阴影会变成噪音）。
+                    track = if (ratio <= 0f) colors.borderDivider else colors.surfaceHighlight,
+                    // 金属质感只给平台层：它要"像一条实心金属"，其余层级仍是平面填充
+                    //（一页里十几条立体阴影会变成噪音）。
                     highlight = metallic,
                 )
                 // 差额写在条的**右端**（改造前它是一枚独占一行的药丸）：一个节点少一行高，
@@ -1041,6 +1042,32 @@ internal fun AcademicTypeRow(
             }
         }
     }
+    val shell = Modifier
+        .fillMaxWidth()
+        .padding(start = (type.depth * style.indentPerDepth.value).dp)
+        .padding(top = if (carded) 8.dp else 6.dp)
+    if (carded) {
+        AppCard(
+            modifier = shell,
+            // 整张卡就是展开/收起键（`AppCard(onClick=)` 自带 MIUIX 下沉反馈）：
+            // 卡有边界，用户就按边界理解可点区 —— 只让标题行能点是把按钮做成了"卡里的一小条"。
+            // 展不开的行（没子节点也没课程）不给 onClick，卡退成纯容器。
+            onClick = if (expandable) onToggle else null,
+            // 平台卡圆角大一号：它是外层容器，模块卡要在它里面还看得清自己的边界
+            shape = RoundedCornerShape(if (type.depth == 1) 16.dp else 13.dp),
+            containerColor = platformTint?.let { lerp(colors.surfaceCard, it, 0.10f) }
+                ?: colors.surfaceCard,
+            // 描边跟着同一档色：淡底在页面底色上太轻，没有这条边就看不出卡在哪结束
+            border = platformTint?.let { BorderStroke(1.dp, lerp(colors.borderDivider, it, 0.5f)) },
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = skin.spaceMd, vertical = skin.spaceSmall),
+                content = body,
+            )
+        }
+    } else {
+        Column(modifier = shell, content = body)
+    }
 }
 
 /**
@@ -1072,7 +1099,8 @@ private fun ProgressTrack(
     highlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(3.dp)
+    // 端头收全圆：条加粗到 5~8dp 以后，固定 3dp 圆角看着像"两头没削平的方木条"
+    val shape = RoundedCornerShape(percent = 50)
     Box(
         modifier = modifier
             .fillMaxWidth()

@@ -591,7 +591,8 @@ class AcademicQueryScreenshotTest {
      * 平台行的颜色**跟着构成条走**（2026-10-29）。
      *
      * 构成条把各平台排成不同色的一段，往下滚树里又是这些平台 —— 原先树里全是同一个主色，
-     * 同一个东西在一页上换了身衣服，两处对不上。现在按 **id** 借色。
+     * 同一个东西在一页上换了身衣服，两处对不上。现在按 **id** 借色（借在卡片底色与描边上；
+     * 进度条按层级给色，不参与身份）。
      * 按 id 不按名字：培养方案里真有同名节点（两个「身心健康类课程」）。
      */
     @Test
@@ -602,7 +603,9 @@ class AcademicQueryScreenshotTest {
         assertEquals(ServiceAccent.ACADEMIC, accents.getValue("p1"))
         assertEquals(ServiceAccent.QUERY, accents.getValue("p2"))
         assertEquals(ServiceAccent.LIFE, accents.getValue("p3"))
-        // 叶子层不在表里（它没有"段"可借），界面退回主色
+        // 只有平台层进表：模块层没有自己的段，界面拿 `parentId` 查父平台那一档（查不到 = 灰）；
+        // 叶子层同理，但它连父平台都隔了一级，所以整条链上只有平台级有颜色。
+        assertFalse(accents.containsKey("m1"))
         assertFalse(accents.containsKey("t1"))
     }
 

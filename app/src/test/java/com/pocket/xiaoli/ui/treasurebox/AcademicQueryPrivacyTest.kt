@@ -364,4 +364,34 @@ class AcademicQueryPrivacyTest {
         composeRule.onAllNodes(hasClickAction() and hasText("通识必修课程模块", substring = true))
             .assertCountEquals(0)
     }
+
+    /**
+     * **整张卡都是展开键**，不只是卡里的标题行（2026-10-29 用户点名"点空白展不开"）。
+     *
+     * 卡有边界，用户就按边界理解可点区。这一条钉的是"点击挂在卡上"这件事：
+     * 挂在标题行上量到 44dp，挂在卡上量到 ~69dp（标题行 + 进度条那一行 + 卡内边距），
+     * 所以断言取 60dp —— 两边都有余量，不是刀口。
+     * 顺带钉"卡里只有一个可点节点"：嵌套两个按钮会让点空白和点标题行走出不同的东西。
+     */
+    @Test
+    fun `整张平台卡都是展开键`() {
+        val types = listOf(
+            AcademicTypeInfo(name = "主修", id = "root", requiredCredit = "170.0", earnedCredit = "95.0"),
+            AcademicTypeInfo(
+                name = "通识教育平台", id = "p1", parentId = "root", depth = 1,
+                requiredCredit = "53.5", earnedCredit = "49.5",
+            ),
+            AcademicTypeInfo(name = "通识必修课程模块", id = "m1", parentId = "p1", depth = 2),
+        )
+        render {
+            LazyColumn {
+                academicTreeSections(types = types, courses = emptyList(), isExpanded = { true }, onToggle = {})
+            }
+        }
+
+        val card = composeRule.onNode(hasClickAction() and hasText("通识教育平台", substring = true))
+        card.assertHeightIsAtLeast(60.dp)
+        composeRule.onAllNodes(hasClickAction() and hasText("通识教育平台", substring = true))
+            .assertCountEquals(1)
+    }
 }
