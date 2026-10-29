@@ -128,6 +128,11 @@ internal class AppUpdatePromptController(
     fun autoShow(state: AppFeedRepository.State) {
         if (info != null || checking || !state.loaded) return
         if (!state.updateAvailable && !state.forceUpdate) return
+        // 「主动提醒更新」被关掉（设置 → 更新）：普通更新不再自己弹出来。
+        // ⚠️ 强更**不受这个开关管** —— 那条说的是"你这个版本已经不能用了"，
+        // 不是一个可以商量的新功能；能被开关关掉就不叫底线。
+        // 手动「检查更新」走的是 [checkNow]，也不经过这里，所以想更新随时能更。
+        if (!state.forceUpdate && !state.pushEnabled) return
         // 有必须确认的公告时先让公告说话，关掉后状态还会再来一次
         if (state.blocking != null) return
         val code = state.latestVersionCode

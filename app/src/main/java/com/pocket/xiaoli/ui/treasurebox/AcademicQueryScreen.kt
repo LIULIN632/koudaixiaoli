@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -163,6 +164,8 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
     // 学分构成条的段。**用全量 types 而不是 visibleTypes**：筛选/搜索改的是"看哪些课"，
     // 毕业要求怎么分配不会因为筛一下就变 —— 跟着筛选变化会让人以为培养方案变了。
     val composition = remember(types) { creditSegments(types) }
+    // 树里平台层那一行的颜色从构成条借：同一块平台在上下两屏是同一个颜色
+    val accents = remember(composition) { platformAccents(composition) }
 
     Column(
         modifier = Modifier
@@ -342,7 +345,8 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
                             }
                         },
                         // 筛选时"祖先"会带着出现，它们名下没有命中课程 —— 别对它们喊"未取到明细"
-                        hideEmptyHint = filtering
+                        hideEmptyHint = filtering,
+                        platformAccents = accents,
                     )
                 }
             }
@@ -505,6 +509,8 @@ internal fun LazyListScope.academicTreeSections(
     isExpanded: (String) -> Boolean,
     onToggle: (String) -> Unit,
     hideEmptyHint: Boolean = false,
+    /** 平台 id → 构成条段色；空表 = 所有平台退回主色（测试与降级路径都走这条）。 */
+    platformAccents: Map<String, ServiceAccent> = emptyMap(),
 ) {
     // ⚠️ **每个类型都要出行**，哪怕它一门课都没取到 —— 以前"没课就不出行"，
     // 于是明细接口一失败，用户看到的就是"这个类型不见了"，与"类型没解析出来"分不清。
@@ -523,7 +529,8 @@ internal fun LazyListScope.academicTreeSections(
                 courseCount = typeCourses.size,
                 expandable = typeCourses.isNotEmpty() || hasChildren,
                 expanded = expanded,
-                onToggle = { onToggle(type.id) }
+                onToggle = { onToggle(type.id) },
+                platformAccent = platformAccents[type.id],
             )
         }
         if (typeCourses.isEmpty() && !hideEmptyHint && !hasChildren) {
@@ -844,10 +851,14 @@ internal fun AcademicTypeRow(
     expandable: Boolean,
     expanded: Boolean,
     onToggle: () -> Unit,
+    /** 平台层（depth 1）在上方「学分构成」那张条里的段色；其余层级传 null。 */
+    platformAccent: ServiceAccent? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val style = hierarchyStyle(type.depth)
+    // 平台层整行跟着它的段色走（左侧色条 + 进度条），与上方构成条对得上
+    val platformTint = platformAccent?.let { serviceAccentColor(it) }
     val earned = type.earnedCredit.trim().toFloatOrNull()
     val required = type.requiredCredit.trim().toFloatOrNull()
     val ratio = if (required != null && required > 0f && earned != null) {
@@ -873,14 +884,14 @@ internal fun AcademicTypeRow(
                 )
                 .heightIn(min = 44.dp)
         ) {
-            // 左侧层级色条：平台 = 主色 3dp，模块 = textTertiary 2dp，其余不画
+            // 左侧层级色条：平台 = 它在构成条里的段色，模块 = textTertiary 2dp，其余不画
             if (style.barColor != null) {
                 Box(
                     modifier = Modifier
                         .width(style.barWidth)
                         .height(18.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(style.barColor)
+                        .background(platformTint ?: style.barColor)
                 )
                 Spacer(Modifier.width(skin.spaceSmall))
             }
@@ -951,18 +962,28 @@ internal fun AcademicTypeRow(
                     // 总进度条更厚（7dp）：金属质感靠"高光 + 阴影 + 渐变"三层，5dp 太薄撑不住
                     //（渲图对比过 —— 5dp 上那 1dp 高光几乎看不见，金属感出不来）；
                     // 各类型保持 3/5dp，横杠多了也不至于变成一堵墙。
-                    height = if (metallic) 7.dp else if (type.depth >= 3) 3.dp else 5.dp,
-                    brush = if (metallic) {
-                        Brush.horizontalGradient(listOf(MetallicGoldStart, MetallicGoldEnd))
-                    } else {
-                        Brush.horizontalGradient(
-                            listOf(
-                                if (ratio >= 1f) colors.success else accentColor(),
-                                if (ratio >= 1f) colors.success else accentColor(),
-                            )
-                        )
+                    height = when {
+                        metallic -> 7.dp
+                        type.depth == 1 -> 6.dp
+                        type.depth >= 3 -> 3.dp
+                        else -> 4.dp
                     },
-                    track = if (ratio <= 0f) colors.borderDivider else colors.surfaceHighlight,
+                    brush = when {
+                        metallic -> Brush.horizontalGradient(listOf(MetallicGoldStart, MetallicGoldEnd))
+                        // 修满一律转绿："这块过没过"比"这块叫什么颜色"更要紧
+                        ratio >= 1f -> Brush.horizontalGradient(listOf(colors.success, colors.success))
+                        platformTint != null -> Brush.horizontalGradient(
+                            listOf(platformTint, lerp(platformTint, Color.Black, 0.18f)),
+                        )
+                        else -> Brush.horizontalGradient(listOf(accentColor(), accentColor()))
+                    },
+                    track = when {
+                        ratio <= 0f -> colors.borderDivider
+                        // 平台层的轨道也染同一档淡调：整条（实心 + 缺口）都是这个平台的颜色
+                        type.depth == 1 && platformTint != null ->
+                            lerp(colors.surfaceHighlight, platformTint, 0.20f)
+                        else -> colors.surfaceHighlight
+                    },
                     // 金属质感只给总进度：它要"像一条实心金属"，各类型仍是平面填充（一页里
                     // 十几条立体阴影会变成噪音）。
                     highlight = metallic,

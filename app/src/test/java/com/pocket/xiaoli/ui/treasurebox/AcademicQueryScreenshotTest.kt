@@ -29,7 +29,9 @@ import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
 import com.pocket.xiaoli.ui.theme.SkinStyle
+import com.pocket.xiaoli.ui.theme.ServiceAccent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -186,6 +188,9 @@ class AcademicQueryScreenshotTest {
                             // 生产默认：有子节点的展开（一眼看到整棵树），叶子收起（课程按需再展开）
                             isExpanded = { id -> slice.any { it.parentId == id } },
                             onToggle = {},
+                            // ⚠️ 段色按**全量** realTypes 算：按切片重算的话，
+                            // 下半段里的「学科专业教育平台」会拿到上半段第一个平台的颜色
+                            platformAccents = platformAccents(creditSegments(realTypes)),
                         )
                     }
                 }
@@ -271,6 +276,7 @@ class AcademicQueryScreenshotTest {
                             onToggle = { id ->
                                 if (expanded.contains(id)) expanded.remove(id) else expanded.add(id)
                             },
+                            platformAccents = platformAccents(creditSegments(types)),
                         )
                     }
                 }
@@ -579,6 +585,25 @@ class AcademicQueryScreenshotTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("超 2.0").assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/screenshots/368-academic-credit-composition-over.png")
+    }
+
+    /**
+     * 平台行的颜色**跟着构成条走**（2026-10-29）。
+     *
+     * 构成条把各平台排成不同色的一段，往下滚树里又是这些平台 —— 原先树里全是同一个主色，
+     * 同一个东西在一页上换了身衣服，两处对不上。现在按 **id** 借色。
+     * 按 id 不按名字：培养方案里真有同名节点（两个「身心健康类课程」）。
+     */
+    @Test
+    fun `平台行的段色按 id 对上构成条`() {
+        val accents = platformAccents(creditSegments(realTypes))
+
+        // 三个平台各拿一档，且与构成条里同一段是同一档
+        assertEquals(ServiceAccent.ACADEMIC, accents.getValue("p1"))
+        assertEquals(ServiceAccent.QUERY, accents.getValue("p2"))
+        assertEquals(ServiceAccent.LIFE, accents.getValue("p3"))
+        // 叶子层不在表里（它没有"段"可借），界面退回主色
+        assertFalse(accents.containsKey("t1"))
     }
 
     @Test

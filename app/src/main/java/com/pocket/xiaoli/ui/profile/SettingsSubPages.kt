@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
@@ -23,7 +24,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SystemUpdate
@@ -377,6 +378,7 @@ private fun UpdateContent(
     // 那个开关后来整个删掉了（学校索引在产品入口下不可达，知识库改为启动静默刷新）。
     val appFeedStore = remember { container.appFeedStore }
     var backgroundCheck by remember { mutableStateOf(appFeedStore.backgroundEnabled()) }
+    var pushEnabled by remember { mutableStateOf(appFeedStore.pushEnabled()) }
     var channel by remember { mutableStateOf(appFeedStore.preferredChannel()) }
     var betaEnabled by remember { mutableStateOf(appFeedStore.betaEnabled()) }
     val context = LocalContext.current
@@ -386,6 +388,7 @@ private fun UpdateContent(
     UpdatePageContent(
         feedState = feedState,
         backgroundCheck = backgroundCheck,
+        pushEnabled = pushEnabled,
         channel = channel,
         betaEnabled = betaEnabled,
         onToggleBackground = {
@@ -393,6 +396,13 @@ private fun UpdateContent(
             backgroundCheck = next
             appFeedStore.setBackgroundEnabled(next)
             if (next) AppFeedScheduler.schedule(context) else AppFeedScheduler.cancel(context)
+        },
+        onTogglePush = {
+            val next = !pushEnabled
+            pushEnabled = next
+            appFeedStore.setPushEnabled(next)
+            // 开关是 State 的一部分，不重算的话页面上那条红点/抽屉要等下一次拉 feed 才认
+            container.appFeedRepository.reapplyChannel()
         },
         onChannel = {
             channel = it
@@ -415,9 +425,11 @@ private fun UpdateContent(
 internal fun UpdatePageContent(
     feedState: AppFeedRepository.State,
     backgroundCheck: Boolean,
+    pushEnabled: Boolean,
     channel: String,
     betaEnabled: Boolean,
     onToggleBackground: () -> Unit,
+    onTogglePush: () -> Unit,
     onChannel: (String) -> Unit,
     onToggleBeta: () -> Unit,
     onCheckUpdate: () -> Unit,
@@ -445,10 +457,27 @@ internal fun UpdatePageContent(
         )
     }
 
-    SettingsSectionHeader("自动检查")
+    SettingsSectionHeader("检查与提醒")
     SettingsCard {
+        // 这一条是给"不想被打扰"的人的：关掉之后 App 不再自己弹更新抽屉、不发更新通知、
+        // 消息入口那颗更新红点也不亮。
+        // ⚠️ 三件事它**不**管，也都写在问号里：检查照旧（feed 里还带着公告，停了检查公告一起瞎）、
+        // 上面的手动「检查更新」照旧（想更随时能更）、**强制更新照旧弹**
+        //（那是"这个版本已不受支持"，能被开关关掉就不叫底线）。
         SettingsSwitchItem(
-            icon = Icons.Filled.NotificationsActive,
+            icon = Icons.Filled.Notifications,
+            title = "主动提醒更新",
+            subtitle = "关掉后不再自动弹更新提示",
+            checked = pushEnabled,
+            onToggle = onTogglePush,
+            accent = ServiceAccent.INFO,
+            hint = "关掉之后：不再自动弹出更新窗口，通知栏也不发更新消息，消息入口的更新红点不亮。" +
+                "想更新随时点上面的「检查更新」，公告不受这个开关影响。" +
+                "版本不被支持时的强制提示仍然会出现 —— 那条不是新功能，是安全底线。",
+        )
+        SettingsDivider()
+        SettingsSwitchItem(
+            icon = Icons.Filled.CloudSync,
             title = "后台检查版本与公告",
             checked = backgroundCheck,
             onToggle = onToggleBackground,

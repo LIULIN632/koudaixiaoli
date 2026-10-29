@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
@@ -26,7 +25,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,9 +45,7 @@ import com.pocket.xiaoli.ui.components.ServiceEmptyCard
 import com.pocket.xiaoli.ui.components.ServicePageTopBar
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.ServiceAccent
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.pocket.xiaoli.util.relativeSinceLabel
 import java.util.UUID
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.invisibleTouchTarget
@@ -97,7 +92,7 @@ fun NoteListScreen(
                 ServiceEmptyCard(
                     icon = Icons.Outlined.EditNote,
                     title = "还没有笔记",
-                    message = "课堂要点先记在这里，之后可以标记公开同步到笔记广场",
+                    message = "课堂要点先记在这里。笔记只存在这台手机上，不上传。",
                     accent = ServiceAccent.STUDY,
                     modifier = Modifier.padding(horizontal = skin.spaceLg),
                     actionLabel = "新建笔记",
@@ -118,14 +113,6 @@ fun NoteListScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
             ) {
-                item {
-                    Text(
-                        "本地笔记会先保存在本机；后续接入服务器后，标记为公开的笔记可同步到笔记广场。",
-                        fontSize = 11.sp,
-                        color = colors.textTertiary,
-                        modifier = Modifier.padding(bottom = skin.spaceXs),
-                    )
-                }
                 items(notes, key = { it.id }) { note ->
                     NoteCard(
                         note = note,
@@ -156,7 +143,7 @@ fun NoteListScreen(
 }
 
 @Composable
-private fun NoteCard(
+internal fun NoteCard(
     note: NoteItem,
     onClick: () -> Unit,
     onDelete: () -> Unit,
@@ -181,18 +168,6 @@ private fun NoteCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (note.isPublic) {
-                        Spacer(Modifier.size(6.dp))
-                        Text(
-                            "待公开",
-                            fontSize = 10.sp,
-                            color = colors.accentMain,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(skin.radiusMicro))
-                                .background(colors.surfaceHighlight)
-                                .padding(horizontal = skin.spaceSmall, vertical = 2.dp),
-                        )
-                    }
                 }
                 if (note.content.isNotBlank()) {
                     Spacer(Modifier.height(skin.spaceXs))
@@ -205,8 +180,10 @@ private fun NoteCard(
                     )
                 }
                 Spacer(Modifier.height(skin.spaceSmall))
+                // 相对时间走全项目那一份实现（`util/RelativeTime.kt`）：
+                // "3 分钟前"比"10-29 15:40"更快回答"这条还新不新"，超过 30 天它自己退回日期。
                 Text(
-                    SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(note.updatedAt)),
+                    relativeSinceLabel(note.updatedAt, ""),
                     fontSize = 10.sp,
                     color = colors.textTertiary,
                 )
@@ -227,7 +204,6 @@ private fun NoteEditorDialog(
     val colors = LocalPocketXiaoliColors.current
     var title by remember { mutableStateOf(initial.title) }
     var content by remember { mutableStateOf(initial.content) }
-    var isPublic by remember { mutableStateOf(initial.isPublic) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -254,13 +230,6 @@ private fun NoteEditorDialog(
                     maxLines = 14,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("允许后续上传到笔记广场", fontSize = 13.sp, color = colors.textPrimary)
-                        Text("当前仅本地保存，服务器接入后生效", fontSize = 10.sp, color = colors.textTertiary)
-                    }
-                    Switch(checked = isPublic, onCheckedChange = { isPublic = it })
-                }
             }
         },
         confirmButton = {
@@ -270,7 +239,6 @@ private fun NoteEditorDialog(
                         initial.copy(
                             title = title.trim(),
                             content = content.trim(),
-                            isPublic = isPublic,
                             updatedAt = System.currentTimeMillis(),
                         )
                     )

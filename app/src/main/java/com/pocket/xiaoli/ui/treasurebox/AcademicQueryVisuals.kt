@@ -389,6 +389,7 @@ internal fun creditGapColor(kind: CreditGapKind?): Color {
 
 /** 构成条里的一段（一个平台）。 */
 internal data class CreditSegment(
+    val id: String,
     val name: String,
     val required: Float,
     val earned: Float,
@@ -397,6 +398,21 @@ internal data class CreditSegment(
     /** 已获占比。分母为 0 时返回 null（不参与绘制，见 [creditSegments]）。 */
     val ratio: Float? get() = if (required > 0f) (earned / required).coerceIn(0f, 1f) else null
 }
+
+/**
+ * 平台 id → 它在「学分构成」那张条里的段色。
+ *
+ * ## 为什么要传回树里
+ *
+ * 构成条把 3~7 个平台排进同一根横杠，每块一个色；往下滚两屏，树里又是这些平台的行，
+ * 却全是同一个主色 —— 同一个东西在一张页上换了身衣服，两处就对不上。
+ * 现在树里**平台层那一行的进度条与左侧色条用它自己的段色**，
+ * 构成条上那块是什么颜色，树里这一行就是什么颜色。
+ *
+ * 按 id 而不是名字：培养方案里真有同名节点（两个「身心健康类课程」）。
+ */
+internal fun platformAccents(segments: List<CreditSegment>): Map<String, ServiceAccent> =
+    segments.associate { it.id to it.accent }
 
 /** 段色循环用的类目色板 —— 与「服务」页同一套语义色，跟着主题色相走，不新造颜色。 */
 private val segmentPalette = listOf(
@@ -427,6 +443,7 @@ internal fun creditSegments(types: List<AcademicTypeInfo>): List<CreditSegment> 
         val required = type.requiredCredit.trim().toFloatOrNull() ?: return@mapIndexed null
         if (required <= 0f) return@mapIndexed null
         CreditSegment(
+            id = type.id,
             name = type.name,
             required = required,
             earned = type.earnedCredit.trim().toFloatOrNull() ?: 0f,

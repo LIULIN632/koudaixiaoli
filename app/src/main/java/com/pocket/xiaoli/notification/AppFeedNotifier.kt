@@ -38,9 +38,13 @@ object AppFeedNotifier {
         if (!canPost(context)) return
 
         val currentCode = state.latestVersionCode
+        // 「主动提醒更新」关掉 ⇒ 通知栏这条不发（强更除外）。
+        // ⚠️ 走的是"让 unseenVersion 为假"而不是"提前 return"：那样会连带把公告的提醒也跳过，
+        // 而用户关的是更新推送，不是公告。也不写进 `notifiedVersionCode` ——
+        // 哪天他把开关打开，那条新版还应该正常提醒一次。
         val unseenVersion = currentCode > 0 &&
             currentCode != store.notifiedVersionCode() &&
-            (state.updateAvailable || state.forceUpdate)
+            (state.forceUpdate || (state.updateAvailable && state.pushEnabled))
         val unseenAnnouncements = state.announcements.filter { it.id !in store.notifiedAnnouncementIds() }
 
         val update = AppUpdateRequest.of(state.latestVersionName, state.apkUrl, state.sha256)

@@ -103,8 +103,18 @@ class AppFeedRepository(
         val newerVersionExists: Boolean = false,
         /** 这个构建允不允许应用内自更新（`-Pfdroid=true` = false，包交给商店推）。 */
         val updatesEnabled: Boolean = !BuildConfig.FDROID,
+        /**
+         * 本机要不要**主动**被提醒更新（设置 → 更新 那个开关，默认开）。
+         *
+         * 只影响"App 自己凑上来"的三处：自动弹的抽屉、通知栏推送、消息红点。
+         * 检查、手动「检查更新」、公告、以及**强制更新**都不受它影响
+         *（强更可被一个开关关掉就不叫底线了）。
+         */
+        val pushEnabled: Boolean = true,
     ) {
-        val showRedDot: Boolean get() = unread > 0 || updateAvailable
+        // 更新那颗红点归"主动提醒"管；公告未读不归（那是用户自己发的消息）。
+        // forceUpdate 例外：它一定要亮，理由同上。
+        val showRedDot: Boolean get() = unread > 0 || forceUpdate || (updateAvailable && pushEnabled)
         val hasAnything: Boolean get() = announcements.isNotEmpty() || updateAvailable || error != null
 
         /**
@@ -259,6 +269,7 @@ class AppFeedRepository(
             loaded = _state.value.loaded,
             rolloutId = store.rolloutId(),
             betaEnabled = store.betaEnabled(),
+            pushEnabled = store.pushEnabled(),
         )
     }
 
@@ -288,6 +299,7 @@ class AppFeedRepository(
             loaded = _state.value.loaded,
             rolloutId = store.rolloutId(),
             betaEnabled = store.betaEnabled(),
+            pushEnabled = store.pushEnabled(),
         )
     }
 
@@ -304,6 +316,7 @@ class AppFeedRepository(
             error = error,
             rolloutId = store.rolloutId(),
             betaEnabled = store.betaEnabled(),
+            pushEnabled = store.pushEnabled(),
         )
         _state.value = next
         return next
@@ -354,6 +367,8 @@ internal object AppFeedView {
          * 公告照常显示（`announcements` 不受这个开关影响）。
          */
         updatesEnabled: Boolean = !BuildConfig.FDROID,
+        /** 本机「主动提醒更新」开关（`AppFeedStore.pushEnabled()`），只影响弹/推送/红点 */
+        pushEnabled: Boolean = true,
     ): AppFeedRepository.State {
         if (feed == null) {
             return AppFeedRepository.State(
@@ -431,6 +446,7 @@ internal object AppFeedView {
             // 不经 `updatesEnabled`、也不经「稍后提醒」：这就是"数据上有更新的东西"这件事本身
             newerVersionExists = hasApp,
             updatesEnabled = updatesEnabled,
+            pushEnabled = pushEnabled,
         )
     }
 }

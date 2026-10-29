@@ -46,6 +46,7 @@ class AppUpdatePromptControllerTest {
         force: Boolean = false,
         blocking: Announcement? = null,
         loaded: Boolean = true,
+        push: Boolean = true,
     ) = AppFeedRepository.State(
         announcements = listOfNotNull(blocking),
         updateAvailable = true,
@@ -56,6 +57,7 @@ class AppUpdatePromptControllerTest {
         apkUrl = "https://example.com/app.apk",
         notes = listOf("改了什么"),
         loaded = loaded,
+        pushEnabled = push,
     )
 
     @Test
@@ -144,5 +146,43 @@ class AppUpdatePromptControllerTest {
 
         prompt.autoShow(state(versionCode = 0))
         assertNull(prompt.info)
+    }
+
+    // ── 「主动提醒更新」开关（设置 → 更新，2026-10-29）──
+
+    /** 关掉之后普通更新不再自己弹出来 —— 这正是"不想更新的人别被打扰"要的效果。 */
+    @Test
+    fun `关掉主动提醒后普通更新不自动弹`() {
+        val prompt = controller()
+
+        prompt.autoShow(state(push = false))
+
+        assertNull(prompt.info)
+    }
+
+    /**
+     * 强更**不受这个开关管**。
+     *
+     * 那条说的是"你这个版本已经不能用了"（接口断版、数据格式变了），不是一个可以商量的新功能。
+     * 写反的后果是：用户关掉提醒后停在坏版本上，连"该升级了"都不知道 ——
+     * 与灰度那几条同一个思路（`minSupported` 不吃灰度，也不吃用户的偏好）。
+     */
+    @Test
+    fun `关掉主动提醒后强更仍然弹`() {
+        val prompt = controller()
+
+        prompt.autoShow(state(force = true, push = false))
+
+        assertNotNull(prompt.info)
+    }
+
+    /** 开着（默认）时照常弹 —— 这条守住的是"新字段的默认值必须是打扰照旧"。 */
+    @Test
+    fun `默认开着时照常弹`() {
+        val prompt = controller()
+
+        prompt.autoShow(state())
+
+        assertNotNull(prompt.info)
     }
 }

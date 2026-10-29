@@ -36,16 +36,24 @@ class UpdatePageContentTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private fun page(state: AppFeedRepository.State, onCheck: () -> Unit = {}, onBeta: () -> Unit = {}) {
+    private fun page(
+        state: AppFeedRepository.State,
+        push: Boolean = true,
+        onCheck: () -> Unit = {},
+        onBeta: () -> Unit = {},
+        onPush: () -> Unit = {},
+    ) {
         composeRule.setContent {
             PocketXiaoliTheme(appearanceMode = AppearanceMode.RAINBOW, skinStyle = SkinStyle.VIVID) {
                 SettingsSubPageScaffold(title = "更新", onBack = {}) {
                     UpdatePageContent(
                         feedState = state,
                         backgroundCheck = false,
+                        pushEnabled = push,
                         channel = "auto",
                         betaEnabled = false,
                         onToggleBackground = {},
+                        onTogglePush = onPush,
                         onChannel = {},
                         onToggleBeta = onBeta,
                         onCheckUpdate = onCheck,
@@ -55,6 +63,24 @@ class UpdatePageContentTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    /**
+     * 「主动提醒更新」这一行：看得见、点得动，且默认是开的。
+     *
+     * 默认值必须是"打扰照旧" —— 新加的开关一旦默认关，等于把所有现有用户的更新提示悄悄停了，
+     * 而那是这个功能最不该做的事。
+     */
+    @Test
+    fun `主动提醒那一行默认开着且能点`() {
+        var toggles = 0
+        page(AppFeedRepository.State(loaded = true), push = true, onPush = { toggles++ })
+
+        composeRule.onNodeWithText("主动提醒更新").assertIsDisplayed()
+        composeRule.onNodeWithText("主动提醒更新").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("点这一行要真的把回调发出去", 1, toggles)
     }
 
     @Test

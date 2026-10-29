@@ -104,14 +104,8 @@ class AppFeedStore(context: Context) {
             .apply()
     }
 
-    // ── 后台检查开关 ────────────────────────────────────────────────────
+    // ── 检查与提醒的本地偏好 ────────────────────────────────────────────
 
-    /**
-     * 要不要在后台定期检查（默认开）。
-     *
-     * 关掉只影响 L2（WorkManager 轮询）；**打开 App 时的 L1 检查不受影响** ——
-     * 否则用户关了个开关就再也收不到更新提示，那不是他想要的。
-     */
     /**
      * 更新渠道：`auto` / `gitee` / `github`（见 [com.pocket.xiaoli.network.AppUpdateChecker.CHANNEL_AUTO]）。
      *
@@ -123,10 +117,36 @@ class AppFeedStore(context: Context) {
     fun setPreferredChannel(channel: String) {
         prefs.edit().putString(KEY_CHANNEL, channel).apply()
     }
+
+    /**
+     * 要不要在后台定期检查（默认开）。
+     *
+     * 关掉只影响 L2（WorkManager 轮询）；**打开 App 时的 L1 检查不受影响** ——
+     * 否则用户关了个开关就再也收不到更新提示，那不是他想要的。
+     */
     fun backgroundEnabled(): Boolean = prefs.getBoolean(KEY_BACKGROUND_ENABLED, true)
 
     fun setBackgroundEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BACKGROUND_ENABLED, enabled).apply()
+    }
+
+    /**
+     * 要不要**主动**提醒更新（默认开）。2026-10-29 加：不想更新的人可以关掉打扰。
+     *
+     * 它挡的是"App 自己凑上来"的三处 —— 自动弹的更新抽屉、通知栏的更新推送、
+     * 消息入口那颗更新红点。**这三处之外一律不动**：
+     *
+     * - 检查照旧（feed 里还带着公告，停了检查公告也一起瞎了）；
+     * - 「设置 → 更新 → 检查更新」这个手动入口照旧，想更新随时能更新；
+     * - **强制更新照旧弹**：那条是"你这个版本已不受支持"的安全底线，
+     *   能被一个开关关掉就不叫底线了（同 [updatesEnabled] 在 F-Droid 构建上的处理思路）。
+     *
+     * 与 [backgroundEnabled] 是两回事：那个管"要不要去问"，这个管"问到了要不要说"。
+     */
+    fun pushEnabled(): Boolean = prefs.getBoolean(KEY_PUSH_ENABLED, true)
+
+    fun setPushEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PUSH_ENABLED, enabled).apply()
     }
 
     /**
@@ -174,6 +194,7 @@ class AppFeedStore(context: Context) {
         private const val KEY_NOTIFIED_VERSION = "notified_version"
         private const val KEY_NOTIFIED_ANNOUNCEMENTS = "notified_announcements"
         private const val KEY_BACKGROUND_ENABLED = "background_enabled"
+        private const val KEY_PUSH_ENABLED = "push_enabled"
         private const val KEY_BETA_ENABLED = "beta_enabled"
     private const val KEY_CHANNEL = "update_channel"
         private const val KEY_FEEDBACK_ENDPOINT = "feedback_endpoint"

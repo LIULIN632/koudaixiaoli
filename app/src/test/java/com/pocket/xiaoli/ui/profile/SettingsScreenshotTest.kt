@@ -357,9 +357,12 @@ class SettingsScreenshotTest {
                         UpdatePageContent(
                             feedState = state,
                             backgroundCheck = true,
+                            // 基线拍的是**默认态**：主动提醒开着（新加的开关默认必须不打扰照旧）
+                            pushEnabled = true,
                             channel = if (state.updateIsBeta) "gitee" else "auto",
                             betaEnabled = state.updateIsBeta,
                             onToggleBackground = {},
+                            onTogglePush = {},
                             onChannel = {},
                             onToggleBeta = {},
                             onCheckUpdate = {},

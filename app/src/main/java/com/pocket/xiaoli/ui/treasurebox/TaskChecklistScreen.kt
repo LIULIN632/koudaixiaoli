@@ -158,8 +158,7 @@ fun TaskChecklistScreen(
                         )
                     }
 
-                    // Completed tasks first, then incomplete
-                    val sortedTasks = tasks.sortedWith(compareBy({ !it.completed }, { it.sortOrder }))
+                    val sortedTasks = taskDisplayOrder(tasks)
                     items(sortedTasks, key = { it.id }) { task ->
                         TaskItem(
                             task = task,
@@ -194,8 +193,18 @@ fun TaskChecklistScreen(
     }
 }
 
+/**
+ * 列表顺序：**没完成的排前面**，同组内按用户自己排的 `sortOrder`。
+ *
+ * 2026-10-29 之前是已完成在前 —— 于是主视觉卡刚说完"先挑一件最容易的开始"，
+ * 第一屏全是划掉的旧账。这一页的用途是"还剩什么"，不是"我做过多少"。
+ * 抽成纯函数是因为这条顺序本身就是**判据**，不该只能靠肉眼看图来守。
+ */
+internal fun taskDisplayOrder(tasks: List<TaskEntity>): List<TaskEntity> =
+    tasks.sortedWith(compareBy({ it.completed }, { it.sortOrder }))
+
 @Composable
-private fun TaskItem(
+internal fun TaskItem(
     task: TaskEntity,
     onToggle: () -> Unit,
     onDelete: () -> Unit
@@ -233,10 +242,9 @@ private fun TaskItem(
                 modifier = Modifier.weight(1f),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (task.completed)
-                    colors.textTertiary.copy(alpha = 0.6f)
-                else
-                    colors.textPrimary,
+                // 完成项不再叠透明度：`textTertiary` 本来就是弱化色，再乘 0.6 在深色主题下
+                // 几乎读不出来；划掉线已经把"这条做完了"说清楚了。
+                color = if (task.completed) colors.textTertiary else colors.textPrimary,
                 textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -248,7 +256,8 @@ private fun TaskItem(
                 Icon(
                     Icons.Outlined.Close,
                     "删除",
-                    tint = colors.textTertiary.copy(alpha = 0.4f),
+                    // 0.4 透明度等于"看不见但点得到"：一个看不见的删除键比没有更危险。
+                    tint = colors.textTertiary,
                     modifier = Modifier.size(14.dp)
                 )
             }

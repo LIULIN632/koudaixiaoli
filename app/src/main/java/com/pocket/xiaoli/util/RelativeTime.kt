@@ -32,7 +32,11 @@ internal fun relativeSinceLabel(
         minutes < 60 -> "${minutes} 分钟前$verb"
         minutes < 60 * 24 -> "${minutes / 60} 小时前$verb"
         minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前$verb"
-        else -> Instant.ofEpochMilli(past).atZone(ZoneId.systemDefault())
-            .toLocalDate().toString() + " $verb"
+        // 动词可以是空串（笔记那种只要"3 分钟前"、不要后缀），拼完要 trim，
+        // 否则日期那一档会留下一个看得见的尾空格。
+        else -> (
+            Instant.ofEpochMilli(past).atZone(ZoneId.systemDefault())
+                .toLocalDate().toString() + " " + verb
+            ).trim()
     }
 }

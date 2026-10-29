@@ -32,6 +32,7 @@ class AppFeedViewTest {
         rolloutId: String? = null,
         betaEnabled: Boolean = false,
         updatesEnabled: Boolean = true,
+        pushEnabled: Boolean = true,
     ) = AppFeedView.build(
         feed = feed,
         currentVersionCode = currentVersionCode,
@@ -44,6 +45,7 @@ class AppFeedViewTest {
         rolloutId = rolloutId,
         betaEnabled = betaEnabled,
         updatesEnabled = updatesEnabled,
+        pushEnabled = pushEnabled,
     )
 
     private fun announcement(id: String, level: AnnouncementLevel = AnnouncementLevel.INFO) =
@@ -545,5 +547,41 @@ class AppFeedViewTest {
             build(newerFeed, currentVersionCode = 40, error = "镜像还在返回旧数据").checkHint
                 .startsWith("这一轮的毛病：镜像"),
         )
+    }
+
+    // ── 「主动提醒更新」开关（2026-10-29）──
+
+    /**
+     * 关掉主动提醒后，更新那颗红点不该再亮，但**数据本身要说实话**。
+     *
+     * `updateAvailable` / `newerVersionExists` 描述的是"feed 上有没有新包"这件事，
+     * 开关管的是"要不要主动说"。把前者也压成 false，手动「检查更新」就会报
+     * 「已是最新版本」—— 而版本号明明比本机新，那是同一类谎（抽屉里已经因为这处
+     * 缺信息修过一次，见 `newerVersionExists` 的注释）。
+     */
+    @Test
+    fun `关掉主动提醒只压红点不改数据`() {
+        val off = build(newerFeed, currentVersionCode = 40, pushEnabled = false)
+
+        assertFalse("更新红点不该亮", off.showRedDot)
+        assertTrue("但数据上确实有新版", off.updateAvailable)
+        assertTrue(off.newerVersionExists)
+        // 开关只管"要不要主动说"，不改数据本身：手动检查仍然要能说出"有新版 v0.1.41"
+        assertTrue(off.checkTrace().contains("0.1.41"))
+    }
+
+    /** 强更的红点**不受开关管**：那条是"这个版本已不受支持"，不是新功能推荐。 */
+    @Test
+    fun `强更的红点压不掉`() {
+        val old = AppReleaseFeed(
+            versionCode = 41,
+            versionName = "0.1.41",
+            apkUrl = "https://example.com/a.apk",
+            minSupported = 41,
+        )
+        val state = build(old, currentVersionCode = 40, pushEnabled = false)
+
+        assertTrue(state.forceUpdate)
+        assertTrue("关了提醒也得亮强更", state.showRedDot)
     }
 }
