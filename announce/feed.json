@@ -9,17 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 101,
-    "versionName": "0.2.0",
+    "versionCode": 102,
+    "versionName": "0.2.1",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.0/koudaixiaoli_v0.2.0.apk",
-    "sha256": "2c2d7025fe01ba8f1ae580000c6c49b625a61b21e3a1be5e0042616e8c825081",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.1/koudaixiaoli_v0.2.1.apk",
+    "sha256": "9844039b4f11ac1c040172613af3e0eea81900e4486d3494620ae85e1b289d98",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "同一个新版本只提醒你一次；你选了「稍后」就不再反复弹，直到下次真正更新",
-      "更新面板改成一条主线：版本号、说明、一个按钮，附带的说明折进「更多」",
-      "教务页的课程表与学分构成微调了对齐和留白，窄屏不再挤在一起"
+      "成绩页整张卡都能点：点一下展开某门课的成绩，不用再找小箭头",
+      "学分构成与成绩分布重排，深色模式下分隔线和底色不再糊在一起",
+      "窄屏（360dp）下课名与分数不再互相挤压"
     ]
   },
   "endpoints": {
