@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  网络安全配置 —— 默认拒绝明文，只对本校域名与两处校内地址开口子。
+  网络安全配置 —— 默认拒绝明文，只对本校域名、两处校内地址与本机回环开口子。
 
   为什么需要这个文件：
   `AndroidManifest.xml` 原先写的是 `usesCleartextTraffic="true"`，等于**全局**允许 http。
@@ -47,6 +47,22 @@
     <!-- 烟台大学教务（B 轨道），见文件头说明。 -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">210.47.245.4</domain>
+    </domain-config>
+
+    <!--
+      内置课件的本机回环服务（`data/courseware/CoursewareServer.kt`）。
+
+      为什么需要开口子：课件是 ESM + importmap，`file://` 会被 Chromium 按跨源拦掉，
+      只能用 `http://127.0.0.1:<随机端口>/…` 打开 —— 而明文策略**不豁免回环地址**，
+      不加这条就是 `net::ERR_CLEARTEXT_NOT_PERMITTED`，表现与"课件坏了"无法区分。
+
+      为什么这里可以放：流量不出这台设备（服务只绑 127.0.0.1、随页面创建、离开即关），
+      内容与 APK 里的静态资源等价（无用户数据、无 Cookie）。localhost 一并列出，
+      是因为 `URLDecoder` 之后两种写法都可能出现。
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
     </domain-config>
 
 </network-security-config>

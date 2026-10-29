@@ -87,6 +87,8 @@ import androidx.compose.material.icons.outlined.OndemandVideo
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.ShowChart
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Checklist
@@ -167,6 +169,8 @@ import com.pocket.xiaoli.data.CampusConfig
 import com.pocket.xiaoli.data.learning.LearningPlatform
 import com.pocket.xiaoli.data.CampusInfo
 import com.pocket.xiaoli.data.CampusServiceKeys
+import com.pocket.xiaoli.data.courseware.Courseware
+import com.pocket.xiaoli.ui.courseware.CoursewareScreen
 import com.pocket.xiaoli.data.service.CampusServiceAdapterRegistry
 import com.pocket.xiaoli.data.service.CampusCardLauncher
 import com.pocket.xiaoli.data.service.CampusServiceRegistry
@@ -526,6 +530,13 @@ fun TreasureBoxScreen(
     }
     if (subPage == ServiceSubPage.McProtein) {
         McProteinIndexPage(onBack = { subPage = null })
+        return
+    }
+    // 内置交互课件（Three.js，见 `data/courseware/`）。这一条是 sealed 层级里唯一带参数的
+    // 目的地，所以只能 `as?` 取载荷再分发 —— 智能转换在 `by remember` 的局部变量上不可用。
+    val coursewarePage = subPage as? ServiceSubPage.CoursewarePage
+    if (coursewarePage != null) {
+        CoursewareScreen(item = coursewarePage.item, onBack = { subPage = null })
         return
     }
     if (subPage == ServiceSubPage.TaskChecklist) {
@@ -915,6 +926,26 @@ fun TreasureBoxScreen(
                     if (onOpenServiceWeb != null) onOpenServiceWeb(url, "迎新网") else openUrl(context, url)
                 }
             )
+        ),
+        // 「互动课件」整节由清单生成（`data/courseware/CoursewareCatalog.kt`）：
+        // 加一个课件，这里只会多一格，不会出现"清单里有、页面上没有"。
+        // 图标用**穷尽 when**而不是 `else -> 通用图标` —— 漏配图标要编译不过，
+        // 静默退回通用图标会让新课件长得跟别的格子一模一样。
+        ServiceSection(
+            title = "互动课件",
+            entries = Courseware.entries.map { item ->
+                ServiceEntry(
+                    item.title,
+                    item.subtitle,
+                    when (item) {
+                        Courseware.BeamDeflection -> Icons.Outlined.ShowChart
+                        Courseware.SoilThreePhase -> Icons.Outlined.Layers
+                    },
+                    Color.Unspecified,
+                    Color.Unspecified,
+                    accent = ServiceAccent.STUDY,
+                ) { subPage = ServiceSubPage.CoursewarePage(item) }
+            },
         ),
         ServiceSection(
             title = "其他",

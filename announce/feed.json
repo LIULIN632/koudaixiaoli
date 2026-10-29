@@ -9,11 +9,11 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 97,
-    "versionName": "0.1.96",
+    "versionCode": 98,
+    "versionName": "0.1.97",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.96/koudaixiaoli_v0.1.96.apk",
-    "sha256": "2a5daf7e607d85a7e9cf08f7c5f80dbafb97e1ad4afd0d6dc1fee702087391ec",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.97/koudaixiaoli_v0.1.97.apk",
+    "sha256": "62cd2a9362bab2f014aeb0e4f71eff7418115438b5833f33e7f259a26b6d9cfa",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [

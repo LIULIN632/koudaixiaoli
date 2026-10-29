@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN" data-soil-ready="0">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>土的三相组成 · Three.js 交互课件</title>
+  <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./app-mobile.css" />
+
+  <!-- ESM 依赖映射：three 与官方 addons 都从本地 node_modules 解析，离线可用 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three.module.min.js",
+      "three/addons/": "../vendor/jsm/"
+    }
+  }
+  </script>
+</head>
+<body data-status="booting">
+  <!-- 3D 视口：OrbitControls 绑定这个 canvas -->
+  <canvas id="view"></canvas>
+
+  <header class="hud">
+    <h1>土的三相组成</h1>
+    <p>固相 Solid · 液相 Water · 气相 Air</p>
+  </header>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">初始化中…</span>
+    </div>
+
+    <!-- 参数滑块由 src/ui.js 依据 PARAM_DEFS 生成 -->
+    <section class="group" id="sliders"></section>
+
+    <!-- 实时读数 -->
+    <section class="group" id="readouts"></section>
+
+    <!-- 三相体积占比条 -->
+    <section class="group" id="bars-wrap">
+      <h2>体积占比</h2>
+      <div class="bars" id="bars">
+        <div class="bar bar-solid" id="bar-solid"><span></span></div>
+        <div class="bar bar-water" id="bar-water"><span></span></div>
+        <div class="bar bar-air" id="bar-air"><span></span></div>
+      </div>
+    </section>
+
+    <footer class="tip">
+      单指拖拽旋转 · 双指捏合缩放 · 下方滑杆改参数
+    </footer>
+  </aside>
+
+  <!-- 运行时诊断：FPS / 错误计数，也是无头验收时读取的证据 -->
+  <div id="diag" role="status">诊断加载中…</div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

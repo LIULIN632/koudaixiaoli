@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN" data-beam-ready="0">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>简支梁挠度与弯矩 · Three.js 交互课件</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./app-mobile.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "../vendor/three.module.min.js",
+          "three/addons/": "../vendor/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body data-status="booting">
+    <canvas id="view"></canvas>
+
+    <header class="hud">
+      <h1>简支梁挠度与弯矩</h1>
+      <p>集中荷载 P · 跨长 L = 8 m · EI = 20000 kN·m²</p>
+    </header>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">初始化…</span>
+      </div>
+
+      <section class="group" id="sliders-wrap">
+        <h2>荷载参数</h2>
+        <div id="sliders"></div>
+      </section>
+
+      <section class="group" id="readouts">
+        <!-- ui.js 填充 -->
+      </section>
+
+      <section class="group">
+        <h2>图示</h2>
+        <ul class="legend">
+          <li><i class="sw sw-beam"></i>梁（变形后）</li>
+          <li><i class="sw sw-dash"></i>梁（未变形）</li>
+          <li><i class="sw sw-load"></i>荷载 P / 支座反力</li>
+          <li><i class="sw sw-moment"></i>弯矩图 M(x)</li>
+        </ul>
+      </section>
+
+      <p class="tip">单指拖拽旋转 · 双指捏合缩放 · 下方滑杆改参数</p>
+    </aside>
+
+    <div id="diag"></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

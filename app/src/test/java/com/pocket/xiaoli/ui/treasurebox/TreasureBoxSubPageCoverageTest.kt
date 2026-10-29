@@ -64,12 +64,33 @@ class TreasureBoxSubPageCoverageTest {
         readSource("src/main/java/com/pocket/xiaoli/ui/treasurebox/ServiceSubPage.kt")
     }
 
-    /** `ServiceSubPage` 里声明的全部条目名。 */
+    /**
+     * `ServiceSubPage` 里声明的全部条目名。
+     *
+     * 2026-10-28 起**同时认 `data object` 与 `data class`** —— 内置课件那条
+     * （`CoursewarePage(item)`）是这一层里第一个带参数的目的地。只认 object 的话，
+     * 守卫会把它当成"不存在"，于是"加了子页忘了接线"这个它本来要拦的错又通了。
+     */
     private fun declaredEntries(): List<String> =
-        Regex("""data\s+object\s+(\w+)\s*:\s*ServiceSubPage""")
+        Regex("""data\s+(?:object|class)\s+(\w+)[^:]*:\s*ServiceSubPage""")
             .findAll(routeType)
             .map { it.groupValues[1] }
             .toList()
+
+    /**
+     * 置位与比较的写法。
+     *
+     * ⚠️ 带参数的那条**不可能**用 `subPage == ServiceSubPage.X` 比较（左边是类型不是实例，
+     * 编译不过；写成 `== X(某值)` 又会因参数不同而静默不等），所以这里三种都算数：
+     * `==`（无参对象）、`is`、`as?`（取载荷）。
+     */
+    private fun wired(name: String): Boolean =
+        screen.contains("subPage = ServiceSubPage.$name")
+
+    private fun rendered(name: String): Boolean =
+        screen.contains("subPage == ServiceSubPage.$name") ||
+            screen.contains("subPage is ServiceSubPage.$name") ||
+            screen.contains("subPage as? ServiceSubPage.$name")
 
     /**
      * ⚠️ 已知「**没有任何入口能进得去**」的目的地。
@@ -154,9 +175,9 @@ class TreasureBoxSubPageCoverageTest {
         )
 
         val noSetter = entries
-            .filterNot { screen.contains("subPage = ServiceSubPage.$it") }
+            .filterNot { wired(it) }
             .filterNot { it in knownUnreachable }
-        val noCompare = entries.filterNot { screen.contains("subPage == ServiceSubPage.$it") }
+        val noCompare = entries.filterNot { rendered(it) }
 
         assertEquals(
             "这些子页目的地**没有任何地方会进得去**（缺 `subPage = ServiceSubPage.X`）：" +
@@ -165,7 +186,7 @@ class TreasureBoxSubPageCoverageTest {
             noSetter,
         )
         assertEquals(
-            "这些子页目的地**没有对应的渲染分支**（缺 `subPage == ServiceSubPage.X`）：" +
+            "这些子页目的地**没有对应的渲染分支**（缺 `subPage == / is / as? ServiceSubPage.X`）：" +
                 noCompare.joinToString("、") + " —— 用户进去了会是一片空白",
             emptyList<String>(),
             noCompare,
@@ -176,7 +197,7 @@ class TreasureBoxSubPageCoverageTest {
     fun `白名单不得过期`() {
         // 反向检查：白名单里那一条一旦被接上线，本测试就红 —— 逼着把豁免删掉，
         // 否则白名单会悄悄变成"永久免罪符"。
-        val stale = knownUnreachable.filter { screen.contains("subPage = ServiceSubPage.$it") }
+        val stale = knownUnreachable.filter { wired(it) }
         assertEquals(
             "这些目的地已经能被访问了，请把它们从 `knownUnreachable` 白名单里删掉：" +
                 stale.joinToString("、"),

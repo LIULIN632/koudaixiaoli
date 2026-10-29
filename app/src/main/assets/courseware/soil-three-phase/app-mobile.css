@@ -1,0 +1,30 @@
+/* 口袋小鲤内置版专用覆盖样式。
+ *
+ * 这个文件**不属于课件源项目**（源在仓库外的 D:\AICAN\建模），由
+ * tools/sync_courseware.py 在同步时追加到每个课件里。放在仓库里是为了：
+ * 源项目改它自己的 styles.css，内置版改这一份，两边不互相牵连。
+ *
+ * 只补"手机上是真问题"的两处：
+ *
+ * 1. **滑杆点不中**。源项目把轨道做成 4px 高、滑块 15px —— 桌面上没问题，
+ *    手指按上去十次有八次落在轨道外（本项目对可点元素的底线是 44dp）。
+ *    所以把元素本身加高到 30px，同时用 background-size 把**可见**轨道仍锁在 4px：
+ *    热区变大、外观不变，源项目的配色与渐变一行都不用动。
+ * 2. **面板惯性滚动**。WebView 里长列表没有 -webkit-overflow-scrolling 会发涩。
+ */
+
+input[type="range"] {
+  height: 30px;
+  background-size: 100% 4px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+.panel {
+  -webkit-overflow-scrolling: touch;
+}

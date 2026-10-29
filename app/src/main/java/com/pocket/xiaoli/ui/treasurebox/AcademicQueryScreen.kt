@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -158,6 +159,9 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
         filterAcademicView(types, courses, filter, query)
     }
     val badges = remember(types, courses) { filterBadgeCounts(types, courses) }
+    // 学分构成条的段。**用全量 types 而不是 visibleTypes**：筛选/搜索改的是"看哪些课"，
+    // 毕业要求怎么分配不会因为筛一下就变 —— 跟着筛选变化会让人以为培养方案变了。
+    val composition = remember(types) { creditSegments(types) }
 
     Column(
         modifier = Modifier
@@ -250,6 +254,9 @@ private fun ResultContent(viewModel: AcademicQueryViewModel) {
                     if (s.plannedTotal.isNotBlank() || s.unplannedPassed.isNotBlank()) {
                         item { CourseStatsCard(s) }
                     }
+                }
+                if (composition.size >= 2) {
+                    item { CreditCompositionBar(composition) }
                 }
                 if (types.isNotEmpty()) {
                     item {
@@ -530,11 +537,14 @@ internal fun LazyListScope.academicTreeSections(
                 )
             }
         } else if (expanded) {
-            items(typeCourses, key = { "${type.id}_${it.courseId}_${it.courseName}" }) { course ->
-                // 课程卡片与它所属的类型行**左对齐**（同缩进）：不然卡片像是"跳出去"了，
+            // 2026-10-28：一门课一张卡 → **一个类型一张表**。
+            // 41 门课原先要滚四屏多，而且每行的学分/成绩/绩点都在不同列位置上，
+            // 数字没法横向比；表格把行高压到原来的四成，列固定右对齐。
+            item(key = "courses_${type.id}") {
+                // 表与它所属的类型行**左对齐**（同缩进）：不然表像是"跳出去"了，
                 // 一眼看不出这几门课属于上面那个类型 —— 渲图看出来的。
                 Box(modifier = Modifier.padding(start = (type.depth * 10).coerceAtMost(20).dp)) {
-                    AcademicCourseCard(course)
+                    AcademicCourseTable(typeCourses)
                 }
             }
         }
@@ -951,25 +961,37 @@ internal fun AcademicTypeRow(
         //（哪块还差多少），压成弱化色等于把它藏起来。
         val missedCredit = type.missedCredit.toFloatOrNull() ?: 0f
         val missedGates = type.missedCount.toIntOrNull() ?: 0
-        if (missedCredit > 0f || missedGates > 0) {
-            Spacer(Modifier.height(skin.spaceXs))
-            Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                if (missedCredit > 0f) {
-                    ShortfallPill("还差 ${type.missedCredit} 学分")
-                }
-                if (missedGates > 0) {
-                    ShortfallPill("还差 $missedGates 门")
-                }
-            }
+        val pills = buildList {
+            if (missedCredit > 0f) add("还差 ${type.missedCredit} 学分")
+            if (missedGates > 0) add("还差 $missedGates 门")
         }
         // 门次 / 课程门数这类**上下文**仍然是弱化小字：它们回答"为什么够/不够"，
-        // 而不是"我该做什么"，与上面的药丸分工明确。
-        // ⚠️ `includeShortfall = false`：「还差 N 门」已经在上面的药丸里了，
+        // 而不是"我该做什么"，与药丸分工明确。
+        // ⚠️ `includeShortfall = false`：「还差 N 门」已经在药丸里了，
         // 这里再说一遍就是同一句话出现两次（渲图抓到的）。
         val countLine = type.countSummary(includeShortfall = false)
-        if (countLine.isNotBlank()) {
+        // 药丸与上下文**共用一行**（2026-10-28）：改造前它们各占一行，
+        // 一个类型节点从标题到脚注要四行，23 个节点滚不到底。
+        // 现在左边是"该做什么"、右边是"为什么"，一行读完。
+        if (pills.isNotEmpty() || countLine.isNotBlank()) {
             Spacer(Modifier.height(skin.spaceXs))
-            Text(countLine, fontSize = 11.sp, color = colors.textTertiary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                pills.forEachIndexed { index, text ->
+                    if (index > 0) Spacer(Modifier.width(skin.spaceSm))
+                    ShortfallPill(text)
+                }
+                if (countLine.isNotBlank()) {
+                    // 有药丸时把上下文推到行尾；没有药丸时它自己就是这一行的主角，留在左边
+                    if (pills.isNotEmpty()) Spacer(Modifier.weight(1f))
+                    Text(
+                        countLine,
+                        fontSize = 11.sp,
+                        color = colors.textTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
@@ -1139,122 +1161,3 @@ private fun TypeHeader(
         }
     }
 }
-
-@Composable
-private fun AcademicCourseCard(item: AcademicCourseItem) {
-    val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
-    // 颜色按**修读状态**分档（纯函数在 `StudyStats.statusTone()`）：
-    // 绿=已修、金=在修、红=未过、灰=未修 —— 用户要求"正在修课和未修课用不同颜色隔开"。
-    // ⚠️ 旧实现按 `status.contains("在读")` 判，而解析层给的词是「在修」⇒ 在修的课与未修一样是灰的。
-    val toneColor = when (item.statusTone()) {
-        CourseStatusTone.PASSED -> colors.success
-        // 「在修」用 info 蓝而不是总进度金：金是**图形专用**令牌
-        //（深色卡上没有"够金又够读"的值，见 ThemeContrastTest 里那两条 3:1 探针的说明），
-        // 而这一档要当**文字**给状态药丸用。
-        CourseStatusTone.IN_PROGRESS -> colors.info
-        CourseStatusTone.FAILED -> colors.danger
-        CourseStatusTone.UNTAKEN -> colors.textTertiary
-    }
-    AppCard(modifier = Modifier.fillMaxWidth()) {
-        // ⚠️ `height(IntrinsicSize.Min)` 不能省：左侧色条用 `fillMaxHeight()`，
-        // 而它需要**确定的高度约束** —— 在 LazyColumn 里直接给的是无限高，色条会画成 0 高
-        //（看着就是"根本没画"，渲图对比才发现的）。IntrinsicSize.Min 让 Row 先量出内容高度。
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // 左侧 3dp 状态色条：一列卡片滚过去时，颜色比小字更快被认出来
-            //（与培养方案树里"平台/模块"的层级色条同一手法，见 `hierarchyStyle`）。
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    // 不透明（用户要求"去掉任何降低透明度的属性"）：状态色本来就靠色相区分，
-                    // 掺了透明度在深色主题下会灰掉，反而分不清。
-                    .background(toneColor)
-            )
-            Column(modifier = Modifier.padding(skin.spaceLg)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    item.courseName.ifBlank { "未知课程" },
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary,
-                    modifier = Modifier.weight(1f)
-                )
-                if (item.status.isNotBlank()) {
-                    Surface(color = toneColor.copy(alpha = 0.12f), shape = RoundedCornerShape(50)) {
-                        Text(
-                            item.status,
-                            fontSize = 10.sp,
-                            color = toneColor,
-                            modifier = Modifier.padding(horizontal = skin.spaceSmall, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(skin.spaceSm))
-                }
-                val headline = item.maxGrade.ifBlank { item.score }
-                if (headline.isNotBlank()) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            headline,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = scoreBandOf(headline).color()
-                        )
-                        // 挂科补考时教务同一行给两列：「成绩 51 / 最大成绩 55」。
-                        // 只显示高的那个，用户会以为系统算错了；两个都显示才说得通。
-                        if (item.maxGrade.isNotBlank() && item.score.isNotBlank() &&
-                            item.score != item.maxGrade
-                        ) {
-                            Text("成绩 ${item.score}", fontSize = 10.sp, color = colors.textTertiary)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(skin.spaceSm))
-            HorizontalDivider(color = Divider, thickness = 0.5.dp)
-            Spacer(Modifier.height(skin.spaceSm))
-            // ⚠️ 拆成**两行**、每行最多三件事：
-            // 改造前是一条八九段的灰字长龙（学分 · 学时 · 绩点 · 必修 · 本科 · 已修 · 学期），
-            // 折成两行以后读起来像"数值 / 归属 / 时间"三段，扫读成本低一半（渲图对比过）。
-            val numbers = buildList {
-                if (item.credit.isNotBlank()) add("学分 ${item.credit}")
-                if (item.hours.isNotBlank()) add("学时 ${item.hours}")
-                if (item.gradePoint.isNotBlank()) add("绩点 ${item.gradePoint}")
-            }.joinToString("  ·  ")
-            val facts = buildList {
-                if (item.nature.isNotBlank()) add(item.nature)
-                if (item.category.isNotBlank()) add(item.category)
-                // ⚠️ 状态**不写进这一行**：它已经以药丸形式显示在右上角（"已修"/"未修"），
-                // 同一张卡里说两遍就是噪音（`2026-10` 美化时渲图看出来的）。
-                if (item.term.isNotBlank()) add(item.term)
-            }.joinToString("  ·  ")
-            if (numbers.isNotBlank()) {
-                Text(numbers, fontSize = 12.sp, color = colors.textSecondary)
-            }
-            if (facts.isNotBlank()) {
-                if (numbers.isNotBlank()) Spacer(Modifier.height(skin.spaceMicro))
-                Text(facts, fontSize = 11.sp, color = colors.textTertiary)
-            }
-            if (numbers.isBlank() && facts.isBlank()) {
-                Text("暂无详细信息", fontSize = 12.sp, color = colors.textTertiary)
-            }
-            // 补考 / 重修：只有教务真给了成绩才显示（这一行在挂科场景下才是关键信息）
-            val retakeLine = buildList {
-                if (item.makeupScore.isNotBlank()) add("补考 ${item.makeupScore}")
-                if (item.retakeScore.isNotBlank()) add("重修 ${item.retakeScore}")
-            }.joinToString("  ·  ")
-            if (retakeLine.isNotBlank()) {
-                Spacer(Modifier.height(skin.spaceXs))
-                Text(retakeLine, fontSize = 12.sp, color = colors.textSecondary)
-            }
-            // 建议修读学年学期：与实际修读**不同**时才说（未修课程就只有这一个信息）。
-            // ⚠️ 这两个是教务页面上**两对不同的列**，混起来就是把"建议"当"实际"，看着完全正常。
-            if (item.suggestedTerm.isNotBlank() && item.suggestedTerm != item.term) {
-                Spacer(Modifier.height(skin.spaceXs))
-                Text("建议修读 ${item.suggestedTerm}", fontSize = 11.sp, color = colors.textTertiary)
-            }
-            } // Column
-        } // Row（左侧状态色条 + 内容列）
-    }
-}
-
