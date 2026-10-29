@@ -9,17 +9,17 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 100,
-    "versionName": "0.1.99",
+    "versionCode": 101,
+    "versionName": "0.2.0",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.1.99/koudaixiaoli_v0.1.99.apk",
-    "sha256": "75b7366ae6d0a86a71e125f1c188ed49f1a3665adda53b6cf5281d015f64b551",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.0/koudaixiaoli_v0.2.0.apk",
+    "sha256": "2c2d7025fe01ba8f1ae580000c6c49b625a61b21e3a1be5e0042616e8c825081",
     "rollout": 100,
     "publishedAt": "2026-10-19T21:36:00+08:00",
     "notes": [
-      "崩溃日志可以一键发到服务器：我的 → 反馈 → 崩溃日志 → 发送，不用截图也不用找文件",
-      "修复互动课件点开就闪退：WebView 初始化失败时给提示，不再整个应用退出",
-      "发送前自动抹掉日志里本机路径的学号那一段，服务端只存这一份"
+      "同一个新版本只提醒你一次；你选了「稍后」就不再反复弹，直到下次真正更新",
+      "更新面板改成一条主线：版本号、说明、一个按钮，附带的说明折进「更多」",
+      "教务页的课程表与学分构成微调了对齐和留白，窄屏不再挤在一起"
     ]
   },
   "endpoints": {
