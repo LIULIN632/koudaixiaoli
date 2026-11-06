@@ -13,9 +13,9 @@ import java.time.temporal.ChronoUnit
  * 只保留 12 小时与今明两天：足够回答「要带伞吗 / 明天冷不冷」，
  * 又不会把 4000 字的结果预算吃掉。
  */
-fun weatherReport(snapshot: WeatherSnapshot): String = buildString {
+fun weatherReport(snapshot: WeatherSnapshot, anchor: WeatherCityAnchor): String = buildString {
     val current = snapshot.current
-    append("烟台天气（Open-Meteo，")
+    append(anchor.shortName).append("天气（Open-Meteo，")
     append(current.time.substringAfter('T').take(5))
     append(" 更新）：\n")
     append("现在：").append(current.label).append(" ")
@@ -52,7 +52,7 @@ fun weatherReport(snapshot: WeatherSnapshot): String = buildString {
         append("（").append(uvLabel(day.uvIndexMax)).append("）。\n")
     }
 
-    append("以上按烟台市坐标请求，不是校区实测；缓存不超过 30 分钟。")
+    append("以上按").append(anchor.fullName).append("坐标请求，不是校区实测；缓存不超过 30 分钟。")
 }
 
 /**

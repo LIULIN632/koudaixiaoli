@@ -4,6 +4,7 @@ import android.util.Log
 import com.pocket.xiaoli.core.exam.ExamCountdown
 import com.pocket.xiaoli.data.card.YxyCardRepository
 import com.pocket.xiaoli.data.electricity.DormElectricityRepository
+import com.pocket.xiaoli.data.electricity.ElectricityAlertSettings
 import com.pocket.xiaoli.data.entity.ExamEntity
 import com.pocket.xiaoli.data.entity.SavedGradeEntity
 import com.pocket.xiaoli.core.weather.WeatherAlert
@@ -123,7 +124,9 @@ object ProactiveEvaluator {
         return Gathered(
             signals = ProactiveSignals(
                 cardBalance = cardBalance(container, store),
-                electricityBalance = electricityBalance(container, store),
+                electricityBalance = electricityBalance(container, store)?.
+                    takeIf { ElectricityAlertSettings.shouldAlert(container.appContext, it) },
+                electricityAlertBelow = ElectricityAlertSettings.threshold(container.appContext),
                 nextCourseName = upcoming?.course?.name?.takeIf { it.isNotBlank() },
                 minutesToClass = minutes,
                 newGradeCount = newGradeCount(grades, store.gradeSeenAt()),

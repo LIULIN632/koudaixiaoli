@@ -16,4 +16,6 @@ data class SpecialWorkDayEntity(
     @PrimaryKey
     @ColumnInfo(name = "origin_date") val originDate: String,
     @ColumnInfo(name = "target_date") val targetDate: String,
+    /** 所属学校；空串由触发器补标。 */
+    val schoolId: String = "",
 )

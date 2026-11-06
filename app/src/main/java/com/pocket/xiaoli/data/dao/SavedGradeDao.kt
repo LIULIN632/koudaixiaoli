@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SavedGradeDao {
-    @Query("SELECT * FROM saved_grades ORDER BY savedAt DESC")
+    @Query("SELECT * FROM saved_grades WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY savedAt DESC")
     fun getAll(): Flow<List<SavedGradeEntity>>
 
     /** 批量保存；返回的 id 中 -1 表示因唯一索引冲突被跳过（已存在） */
@@ -22,6 +22,6 @@ interface SavedGradeDao {
     @Query("DELETE FROM saved_grades WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("DELETE FROM saved_grades")
+    @Query("DELETE FROM saved_grades WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteAll()
 }

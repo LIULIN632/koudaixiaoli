@@ -31,6 +31,8 @@ data class TermEntity(
 
     /** 排序：列表按此升序，数值越小越靠前。 */
     val sortOrder: Int = 0,
+    /** 所属学校；空串由触发器补标。 */
+    val schoolId: String = "",
 ) {
     /** 列表里显示的学期名：没填就按 id 兜底，不留空行。 */
     val displayName: String get() = name.ifBlank { if (id == 0L) "默认学期" else "学期 ${id + 1}" }

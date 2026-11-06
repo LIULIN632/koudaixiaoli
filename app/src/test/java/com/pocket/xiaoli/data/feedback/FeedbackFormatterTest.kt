@@ -109,4 +109,17 @@ class FeedbackFormatterTest {
         assertEquals(FeedbackCategory.OTHER, FeedbackCategory.fromLabel("随便"))
         assertEquals(FeedbackCategory.UX, FeedbackCategory.fromLabel("用着别扭"))
     }
+
+    @Test
+    fun `开发者邮箱只有一处真源且是完整地址`() {
+        // 2026-10 之前这个地址在 FeedbackScreen 与 ProfileDialogs 里各写了一份
+        // （其中一份还是 outlook），换邮箱时漏一处就等于反馈发进没人看的信箱。
+        assertEquals("pocketxiaoli@163.com", FEEDBACK_MAIL)
+        assertTrue(
+            "必须是完整地址（带 @ 与域名）",
+            FEEDBACK_MAIL.matches(Regex("[a-z0-9._-]+@[a-z0-9.-]+\\.[a-z]{2,}")),
+        )
+        val url = FeedbackFormatter.mailtoUrl(FEEDBACK_MAIL, draft, "T26101800A1B2", baseMillis, null)
+        assertTrue(url.startsWith("mailto:$FEEDBACK_MAIL?subject="))
+    }
 }

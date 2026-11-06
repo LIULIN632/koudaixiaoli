@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pocket.xiaoli.data.electricity.ElectricityAlertSettings
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.ui.components.campusui.rememberCampusScrollState
 import com.pocket.xiaoli.ui.profile.components.OptionsDialog
@@ -687,6 +688,22 @@ private fun ServicesSettingsPage(
                 title = "自定义首页",
                 onClick = onCustomHome,
                 accent = ServiceAccent.STUDY,
+            )
+            SettingsDivider()
+            // 电费提醒线：电费页里也有一行（用户在那里看得见余额，顺手就能调）；
+            // 这一份是"我没进电费页，但想先把提醒关了"的入口。两处读写同一个 prefs，天然一致。
+            var alertThreshold by remember { mutableStateOf(ElectricityAlertSettings.threshold(container.appContext)) }
+            SettingsMenuChoiceItem(
+                icon = Icons.Outlined.Notifications,
+                title = "电费提醒线",
+                subtitle = "低于这条线提醒，当天只说一次",
+                options = ElectricityAlertSettings.THRESHOLD_CHOICES.map { "¥${it.toInt()}" to it },
+                selected = alertThreshold,
+                onSelect = { yuan ->
+                    ElectricityAlertSettings.setThreshold(container.appContext, yuan)
+                    alertThreshold = yuan
+                },
+                accent = ServiceAccent.LIFE,
             )
         }
     }

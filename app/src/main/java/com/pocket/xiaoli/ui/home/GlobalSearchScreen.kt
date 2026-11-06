@@ -98,7 +98,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GlobalSearchScreen(
-    campus: CampusInfo,
+    /** 当前学校名下的校区；**null = 这所学校的校园服务与地图还没收录**，那些命中一起消失（见 [buildIndex]）。 */
+    campus: CampusInfo?,
     onBack: () -> Unit,
     onOpenRoute: (String) -> Unit,
 ) {
@@ -159,7 +160,7 @@ fun GlobalSearchScreen(
                             onSearch = { },
                             expanded = false,
                             onExpandedChange = { },
-                            label = "课表、成绩、空教室、服务、帮助",
+                            label = if (campus != null) "课表、成绩、空教室、服务、帮助" else "课表、导入、助手、帮助",
                             modifier = Modifier.fillMaxWidth(),
                         )
                     },
@@ -394,7 +395,8 @@ private fun ResultRow(
 
 // ── 索引与匹配（这一块没动：搜索行为与改造前逐字节一致，只是外层观感换了） ──────────
 
-private data class GlobalSearchItem(
+/** 一条搜索命中。`internal` 是给 `GlobalSearchIndexTest` 的 —— 它要断言"哪所学校能搜到什么"。 */
+internal data class GlobalSearchItem(
     val title: String,
     val subtitle: String,
     val keywords: List<String>,
@@ -402,23 +404,32 @@ private data class GlobalSearchItem(
     val body: String? = null,
 )
 
-private fun buildIndex(campus: CampusInfo): List<GlobalSearchItem> {
-    val features = listOf(
-        GlobalSearchItem("课表", "周视图 · 课程 · 方案 · 导入", listOf("课表", "课程", "安排"), "timetable"),
-        GlobalSearchItem("导入课表", "教务直连 / 网页 / 文件 / 分享码", listOf("导入", "教务", "课表"), "import_entry"),
-        GlobalSearchItem("校园地图", "楼栋 · 楼层 · 教室定位", listOf("地图", "校园", "楼栋", "导航"), "campus_map"),
-        GlobalSearchItem("教室分布图", "查看和录入教室", listOf("教室", "分布图", "房间"), "room_layout"),
-        GlobalSearchItem("鲤鱼", "校园助手 · 本地知识库 · 只读工具", listOf("助手", "鲤鱼", "ai", "问答"), "assistant"),
-        GlobalSearchItem("我的", "账号 · 外观 · 设置 · 数据", listOf("我的", "设置", "外观", "账号"), "profile"),
-    )
-    val services = CampusServiceRegistry.catalogFor(campus).map { spec ->
-        GlobalSearchItem(
-            title = spec.name,
-            subtitle = (spec.provider ?: campus.shortName) + " · 服务入口",
-            keywords = listOf(spec.id, spec.name, spec.provider.orEmpty()),
-            route = "services",
-        )
+internal fun buildIndex(campus: CampusInfo?): List<GlobalSearchItem> {
+    val features = buildList {
+        add(GlobalSearchItem("课表", "周视图 · 课程 · 方案 · 导入", listOf("课表", "课程", "安排"), "timetable"))
+        add(GlobalSearchItem("导入课表", "教务直连 / 网页 / 文件 / 分享码", listOf("导入", "教务", "课表"), "import_entry"))
+        add(GlobalSearchItem("鲤鱼", "校园助手 · 本地知识库 · 只读工具", listOf("助手", "鲤鱼", "ai", "问答"), "assistant"))
+        add(GlobalSearchItem("我的", "账号 · 外观 · 设置 · 数据", listOf("我的", "设置", "外观", "账号"), "profile"))
+        // ⚠️ 这四条是**学校相关**的入口，判据与服务页那一档同源（`ServiceScope.CAMPUS_CONFIG`）：
+        // 没收录这所学校时 `selectedCampus` 会静默兜底成烟台理工本校区，于是搜索结果里
+        // 出现「宿舍电费 · 校园电费 · 服务入口」与「校园地图」—— 点过去要么跳到服务页看着
+        // 一个不存在的格子，要么把别人的楼栋当成他的校园。少四条命中可以接受，
+        // 给出到不了/不属于他的入口不行。
+        if (campus != null) {
+            add(GlobalSearchItem("校园地图", "楼栋 · 楼层 · 教室定位", listOf("地图", "校园", "楼栋", "导航"), "campus_map"))
+            add(GlobalSearchItem("教室分布图", "查看和录入教室", listOf("教室", "分布图", "房间"), "room_layout"))
+        }
     }
+    val services = campus?.let { target ->
+        CampusServiceRegistry.catalogFor(target).map { spec ->
+            GlobalSearchItem(
+                title = spec.name,
+                subtitle = (spec.provider ?: target.shortName) + " · 服务入口",
+                keywords = listOf(spec.id, spec.name, spec.provider.orEmpty()),
+                route = "services",
+            )
+        }
+    }.orEmpty()
     val faqs = LocalFaqKnowledgeSource.documents.map { doc ->
         GlobalSearchItem(
             title = doc.title,

@@ -131,6 +131,7 @@ class FeedbackScreenshotTest {
                         sending = false,
                         onSend = {},
                         onCopy = {},
+                        onCopyMail = {},
                         onMail = {},
                         onIssue = {},
                         onShare = {},
@@ -201,5 +202,40 @@ class FeedbackScreenshotTest {
             composeRule.waitForIdle()
             composeRule.onRoot().captureRoboImage("src/test/screenshots/${case.first}")
         }
+    }
+
+    /**
+     * 「发出去」这一段单独渲一次。
+     *
+     * 整页图（357 / 359）到 2340px 就截断了，四个渠道格下面那行「开发者邮箱」
+     * 正好落在图外 —— 而那一行是 2026-11 新加的（把地址露出来、点一下复制），
+     * 不单独渲就等于没验：地址会不会被省略号截断、有没有把「直接发送」挤丢。
+     */
+    @Test
+    fun `反馈发送区截图`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                SettingsSubPageScaffold(title = "反馈", onBack = {}) {
+                    FeedbackSendSection(
+                        remoteReady = true,
+                        enabled = true,
+                        sending = false,
+                        onSend = {},
+                        onCopy = {},
+                        onCopyMail = {},
+                        onMail = {},
+                        onIssue = {},
+                        onShare = {},
+                    )
+                    FeedbackPrivacyNote()
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/362-feedback-send.png")
     }
 }

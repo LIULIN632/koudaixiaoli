@@ -233,7 +233,9 @@ object AssistantFormatters {
     }
     /** 校园服务问答：从服务目录里按名称 / 服务商匹配。 */
     fun services(specs: List<CampusServiceSpec>, query: String): String {
-        if (specs.isEmpty()) return "当前校区还没有配置校园服务入口。"
+        // 空表现在只有一种来路：这所学校的校园服务还没收录（`campusForCurrentSchool()` 为 null）。
+        // 措辞跟着判据走 —— 说"当前校区"会让人以为是自己选错了校区，而事实是学校没接进来。
+        if (specs.isEmpty()) return "这所学校的校园服务还没收录，所以没有服务入口可列。"
         val q = query.trim()
         val matched = specs.filter { spec ->
             q.contains(spec.name, ignoreCase = true) ||

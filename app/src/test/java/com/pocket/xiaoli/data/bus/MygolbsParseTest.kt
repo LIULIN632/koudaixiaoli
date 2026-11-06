@@ -235,4 +235,42 @@ class MygolbsParseTest {
         // 只格式化传入的毫秒，不读当前时钟 —— 基准图因此不会天天漂红
         assertEquals(label, BusRepository.capturedLabel(1_730_000_000_000L))
     }
+
+    /**
+     * 2026-11-06 实测到的上游响应：HTTP 仍 200，正文是同一段 44 字符 base64，
+     * CMD=105 / 106、换站名、换坐标、改 GET 全都一样 —— 即接口层面已经不再给明文。
+     * 这条夹具钉的不是"能解析"，而是**解析不出时不许当成用户的网络故障**。
+     */
+    private val opaqueResponse = "0vx0czK73ykwCHaLBTiKh0iCXQINzRvSZw4+b/H8FgE52U="
+
+    @Test
+    fun `读不懂的响应不编线路也不崩`() {
+        assertEquals(emptyList<Any>(), BusRepository.parseLines(opaqueResponse))
+        assertEquals(emptyList<Any>(), BusRepository.parseStations(opaqueResponse))
+    }
+
+    /**
+     * 失败归因：**接口应答了**与**没连上**必须是两句话。
+     *
+     * 改造前 `fetchBoard` 只返回 `BusBoard?`，两种失败共用一句"没能连上实时公交，检查网络后再刷新"——
+     * 上游今天改成密文之后，那句话会把人送去重启路由器，而该说的是"这项服务这次取不到数"。
+     */
+    @Test
+    fun `失败文案按原因分两句`() {
+        assertEquals(
+            "没能连上实时公交，检查网络后再刷新",
+            busFailureText(BusFetchProblem.NO_RESPONSE, hasCachedLines = false),
+        )
+        assertTrue(
+            "有缓存时必须说清下面那批数字是上次的",
+            busFailureText(BusFetchProblem.NO_RESPONSE, hasCachedLines = true).contains("上次刷新"),
+        )
+        val answered = busFailureText(BusFetchProblem.ANSWERED_WITHOUT_DATA, hasCachedLines = false)
+        assertTrue(answered, !answered.contains("检查网络"))
+        assertTrue(answered, answered.contains("不是你的网络问题"))
+        assertTrue(
+            "接口没给数据时同样不能假装下面是实时的",
+            busFailureText(BusFetchProblem.ANSWERED_WITHOUT_DATA, hasCachedLines = true).contains("上次刷新"),
+        )
+    }
 }

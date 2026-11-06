@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ExamDao {
 
-    @Query("SELECT * FROM exams WHERE schemeId = :schemeId ORDER BY date, time")
+    @Query("SELECT * FROM exams WHERE schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY date, time")
     fun getByScheme(schemeId: Long): Flow<List<ExamEntity>>
 
-    @Query("SELECT * FROM exams ORDER BY date, time")
+    @Query("SELECT * FROM exams WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY date, time")
     fun getAll(): Flow<List<ExamEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -28,7 +28,7 @@ interface ExamDao {
     @Query("DELETE FROM exams WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("DELETE FROM exams WHERE schemeId = :schemeId")
+    @Query("DELETE FROM exams WHERE schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteByScheme(schemeId: Long)
 
     /**
@@ -38,6 +38,6 @@ interface ExamDao {
      * 在 SQL 层查已存在的键，比查全表再在内存里比更省 —— 且避免
      * "两次导入之间数据变了"导致的内存/FK 不一致。
      */
-    @Query("SELECT courseName || '|' || date || '|' || time FROM exams")
+    @Query("SELECT courseName || '|' || date || '|' || time FROM exams WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun existingKeys(): List<String>
 }

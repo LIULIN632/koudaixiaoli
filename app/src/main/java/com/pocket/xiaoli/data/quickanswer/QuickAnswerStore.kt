@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.data.quickanswer
 
 import android.content.Context
+import com.pocket.xiaoli.data.school.SchoolScopedPrefs
 
 /**
  * 「会了 / 还不会」的本地账本。
@@ -18,7 +19,8 @@ import android.content.Context
  */
 class QuickAnswerStore(context: Context) {
 
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    // 按校隔离：A 校标过的“这章会了”不该出现在 B 校的同一章上。
+    private val prefs = SchoolScopedPrefs.of(context.applicationContext, PREFS)
 
     fun knownIds(): Set<String> = prefs.getStringSet(KEY_KNOWN, emptySet()).orEmpty()
 

@@ -9,7 +9,7 @@ import com.pocket.xiaoli.data.entity.CampusMapCorrectionEntity
 @Dao
 interface CampusMapCorrectionDao {
 
-    @Query("SELECT * FROM campus_map_corrections WHERE campus_id = :campusId ORDER BY updated_at DESC")
+    @Query("SELECT * FROM campus_map_corrections WHERE campus_id = :campusId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY updated_at DESC")
     suspend fun getAll(campusId: String): List<CampusMapCorrectionEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -18,6 +18,6 @@ interface CampusMapCorrectionDao {
     @Query("DELETE FROM campus_map_corrections WHERE id = :id")
     suspend fun delete(id: String)
 
-    @Query("DELETE FROM campus_map_corrections")
+    @Query("DELETE FROM campus_map_corrections WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun clear()
 }

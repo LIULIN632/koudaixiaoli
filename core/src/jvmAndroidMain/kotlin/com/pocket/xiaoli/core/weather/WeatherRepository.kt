@@ -27,7 +27,7 @@ import okhttp3.Request
  * Open-Meteo（github.com/open-meteo/open-meteo），免 Key、HTTPS。
  * 请求里只有坐标与字段名，**不含任何设备/用户标识** —— 符合本项目
  * 「不接第三方统计、不上传用户数据」的红线。
- * 坐标为什么是烟台市见 [WeatherSnapshot] 的 KDoc。
+ * 按哪座城市取数见 [anchorOf] 与 [WeatherCityAnchor] 的 KDoc。
  *
  * ## 存储为什么是接口
  *
@@ -36,6 +36,12 @@ import okhttp3.Request
  */
 class WeatherRepository(
     private val store: WeatherCache,
+    /**
+     * **这次按哪座城市取数**。做成函数而不是常量：Android 端它跟着当前学校走，
+     * 而核心不许自己猜一个城市 —— 猜就会把烟台的温度挂到淄博的天气页上。
+     * 返回 null = 这座城市还没配坐标，本仓储如实拒绝取数。
+     */
+    private val anchorOf: () -> WeatherCityAnchor?,
     private val endpoint: String = FORECAST_ENDPOINT,
     private val clock: () -> Long = System::currentTimeMillis,
     private val client: OkHttpClient = defaultClient(),
@@ -81,6 +87,12 @@ class WeatherRepository(
      */
     suspend fun load(force: Boolean = false): Result = withContext(Dispatchers.IO) {
         val now = clock()
+        val anchor = anchorOf()
+        if (anchor == null) {
+            // 城市还没配坐标：**连缓存都不读**。落盘是按城市分槽的（Android 端如此实现），
+            // 但核心不知道那件事，这里唯一安全的选择是"不知道城市就当没有数据"。
+            return@withContext failure("这座城市还没有配天气取数坐标", cached = null)
+        }
         val cached = readCache()
 
         if (!force && cached != null && now - store.cachedAt() in 0 until TTL_MS) {
@@ -90,7 +102,7 @@ class WeatherRepository(
 
         try {
             val request = Request.Builder()
-                .url("$endpoint?$FORECAST_QUERY")
+                .url("$endpoint?${forecastQuery(anchor)}")
                 .header("Accept", "application/json")
                 .build()
             client.newCall(request).execute().use { response ->
@@ -120,6 +132,13 @@ class WeatherRepository(
         return Result.Failure(message, cached)
     }
 
+    /**
+     * 读缓存。
+     *
+     * ⚠️ 缓存**按城市分槽**由各端实现（Android 是 `WeatherStore` 的带城市后缀键），
+     * 核心只看见"当前城市的那份"。所以不要在调用点之外缓存任何东西 ——
+     * 一旦核心自己存了一份跨城市的快照，换学校之后就会把烟台的温度挂到淄博的标签下。
+     */
     private fun readCache(): WeatherSnapshot? {
         val json = store.cachedJson() ?: return null
         return try {
@@ -136,16 +155,17 @@ class WeatherRepository(
         internal const val FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 
         /**
-         * 请求参数。
+         * 请求参数：坐标来自 [WeatherCityAnchor]（按当前学校所在城市查表，不是校区实测）。
          *
-         * `timezone=Asia/Shanghai` 固定为烟台所在时区：`timezone=auto` 也会得到同一结果，
-         * 但显式写出来才能保证「字符串比较当前小时」这一解析前提不随服务端默认值变化。
+         * `timezone=Asia/Shanghai` 固定写死：表里三座城市（烟台 / 淄博 / 廊坊）都在东八区，
+         * `timezone=auto` 也会得到同一结果，但显式写出来才能保证
+         * 「字符串比较当前小时」这一解析前提不随服务端默认值变化。
          *
          * ⚠️ 不要删 `wind_speed_unit=kmh`：默认单位是 km/h，但写出来才能让
          * [windScale] 的档位与接口单位永久对齐。
          */
-        internal const val FORECAST_QUERY =
-            "latitude=$WEATHER_LATITUDE&longitude=$WEATHER_LONGITUDE" +
+        internal fun forecastQuery(anchor: WeatherCityAnchor): String =
+            "latitude=${anchor.latitude}&longitude=${anchor.longitude}" +
                 "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day," +
                 "precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m" +
                 "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +

@@ -1,7 +1,16 @@
 package com.pocket.xiaoli.ui.electricity
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.NotificationsActive
+import com.pocket.xiaoli.ui.components.MiuiMenuPopup
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +32,7 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.foundation.Canvas
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,11 +48,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.electricity.DormElectricityBalance
+import com.pocket.xiaoli.data.electricity.ElectricityAlertSettings
+import com.pocket.xiaoli.data.electricity.USAGE_WINDOW_DAYS
+import com.pocket.xiaoli.data.electricity.UsageStats
+import com.pocket.xiaoli.data.electricity.trendCoordinates
+import com.pocket.xiaoli.data.electricity.trendLineY
+import com.pocket.xiaoli.data.electricity.usageFootnote
+import com.pocket.xiaoli.data.electricity.usageNotice
+import com.pocket.xiaoli.data.electricity.usageStatLines
 import com.pocket.xiaoli.data.proactive.ProactiveRules
 import com.pocket.xiaoli.ui.components.AppCard
 import com.pocket.xiaoli.ui.components.ErrorCard
@@ -78,6 +101,12 @@ internal fun ElectricityContent(
     onPayment: () -> Unit,
     onCopyLink: () -> Unit,
     onOpenPortal: () -> Unit,
+    alertThreshold: Double = ElectricityAlertSettings.DEFAULT_THRESHOLD,
+    alertVisible: Boolean = true,
+    onDismissAlert: () -> Unit = {},
+    onThresholdChange: (Double) -> Unit = {},
+    /** 清空本机的余额采样（用户不想让这台宿舍的财务读数留在手机里时）。 */
+    onClearUsage: () -> Unit = {},
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -128,8 +157,24 @@ internal fun ElectricityContent(
                 state.error?.let { message ->
                     ErrorCard(title = "没查到余额", message = message, onRetry = onRefresh)
                 }
-                BalanceAlert(state.detail)
+                BalanceAlert(
+                    detail = state.detail,
+                    threshold = alertThreshold,
+                    visible = alertVisible,
+                    onDismiss = onDismissAlert,
+                    onPayment = onPayment,
+                )
                 ActionRow(state = state, onRefresh = onRefresh, onPayment = onPayment)
+                // 一条采样都没有时**整张卡不出现**：留一个"还没有数据"的空框，
+                // 等于让第一次进这一页的人以为功能坏了。有了第一条才开始告诉他还要攒几天。
+                if (state.usage.points.isNotEmpty()) {
+                    UsageCard(
+                        usage = state.usage,
+                        threshold = alertThreshold,
+                        onClear = onClearUsage,
+                    )
+                }
+                AlertThresholdCard(threshold = alertThreshold, onChange = onThresholdChange)
                 PaymentGuideCard(weChatInstalled = state.weChatInstalled, onCopyLink = onCopyLink)
                 Spacer(Modifier.height(skin.spaceXs))
                 ServiceSectionLabel(title = "账户信息", accent = ServiceAccent.ENERGY)
@@ -161,16 +206,26 @@ internal data class ElectricityViewState(
     val weChatInstalled: Boolean = false,
     /** 形如「10-24 09:30 · 实时」；未查到时为 null。 */
     val updatedText: String? = null,
+    /**
+     * 本机每日余额采样算出来的用量。
+     *
+     * 默认值是**空统计** —— 空统计意味着整张用量卡不出现，
+     * 于是"刚装机 / 没查过电费"的人看到的页面与改造前逐字相同（既有基准图不受影响）。
+     */
+    val usage: UsageStats = UsageStats(),
 )
 
 /** 余额的语义档位。阈值只有一处：[ProactiveRules.LOW_BALANCE_ELECTRICITY]。 */
 internal enum class BalanceLevel { NONE, NORMAL, LOW, OVERDRAFT }
 
-internal fun balanceLevel(raw: String?): BalanceLevel {
+internal fun balanceLevel(
+    raw: String?,
+    threshold: Double = ProactiveRules.LOW_BALANCE_ELECTRICITY,
+): BalanceLevel {
     val value = raw?.trim()?.toDoubleOrNull() ?: return BalanceLevel.NONE
     return when {
         value < 0.0 -> BalanceLevel.OVERDRAFT
-        value < ProactiveRules.LOW_BALANCE_ELECTRICITY -> BalanceLevel.LOW
+        value < threshold -> BalanceLevel.LOW
         else -> BalanceLevel.NORMAL
     }
 }
@@ -313,12 +368,27 @@ private fun LoadingBar() {
  * 阈值复用主动提醒那一份（[ProactiveRules.LOW_BALANCE_ELECTRICITY]），
  * 不再在界面里写一个 20 —— 两处阈值一旦分叉，会出现「首页提醒了、电费页说正常」。
  */
+/**
+ * 低余额 / 欠费提示。
+ *
+ * 三件事在这张卡里说清楚，缺一条就会被当成骚扰：
+ * 1. 还剩多少、低于哪条线（提醒线由用户自己设，见 `ElectricityAlertSettings`）；
+ * 2. 能立刻做什么（去充值）；
+ * 3. 怎么让它先安静（知道了 —— 只在余额继续掉的时候才再出现）。
+ */
 @Composable
-private fun BalanceAlert(detail: DormElectricityBalance?) {
+private fun BalanceAlert(
+    detail: DormElectricityBalance?,
+    threshold: Double,
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onPayment: () -> Unit,
+) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val isDark = LocalDarkMode.current
-    val level = balanceLevel(detail?.balance)
+    val level = balanceLevel(detail?.balance?.toString(), threshold)
+    if (!visible) return
     if (level != BalanceLevel.LOW && level != BalanceLevel.OVERDRAFT) return
 
     val raw = balanceDigits(detail?.balance)
@@ -327,48 +397,123 @@ private fun BalanceAlert(detail: DormElectricityBalance?) {
     val message = if (level == BalanceLevel.OVERDRAFT) {
         "当前欠 ¥${raw.removePrefix("-")}，充值后才能继续用电。"
     } else {
-        "只剩 ${amountText(raw)}，低于 ${ProactiveRules.LOW_BALANCE_ELECTRICITY.toInt()} 元提醒线。" +
-            "先充一点，别等到断电。"
+        "只剩 ${amountText(raw)}，低于你设的 ${yuanText(threshold)} 提醒线。先充一点，别等到断电。"
     }
 
     AppCard(
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.45f)),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(skin.cardPaddingLarge),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(tint.copy(alpha = if (isDark) 0.24f else 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.WarningAmber,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(20.dp),
-                )
+        Column(modifier = Modifier.fillMaxWidth().padding(skin.cardPaddingLarge)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(tint.copy(alpha = if (isDark) 0.24f else 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WarningAmber,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Spacer(Modifier.width(skin.spaceMd))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint)
+                    Spacer(Modifier.height(skin.spaceMicro))
+                    Text(
+                        text = message,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        color = colors.textSecondary,
+                    )
+                }
             }
-            Spacer(Modifier.width(skin.spaceMd))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = tint)
-                Spacer(Modifier.height(skin.spaceMicro))
-                Text(
-                    text = message,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    color = colors.textSecondary,
-                )
+            Spacer(Modifier.height(skin.spaceSm))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onDismiss) {
+                    Text("知道了", fontSize = 13.sp, color = colors.textSecondary)
+                }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = onPayment,
+                    colors = ButtonDefaults.buttonColors(containerColor = tint),
+                ) {
+                    Text("去充值", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
     }
 }
+
+/**
+ * 提醒线设置。放在电费页而不是「设置」里：用户是在看到余额的那一刻才想起“这线不合适”。
+ */
+@Composable
+private fun AlertThresholdCard(
+    threshold: Double,
+    onChange: (Double) -> Unit,
+) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    var expanded by remember { mutableStateOf(false) }
+    val options = ElectricityAlertSettings.THRESHOLD_CHOICES
+    val labels = options.map { yuanText(it) }
+
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = true }
+                    .padding(skin.cardPaddingLarge),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.NotificationsActive,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(skin.spaceMd))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("余额提醒线", fontSize = 14.sp, color = colors.textPrimary)
+                    Spacer(Modifier.height(skin.spaceMicro))
+                    Text(
+                        "低于这条线提醒；点「知道了」当天不再说",
+                        fontSize = 11.sp,
+                        color = colors.textTertiary,
+                    )
+                }
+                Text(yuanText(threshold), fontSize = 14.sp, color = colors.textSecondary)
+                Spacer(Modifier.width(skin.spaceXs))
+                Icon(
+                    imageVector = Icons.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            MiuiMenuPopup(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                options = labels,
+                selectedIndex = options.indexOfFirst { kotlin.math.abs(it - threshold) < 0.01 },
+                onSelect = { index ->
+                    expanded = false
+                    onChange(options[index])
+                },
+            )
+        }
+    }
+}
+
+/** 提醒线文案：整数不带小数点（¥20 而不是 ¥20.0）。 */
+private fun yuanText(yuan: Double): String =
+    "¥" + if (yuan % 1.0 == 0.0) yuan.toInt().toString() else String.format("%.1f", yuan)
 
 // ── 操作 ────────────────────────────────────────────────────────────────
 
@@ -540,3 +685,148 @@ private fun AccountCard(state: ElectricityViewState) {
         }
     }
 }
+
+// ── 用量趋势（本机采样推的，不是上游给的）────────────────────────────────
+
+/**
+ * 用量统计卡。
+ *
+ * ## 为什么这张图上所有数字都要带口径
+ *
+ * 上游只有「实时余额」一个数，没有用电量、没有抄表、没有充值流水。
+ * 于是"日均多少""还能用几天"**全是我自己从每日采样推的**（见
+ * [com.pocket.xiaoli.data.electricity.usageStatsOf]）。推算就该写成推算：
+ * 窗口几天、充值的日子算不算、为什么可能看不出来 —— 都要在卡上说出来，
+ * 而不是用一个漂亮的折线让人以为这是后勤给的数据。
+ */
+@Composable
+private fun UsageCard(
+    usage: UsageStats,
+    threshold: Double,
+    onClear: () -> Unit,
+) {
+    val colors = LocalPocketXiaoliColors.current
+    val skin = LocalSkin.current
+    val notice = usageNotice(usage)
+
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(skin.cardPaddingLarge),
+            verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "用量趋势",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onClear) { Text("清空", fontSize = 13.sp) }
+            }
+
+            if (notice != null) {
+                // 数据不够 → 一句话，**不画任何东西**。
+                // 一条贴底的假线读起来正好就是"钱快用光了"，那是拿图形骗人。
+                Text(
+                    text = notice,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = colors.textSecondary,
+                )
+            } else {
+                UsageTrendCanvas(usage = usage, threshold = threshold, modifier = Modifier.fillMaxWidth().height(112.dp))
+                usageStatLines(usage, threshold).forEach { (label, value) -> InfoRow(label, value) }
+            }
+
+            Text(
+                text = usageFootnote(usage),
+                fontSize = 11.sp,
+                lineHeight = 17.sp,
+                color = colors.textTertiary,
+            )
+        }
+    }
+}
+
+/**
+ * 折线本体：面积 + 线 + 采样点 + 提醒线。
+ *
+ * 自绘 `Canvas`，不引图表库 —— 与 `ui/focus/FocusScreen.kt` 的番茄钟环同一条惯例
+ *（本项目不收第三方 UI 依赖）。
+ *
+ * ⚠️ 图里**不画文字**：坐标数值用卡上的 `InfoRow` 给。
+ * 一是 `drawText` 在 Robolectric 的 NATIVE 渲染下与真机字距不一致（基线会假红），
+ * 二是系统字体放大时 Canvas 里的文字会被裁掉，而 Text 会自己换行。
+ */
+@Composable
+private fun UsageTrendCanvas(
+    usage: UsageStats,
+    threshold: Double,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalPocketXiaoliColors.current
+    val accent = serviceAccentColor(ServiceAccent.ENERGY)
+    val coords = trendCoordinates(usage, extraLine = threshold) ?: return
+    val lineY = trendLineY(threshold, usage)
+    val rechargeDays = usage.rechargeDays.toSet()
+
+    Canvas(modifier) {
+        val pad = ChartPadding.toPx()
+        val plotW = size.width - pad * 2f
+        val plotH = size.height - pad * 2f
+        if (plotW <= 0f || plotH <= 0f) return@Canvas
+
+        val points = coords.map { Offset(pad + it.first * plotW, pad + it.second * plotH) }
+        val baseline = pad + plotH
+
+        // 面积：给"还剩多少"一个体积感。渐变到底部近乎透明，避免盖住提醒线。
+        drawPath(
+            path = Path().apply {
+                moveTo(points.first().x, baseline)
+                points.forEach { lineTo(it.x, it.y) }
+                lineTo(points.last().x, baseline)
+                close()
+            },
+            brush = Brush.verticalGradient(
+                listOf(accent.copy(alpha = 0.22f), accent.copy(alpha = 0.02f)),
+            ),
+        )
+
+        // 提醒线（虚线）：这张图真正要回答的是"离没钱还有多远"。
+        lineY?.let { fraction ->
+            val y = pad + fraction * plotH
+            drawLine(
+                color = colors.warning.copy(alpha = 0.8f),
+                start = Offset(pad, y),
+                end = Offset(pad + plotW, y),
+                strokeWidth = 1.2.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)),
+            )
+        }
+
+        drawPath(
+            path = Path().apply {
+                points.forEachIndexed { index, point ->
+                    if (index == 0) moveTo(point.x, point.y) else lineTo(point.x, point.y)
+                }
+            },
+            color = accent,
+            style = Stroke(width = 2.dp.toPx()),
+        )
+
+        points.forEachIndexed { index, point ->
+            val recharged = usage.points[index].epochDay in rechargeDays
+            // 充值那天画成空心环而不是实心点：它**不是**用量，混成实心点就会被读成"那天用了钱"。
+            drawCircle(
+                color = if (recharged) colors.warning else accent,
+                radius = if (recharged) 4.5.dp.toPx() else 2.4.dp.toPx(),
+                center = point,
+                style = if (recharged) Stroke(1.6.dp.toPx()) else androidx.compose.ui.graphics.drawscope.Fill,
+            )
+        }
+    }
+}
+
+private val ChartPadding = 10.dp
+

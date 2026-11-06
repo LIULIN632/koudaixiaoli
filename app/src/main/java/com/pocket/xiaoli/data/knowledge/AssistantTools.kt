@@ -4,6 +4,7 @@ import com.pocket.xiaoli.data.academic.AcademicSnapshotCodec
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
 import com.pocket.xiaoli.data.service.CampusServiceRegistry
+import com.pocket.xiaoli.core.weather.WeatherCityAnchor
 import com.pocket.xiaoli.core.weather.WeatherRepository
 import com.pocket.xiaoli.core.weather.weatherReport
 import com.pocket.xiaoli.di.AppContainer
@@ -29,7 +30,14 @@ object AssistantTools {
 
         // 教室位置：用房间号反查楼栋/楼层
         AssistantTool.CAMPUS_LOCATION -> text(AssistantFormatters.rooms(container.roomCells.value, query))
-        AssistantTool.CAMPUS_SERVICE -> text(AssistantFormatters.services(CampusServiceRegistry.catalogFor(container.selectedCampus.value), query))
+        // 校园服务清单跟着**当前学校名下的校区**：读 `selectedCampus` 时，
+        // 没收录的那所学校会让鲤鱼念出烟台理工的服务表 —— 用户问的是"我们学校有什么"。
+        AssistantTool.CAMPUS_SERVICE -> text(
+            AssistantFormatters.services(
+                container.campusForCurrentSchool()?.let { CampusServiceRegistry.catalogFor(it) } ?: emptyList(),
+                query,
+            )
+        )
 
         // 资料库：四源合一（知识库 / 快问快答 / 内置帮助 / 资料站）。
         // ⚠️ 过滤必须在**每次检索时**现算"今天"。
@@ -57,9 +65,16 @@ object AssistantTools {
 
         // 天气：用户主动问，允许联网。30 分钟内的缓存直接命中（首页通常已经拉过一次），
         // 因此这里的"联网"不会因为用户连问几句就变成连发请求。
-        AssistantTool.WEATHER -> when (val result = container.weatherRepository.load()) {
-            is WeatherRepository.Result.Success -> text(weatherReport(result.snapshot))
-            is WeatherRepository.Result.Failure -> text(weatherFailure(result))
+        // 城市跟着**当前学校**走：报告第一行写的是哪座城，数据就是从哪座城取的。
+        AssistantTool.WEATHER -> {
+            val anchor = container.weatherAnchorForCurrentSchool()
+            when (val result = container.weatherRepository.load()) {
+                is WeatherRepository.Result.Success -> text(
+                    anchor?.let { weatherReport(result.snapshot, it) } ?: NO_CITY_TEXT
+                )
+
+                is WeatherRepository.Result.Failure -> text(weatherFailure(result, anchor))
+            }
         }
 
         AssistantTool.TODAY_COURSES,
@@ -96,12 +111,19 @@ object AssistantTools {
      *
      * 完全没数据时把"不要编造"写进结果 —— 模型最容易在这里凭常识补一个温度。
      */
-    private fun weatherFailure(result: WeatherRepository.Result.Failure): String {
+    private fun weatherFailure(result: WeatherRepository.Result.Failure, anchor: WeatherCityAnchor?): String {
         val cached = result.cached
             ?: return "暂时拿不到天气：${result.message}。不要编造天气数据，请如实告诉用户稍后再试。"
+        // 没锚点就不报温度：一段没有城市的天气会让模型分不清这是哪座城，
+        // 而"当前学校的城市还没配坐标"本身就是该如实说出口的事。
+        if (anchor == null) return NO_CITY_TEXT
         return "获取最新天气失败（${result.message}），以下是上次的缓存，可能已经过时：\n" +
-            weatherReport(cached)
+            weatherReport(cached, anchor)
     }
+
+    /** 当前学校所在城市还没配天气坐标时给模型的统一回答（与"不要编造"一起给，这是本项目的老纪律）。 */
+    private const val NO_CITY_TEXT =
+        "这座城市还没有配天气取数坐标，所以查不到本校所在城市的天气。不要编造天气数据，请如实告诉用户。"
 
     private fun todayCourses(
         courses: List<CourseEntity>,

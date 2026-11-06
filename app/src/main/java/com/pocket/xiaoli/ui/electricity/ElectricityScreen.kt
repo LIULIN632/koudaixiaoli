@@ -14,12 +14,17 @@ import com.pocket.xiaoli.data.CampusInfo
 import com.pocket.xiaoli.data.CampusServiceKeys
 import com.pocket.xiaoli.data.electricity.DormElectricityBalance
 import com.pocket.xiaoli.data.electricity.DormElectricityRepository
+import com.pocket.xiaoli.data.electricity.ElectricityAlertSettings
+import com.pocket.xiaoli.data.electricity.ElectricityUsageStore
+import com.pocket.xiaoli.data.electricity.usageStatsOf
 import com.pocket.xiaoli.data.electricity.WeChatUrlLauncher
 import com.pocket.xiaoli.data.model.DormBuildingCatalog
 import com.pocket.xiaoli.data.model.DormInfo
 import com.pocket.xiaoli.data.model.DormServiceRouter
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -39,6 +44,8 @@ fun ElectricityScreen(
     onBack: () -> Unit,
     onOpenWeb: (url: String, title: String) -> Unit,
     onBalanceLoaded: (DormElectricityBalance?) -> Unit = {},
+    /** 本机余额采样存储（用量趋势的原料），由 `AppContainer` 给出。 */
+    usageStore: ElectricityUsageStore,
 ) {
     val context = LocalContext.current
     val campus = DormServiceRouter.serviceCampus(dormInfo, fallbackCampus)
@@ -194,6 +201,29 @@ fun ElectricityScreen(
         formatTime(it.fetchedAtMillis, locale) + if (it.fromCache) " · 缓存" else " · 实时"
     }
 
+    // 提醒线是用户口径（见 ElectricityAlertSettings），界面跟着它走；
+    // alertTick 只用来在“点了知道了 / 改了线”之后强制重算一次可见性。
+    var alertThreshold by remember { mutableStateOf(ElectricityAlertSettings.threshold(context)) }
+    var alertTick by remember { mutableStateOf(0) }
+    val alertVisible = remember(alertTick, alertThreshold, detail?.balance) {
+        ElectricityAlertSettings.shouldAlert(context, detail?.balance?.toDoubleOrNull())
+    }
+
+    // ── 用量趋势：原料是**本机每日余额采样**，不是上游给的数据 ──
+    //
+    // 重算的时机挂在 `detail` 上：查询成功时仓储会把当日读数记进采样表
+    //（见 `DormElectricityRepository.balanceSampler`），于是这一次查询自己就能让图长出一个点。
+    // `usageTick` 是「清空」之后的重算开关 —— 清空只动存储，没有别的状态会变。
+    var usageTick by remember { mutableStateOf(0) }
+    val usage = remember(dormKey, detail?.fetchedAtMillis, alertThreshold, usageTick) {
+        usageStatsOf(
+            samples = usageStore.samples(dormInfo),
+            // 「今天」由参数进去，不让纯函数自己读时钟 —— 快照测试要能钉住日期
+            todayDay = LocalDate.now(ZoneId.systemDefault()).toEpochDay(),
+            lowBalanceThreshold = alertThreshold,
+        )
+    }
+
     ElectricityContent(
         state = ElectricityViewState(
             supported = supported,
@@ -206,6 +236,7 @@ fun ElectricityScreen(
             error = error,
             weChatInstalled = weChatInstalled,
             updatedText = updatedText,
+            usage = usage,
         ),
         snackbarHostState = snackbarHostState,
         onBack = onBack,
@@ -213,6 +244,22 @@ fun ElectricityScreen(
         onPayment = { openPayment() },
         onCopyLink = { copyPayLink() },
         onOpenPortal = { openPortal() },
+        alertThreshold = alertThreshold,
+        alertVisible = alertVisible,
+        onDismissAlert = {
+            ElectricityAlertSettings.dismiss(context, detail?.balance?.toDoubleOrNull())
+            alertTick++
+        },
+        onThresholdChange = { yuan ->
+            ElectricityAlertSettings.setThreshold(context, yuan)
+            alertThreshold = yuan
+            alertTick++
+        },
+        onClearUsage = {
+            // 财务读数只留在本机，但"留在本机"不等于"我不能让它走"
+            dormInfo?.let(usageStore::clear)
+            usageTick++
+        },
     )
 }
 

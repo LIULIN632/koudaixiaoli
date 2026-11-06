@@ -54,6 +54,24 @@ private val PINNED_SCHOOL_IDS = listOf("YIT", "YTU")
  */
 private val EXTRA_PICKER_SCHOOL_IDS = listOf("YJIT", "SDUT")
 
+/**
+ * 校园数据源**只为这一所学校**配好的名单（服务页 `ANCHORED_SCHOOL` 档格的可见性判据）。
+ *
+ * ## 为什么单独列一份，而不是复用校区配置
+ *
+ * `CampusConfig` 回答的是"这所学校有没有配校园服务"；这里回答的是另一件事：
+ * 有些格子的数据源是**写死在代码里的单一学校系统**，与校区配置无关 ——
+ * 公交到站的站点锚点（[com.pocket.xiaoli.data.bus.BusRepository] 的坐标与默认站名）、
+ * 图书馆馆藏（`LibraryOpacRepository.SEARCH_URL` 指向 `lib.yitsd.edu.cn`）。
+ * 烟台大学虽然也在 `CampusConfig` 里，但点这两格会拿到烟台理工的公交站和别人的馆藏书目 ——
+ * 那不是"数据没配全"，是**把别人的东西当成他的**。
+ *
+ * ⚠️ 这是**临时口径，不是终态**：接第二所学校的站点/馆藏数据源时，正确做法是把锚点搬进
+ * 校区配置（或按学校取数），然后**删掉这份名单**，而不是往里面加 id。
+ * 由 `ServiceScopeTest` 钉住当前只有 YIT。
+ */
+val ANCHORED_SCHOOL_IDS = setOf("YIT")
+
 /** 用户自己添加的学校（`custom_` 前缀）：可编辑、可删除，也一定进选校列表。 */
 fun School.isCustomSchool(): Boolean = id.startsWith("custom_")
 

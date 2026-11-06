@@ -50,6 +50,22 @@ data class DormElectricityBalance(
  */
 object DormElectricityRepository {
 
+    /**
+     * 余额采样出口 —— 由 `AppContainer` 在装配时接上 [ElectricityUsageStore]。
+     *
+     * 做成可注入的回调而不是让仓储直接依赖存储：仓储是 `object` 且拿不到 `Context`，
+     * 而"查到余额"这件事有两条消费者路径（电费页与「我的」四格），
+     * 记一次账必须发生在这个**唯一的成功出口**上，不能让两个页面各自记得一遍
+     *（两处记就会有两套口径，早晚有一处漏）。
+     * 没接上时是 null：功能照跑，只是不攒历史 —— 不做"静默写到某个默认位置"那种事。
+     */
+    fun interface BalanceSampler {
+        fun sample(dorm: DormInfo, rawBalance: String)
+    }
+
+    @Volatile
+    var balanceSampler: BalanceSampler? = null
+
     private const val LIST_URL = "https://ydny.ytu.edu.cn/pms/wechat/ytdx/payItemList"
     private const val ADD_URL = "https://ydny.ytu.edu.cn/pms/wechat/ytdx/payItemAdd"
     private const val PAY_URL = "https://ydny.ytu.edu.cn/pms/wechat/ytdx/payItemIndex"
@@ -124,7 +140,12 @@ object DormElectricityRepository {
                     fetchedAtMillis = System.currentTimeMillis(),
                     fromCache = false,
                 )
-                if (balance != null) rememberBalance(dorm, balance)
+                if (balance != null) {
+                    rememberBalance(dorm, balance)
+                    // 用量统计唯一的采样点：只有**查到并且认到了这间宿舍**的余额才记账。
+                    // 缓存命中不走这里 —— 同一天重复查询本来就只算一个读数。
+                    balanceSampler?.sample(dorm, balance.balance)
+                }
                 Result.success(balance)
             }
         } catch (e: CancellationException) {

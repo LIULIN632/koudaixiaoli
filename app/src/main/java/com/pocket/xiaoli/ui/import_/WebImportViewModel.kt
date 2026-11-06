@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.ui.import_
 
 import android.content.Context
+import com.pocket.xiaoli.data.school.SchoolScopedPrefs
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
@@ -222,10 +223,10 @@ class WebImportViewModel(
     val searchQuery: StateFlow<String> = _searchQuery
 
     /** 专用客户端：当前校区锁定的学校（可能为空）。 */
-    private val campusSchool: School? = appContainer.currentCampusSchool()
-    val campusOnly: Boolean get() = campusSchool != null
+    private val lockedSchool: School? = appContainer.currentAcademicSchool()
+    val campusOnly: Boolean get() = lockedSchool != null
 
-    private val _selectedSchool = MutableStateFlow<School?>(campusSchool)
+    private val _selectedSchool = MutableStateFlow<School?>(lockedSchool)
     val selectedSchool: StateFlow<School?> = _selectedSchool
 
     /** Custom URL override — when non-empty, this URL is used instead of school.baseUrl. */
@@ -250,7 +251,7 @@ class WebImportViewModel(
 
     val filteredSchools: StateFlow<List<School>> = combine(_searchQuery, _selectedSchool, appContainer.customSchools, appContainer.favoriteSchoolIds) { query, _, customSchools, favIds ->
         if (campusOnly) {
-            return@combine listOfNotNull(campusSchool)
+            return@combine listOfNotNull(lockedSchool)
         }
         val all = schoolRegistry.allSchools + customSchools
         val base = (if (query.isBlank()) all
@@ -293,20 +294,20 @@ class WebImportViewModel(
 
     fun updateSearch(query: String) { _searchQuery.value = query }
     fun selectSchool(school: School) {
-        if (campusOnly && school.id != campusSchool?.id) return
+        if (campusOnly && school.id != lockedSchool?.id) return
         _selectedSchool.value = school; _freeUrlActive.value = false; _importedCount.value = 0
     }
     fun clearSchool() {
         flushAutoSave()
         cancelPendingInjections()
-        _selectedSchool.value = if (campusOnly) campusSchool else null; _freeUrlActive.value = false; _importedCount.value = 0; _detectedCount.value = 0
+        _selectedSchool.value = if (campusOnly) lockedSchool else null; _freeUrlActive.value = false; _importedCount.value = 0; _detectedCount.value = 0
     }
     fun setCustomUrl(url: String) { _customUrl.value = url }
     fun toastShown() { _toastMessage.value = null }
 
     /** Initialize URL history from SharedPreferences (call once with app context). */
     fun initUrlHistory(context: Context) {
-        urlHistoryPrefs = context.getSharedPreferences("web_import_urls", Context.MODE_PRIVATE)
+        urlHistoryPrefs = SchoolScopedPrefs.of(context, "web_import_urls")
         val json = urlHistoryPrefs?.getString("history", null)
         if (!json.isNullOrEmpty()) {
             try {

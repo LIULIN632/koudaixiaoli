@@ -64,12 +64,27 @@ class WeatherRepositoryTest {
         server.shutdown()
     }
 
-    private fun repository() = WeatherRepository(
+    private fun repository(anchorOf: () -> WeatherCityAnchor? = { HOME_CITY_WEATHER_ANCHOR }) = WeatherRepository(
         store = cache,
+        // 按哪座城市取数是**必填**的：核心不许自己猜一座城，
+        // 否则接了外地学校之后，猜出来的那句"烟台"会挂在别人的坐标上。
+        anchorOf = anchorOf,
         endpoint = server.url("/v1/forecast").toString(),
         clock = { now },
         client = OkHttpClient(),
     )
+
+    /** 城市还没配坐标时：不联网、不读缓存、如实失败（拿烟台的数兜底等于给另一座城报天气）。 */
+    @Test
+    fun `没有城市锚点时不取数也不编`() = runBlocking {
+        cache.save(SAMPLE, now)
+        val result = repository(anchorOf = { null }).load()
+        assertTrue(result is WeatherRepository.Result.Failure)
+        val failure = result as WeatherRepository.Result.Failure
+        assertTrue(failure.message, failure.message.contains("这座城市还没有配天气取数坐标"))
+        assertNull("不能把上一座城市的缓存当本校的天气交出去", failure.cached)
+        assertEquals("一次请求都不该发出去", 0, server.requestCount)
+    }
 
     @Test
     fun `首次加载联网成功并写入缓存`() = runBlocking {

@@ -654,8 +654,8 @@ fun AppNavigation(initialDeepLink: String? = null) {
                     onFileImport = { navController.navigate("import_file") },
                     lastImport = lastImport,
                     onOpenHistory = { navController.navigate("import_history") },
-                    lockedSchoolName = container.currentCampusSchool()?.name,
-                    boundStudentId = container.currentCampusSchool()?.baseUrl?.let { base ->
+                    lockedSchoolName = container.currentAcademicSchool()?.name,
+                    boundStudentId = container.currentAcademicSchool()?.baseUrl?.let { base ->
                         container.loadCredential(base) ?: container.loadCredential("campus_bind")
                     }?.first,
                     onOpenTimetable = { navController.popBackStack("timetable", inclusive = false) },
@@ -704,9 +704,16 @@ fun AppNavigation(initialDeepLink: String? = null) {
                 )
             }
             composable("global_search") {
-                val selectedCampus by container.selectedCampus.collectAsStateWithLifecycle()
+                // 学校 → 校区，而不是直接读 `selectedCampus`：后者对这所没收录的学校会兜底成
+                // 烟台理工本校区，搜索结果就会给出到不了的服务与别人的楼栋。
+                // 两个 flow 都要 collect（自建学校改完城市/名字要跟着重组）。
+                val academicSchoolId by container.academicSchoolId.collectAsStateWithLifecycle()
+                val customSchools by container.customSchools.collectAsStateWithLifecycle()
+                val searchCampus = remember(academicSchoolId, customSchools) {
+                    container.campusForCurrentSchool()
+                }
                 GlobalSearchScreen(
-                    campus = selectedCampus,
+                    campus = searchCampus,
                     onBack = { navController.popBackStack() },
                     onOpenRoute = { route ->
                         navController.popBackStack()
@@ -780,6 +787,7 @@ fun AppNavigation(initialDeepLink: String? = null) {
             composable("weather") {
                 WeatherScreen(
                     repository = container.weatherRepository,
+                    anchor = container.weatherAnchorForCurrentSchool(),
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -792,6 +800,7 @@ fun AppNavigation(initialDeepLink: String? = null) {
                 ElectricityScreen(
                     dormInfo = dormInfo,
                     fallbackCampus = selectedCampus,
+                    usageStore = container.electricityUsageStore,
                     onBack = { navController.popBackStack() },
                     onOpenWeb = { url, title ->
                         navController.navigate(

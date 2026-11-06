@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocket.xiaoli.data.feedback.FEEDBACK_MAIL
 import com.pocket.xiaoli.data.feedback.FeedbackCategory
 import com.pocket.xiaoli.data.feedback.FeedbackDraft
 import com.pocket.xiaoli.data.feedback.FeedbackLimits
@@ -212,7 +213,7 @@ private data class FeedbackChannel(
     val onClick: () -> Unit,
 )
 
-/** 「发出去」：一个主按钮 + 2×2 渠道格。 */
+/** 「发出去」：一个主按钮 + 2×2 渠道格 + 一行开发者邮箱。 */
 @Composable
 internal fun FeedbackSendSection(
     remoteReady: Boolean,
@@ -220,6 +221,7 @@ internal fun FeedbackSendSection(
     sending: Boolean,
     onSend: () -> Unit,
     onCopy: () -> Unit,
+    onCopyMail: () -> Unit,
     onMail: () -> Unit,
     onIssue: () -> Unit,
     onShare: () -> Unit,
@@ -308,6 +310,20 @@ internal fun FeedbackSendSection(
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
+    }
+
+    // 邮箱地址单独占一行：渠道格的小字只有一行 11sp，「pocketxiaoli@163.com」在那里
+    // 一定被截成省略号。这一行本身就是一条通道 —— 手机上没装邮件 App 的人
+    // 点一下就复制了地址，可以去网页版/电脑上发。（只用渠道格＝把地址藏了一半。）
+    Spacer(Modifier.height(skin.spaceSm))
+    SettingsCard {
+        SettingsMenuItem(
+            icon = Icons.Outlined.MailOutline,
+            title = "开发者邮箱",
+            subtitle = "$FEEDBACK_MAIL · 点一下复制",
+            onClick = onCopyMail,
+            accent = ServiceAccent.QUERY,
+        )
     }
 }
 

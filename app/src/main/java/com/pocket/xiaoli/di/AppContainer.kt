@@ -6,6 +6,9 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.pocket.xiaoli.PocketXiaoliApplication
+import com.pocket.xiaoli.data.database.PocketXiaoliDatabase
+import com.pocket.xiaoli.data.electricity.DormElectricityRepository
+import com.pocket.xiaoli.data.electricity.ElectricityUsageStore
 import com.pocket.xiaoli.data.JwSystemType
 import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.data.CampusConfig
@@ -44,6 +47,8 @@ import com.pocket.xiaoli.data.map.RoomCell
 import com.pocket.xiaoli.data.map.RoomDirectorySearch
 import com.pocket.xiaoli.data.map.RoomDirectorySearch.RoomMergeDirection
 import com.pocket.xiaoli.data.bus.BusRepository
+import com.pocket.xiaoli.data.school.SchemePlan
+import com.pocket.xiaoli.data.school.schemePlanFor
 import com.pocket.xiaoli.data.calendar.CalendarRepository
 import com.pocket.xiaoli.data.holiday.HolidayDay
 import com.pocket.xiaoli.data.holiday.HolidayRepository
@@ -90,11 +95,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import com.pocket.xiaoli.data.entity.SpecialWorkDayEntity
 import com.pocket.xiaoli.data.announcement.AppFeedRepository
 import com.pocket.xiaoli.data.announcement.AppFeedStore
+import com.pocket.xiaoli.core.weather.WeatherCityAnchor
 import com.pocket.xiaoli.core.weather.WeatherRepository
+import com.pocket.xiaoli.core.weather.weatherAnchorForCity
 import com.pocket.xiaoli.data.weather.WeatherStore
 import com.pocket.xiaoli.notification.ExamReminderScheduler
 import com.pocket.xiaoli.notification.HomeworkReminderScheduler
@@ -128,13 +136,42 @@ class AppContainer(context: Context) {
     val appFeedRepository by lazy { AppFeedRepository(app, appFeedStore, appUpdateChecker) }
 
     /**
-     * 天气：Open-Meteo（免 Key）+ 30 分钟本地缓存。
+     * 天气：Open-Meteo（免 Key）+ 30 分钟本地缓存，**按当前学校所在城市取数**。
      *
      * 全 App 共用一个实例，页面进出时不会各自建 OkHttp 连接池；
      * 缓存也只有一个真源（见 `WeatherRepository` 的 KDoc）。
+     *
+     * ⚠️ 两个 lambda 都在**每次取数时**现读城市，不是在构造时锁死：换学校之后
+     * 天气必须跟着换城市，而缓存是按城市分槽的（见 [WeatherStore]），所以永远不会
+     * 出现"淄博的温度挂着烟台的标签"。城市还没配坐标时 [weatherAnchorForCurrentSchool]
+     * 返回 null，仓储如实拒绝取数 —— 拿烟台的坐标兜底等于给另一座城市报天气。
      */
-    val weatherStore by lazy { WeatherStore(app) }
-    val weatherRepository by lazy { WeatherRepository(weatherStore) }
+    val weatherStore by lazy { WeatherStore(app) { weatherAnchorForCurrentSchool()?.cityKey } }
+
+    // ⚠️ 具名传参，不用尾随 lambda：构造器最后一个参数是 `client: OkHttpClient`，
+    // 写成 `WeatherRepository(store) { ... }` 时那个 lambda 会**按位置落到 client 上**，
+    // 编译器只会说"anchorOf 没给值 + 类型不匹配"，读起来像少传了一个参数。
+    val weatherRepository by lazy {
+        WeatherRepository(store = weatherStore, anchorOf = { weatherAnchorForCurrentSchool() })
+    }
+
+    /**
+     * 电费用量采样的本机存储（一间宿舍一天一条，只在本机）。
+     *
+     * 上游只给当前余额，没有历史接口 —— 所以"用了多少 / 还能用几天"只能靠自己攒的读数算
+     * （见 [com.pocket.xiaoli.data.electricity.usageStatsOf]）。这也意味着**装机的第一周这张图必然画不出来**，
+     * 界面要如实说"再查一天就能看到走势"，而不是画一条贴底的假线。
+     */
+    val electricityUsageStore by lazy { ElectricityUsageStore(app) }
+
+    /**
+     * 当前学校的天气取数锚点；这座城市还没配坐标时返回 null。
+     *
+     * 判据与天气格子的可见性同源（服务页 `ServiceScope.CITY_DATA`），
+     * 也供天气页取城市名文案 —— 标签与数据必须出自同一个对象。
+     */
+    fun weatherAnchorForCurrentSchool(): WeatherCityAnchor? =
+        weatherAnchorForCity(currentAcademicSchool()?.city)
 
     /**
      * 公交到站：只打掌上公交那**一个明文接口**（无 key、无签名、无 SDK），
@@ -318,6 +355,11 @@ class AppContainer(context: Context) {
 
     init {
        holidayScope.launch { reloadSpecialWorkDays() }
+       // 电费用量：把采样接到查询的成功出口上。**在装配时接而不是等页面碰**——
+       // lazy 到第一次进电费页才接上，会让"第一次查到余额"那一条记录丢掉，
+       // 而那恰好是用户最可能只查一次的情况（之后就永远只有一天记录，画不出走势）。
+       DormElectricityRepository.balanceSampler =
+           DormElectricityRepository.BalanceSampler { dorm, raw -> electricityUsageStore.record(dorm, raw) }
     }
 
     fun saveSpecialWorkDay(originDate: String, targetDate: String) {
@@ -334,7 +376,8 @@ class AppContainer(context: Context) {
        }
     }
     private val prefs = context.getSharedPreferences("pocket_xiaoli_prefs", Context.MODE_PRIVATE)
-    private val appContext = context.applicationContext
+    /** 应用 Context；主动提醒等「非 UI 层」要读按校 prefs 时用得到。 */
+    internal val appContext = context.applicationContext
 
     // ── Favorite schools ──
     private val gson = Gson()
@@ -891,11 +934,42 @@ class AppContainer(context: Context) {
     )
     val selectedCampus: StateFlow<CampusInfo> = _selectedCampus
 
+    /**
+     * 用户**自己选过**的教务学校 id；null = 从没选过（老用户 / 装机后跳过引导），
+     * 那时 [currentAcademicSchool] 回退到校区配置的学校。
+     *
+     * 一台设备只服务一所学校：`SchemeEntity` 没有学校字段，多所学校同时接入会把课表
+     * 混进同一张表，所以这里存的是"当前"而不是"列表"（决定过程见 [switchAcademicSchool]）。
+     */
+    private val _academicSchoolId = MutableStateFlow(prefs.getString("academic_school_id", null))
+    val academicSchoolId: StateFlow<String?> = _academicSchoolId
+
     // ── 宿舍绑定（按校区本地保存）──
-    private val _dormInfo = MutableStateFlow(loadDormInfo(_selectedCampus.value.id))
+    private val _dormInfo = MutableStateFlow(dormCampusIdOrNull()?.let { loadDormInfo(it) })
     val dormInfo: StateFlow<DormInfo?> = _dormInfo
 
     private fun dormPrefKey(campusId: String) = "dorm_$campusId"
+
+    /**
+     * 当前学校名下**可以存宿舍的校区** id；未收录的学校返回 null。
+     *
+     * ## 为什么不能退回默认校区
+     *
+     * 宿舍是按校区存（`dorm_ytlg_main`）的，而 [selectedCampus] 对学校没收录时会静默
+     * 回退到烟台理工本校区。改造前山东理工的学生绑宿舍，写进去的是 `dorm_ytlg_main` ——
+     * 电费页于是拿**别人的宿舍编号**去查别人的账户，看到的可能是别人的余额。
+     * 少一个入口可以接受，给错数据不行（与服务页 [currentSchoolHasCampusConfig] 同一条纪律）。
+     */
+    private fun dormCampusIdOrNull(): String? = campusForCurrentSchool()?.id
+
+    /**
+     * 这个校区是不是**当前学校**名下的（多校区学校要逐个校区判，不能只看第一个）。
+     *
+     * [dormCampusIdOrNull] 只给出学校的第一校区，而「我的 → 校区」可以选到同校的另一个校区；
+     * 那条路径要按**选中的校区**读宿舍，所以单独给一个判据。
+     */
+    private fun isCampusOfCurrentSchool(campus: CampusInfo): Boolean =
+        campus.schoolId != null && campus.schoolId == currentAcademicSchool()?.id
 
     private fun loadDormInfo(campusId: String): DormInfo? {
        val raw = prefs.getString(dormPrefKey(campusId), null) ?: return null
@@ -911,22 +985,24 @@ class AppContainer(context: Context) {
     /** 指定校区的宿舍绑定（绑定页可在未切换校区时读取） */
     fun dormInfoFor(campusId: String): DormInfo? = loadDormInfo(campusId)
 
-    /** 保存当前校区的宿舍绑定；两项都为空视为解绑 */
-    fun setDormInfo(
-       building: String,
-       room: String,
-       serviceCampusId: String? = null,
-       dormCode: String = "",
-    ) = setDormInfoFor(_selectedCampus.value.id, building, room, serviceCampusId, dormCode)
-
-    /** 保存指定校区的宿舍绑定；[dormCode] 是缴费系统用的宿舍编号（见 [DormInfo.dormCode]） */
+    /**
+     * 保存指定校区的宿舍绑定；[dormCode] 是缴费系统用的宿舍编号（见 [DormInfo.dormCode]）。
+     *
+     * ⚠️ 只允许写**当前学校名下的校区**：改造前绑定页把 `campusId` 一路传到这里，而那个值
+     * 来自 [selectedCampus] 借用的默认校区，于是未收录学校的宿舍被存进 `dorm_ytlg_main`。
+     * 判据落在数据层而不是只落在界面，是因为漏一个调用点就等于又把键写错。
+     *
+     * @return 是否落盘；false = 这个校区不属于当前学校（调用方据此说实话）。
+     */
     fun setDormInfoFor(
        campusId: String,
        building: String,
        room: String,
        serviceCampusId: String? = null,
        dormCode: String = "",
-    ) {
+    ): Boolean {
+       val campus = CampusConfig.byIdOrNull(campusId) ?: return false
+       if (!isCampusOfCurrentSchool(campus)) return false
        val info = DormInfo(
            building = building.trim(),
            room = room.trim(),
@@ -934,24 +1010,33 @@ class AppContainer(context: Context) {
            dormCode = dormCode.trim(),
        )
        val edit = prefs.edit()
-       if (info.isBound) edit.putString(dormPrefKey(campusId), gson.toJson(info))
-       else edit.remove(dormPrefKey(campusId))
+       if (info.isBound) edit.putString(dormPrefKey(campus.id), gson.toJson(info))
+       else edit.remove(dormPrefKey(campus.id))
        edit.apply()
-       if (campusId == _selectedCampus.value.id) {
+       if (campus.id == _selectedCampus.value.id) {
            _dormInfo.value = info.takeIf { it.isBound }
        }
+       return true
     }
 
     fun setSelectedCampus(id: String) {
        val campus = CampusConfig.byId(id)
        if (campus.underConstruction) return
        _selectedCampus.value = campus
-       _dormInfo.value = loadDormInfo(campus.id)
+       // 宿舍存档按**校区**存，但只有属于当前学校的那些校区才是他的宿舍；
+       // 借来的默认校区一律读成 null，否则未收录学校会顶着烟台理工的楼栋跑。
+       _dormInfo.value = if (isCampusOfCurrentSchool(campus)) loadDormInfo(campus.id) else null
        prefs.edit().putString("selected_campus_id", campus.id).apply()
     }
 
     // ── Campus-locked school (dedicated client) ──
-    /** 当前校区锁定的教务学校；专用客户端只服务本校，不再使用全国学校列表。 */
+    /**
+     * 当前**校区**锁定的教务学校。
+     *
+     * ⚠️ 这是 [currentAcademicSchool] 的**回退分支**，不是教务页该调的那个：
+     * 用户自己选过学校时，教务页必须跟随所选学校，否则会拿校区配置去查别人的教务。
+     * 只有"这台设备还没选过学校"的老用户/跳过引导的用户会走到这里。
+     */
     fun currentCampusSchool(): School? {
        val campus = selectedCampus.value
        // 1) 按 schoolId 查索引
@@ -976,6 +1061,98 @@ class AppContainer(context: Context) {
            },
            baseUrl = baseUrl
        )
+    }
+
+    /**
+     * 这台设备上**当前接入的教务学校** —— 所有教务页的唯一真源。
+     *
+     * ## 为什么不能再让各页自己从校区反推
+     *
+     * 成绩 / 修课 / 存档 / 选课 / 导入都继承 `ZhengfangLoginViewModel`，它在构造时取学校。
+     * 改造前那里读的是 [currentCampusSchool]（校区反推），于是"从列表选了别的学校导入，
+     * 点进成绩查询却还在打烟台理工"—— 用户拿到的是别人的教务数据或一句登录失败，
+     * 而它看起来像 App 坏了。现在只有这一处判据，换学校之后教务页自动跟着走。
+     *
+     * 没选过学校（老用户、或装机后跳过引导）时回退到校区配置，行为与改造前逐字一致。
+     */
+    fun currentAcademicSchool(): School? =
+        _academicSchoolId.value?.let { resolveSchoolById(it) } ?: currentCampusSchool()
+
+    /** 按 id 找学校：内置名单优先，其次用户自建（自建学校不在名单里）。 */
+    fun resolveSchoolById(id: String): School? =
+        schoolRegistry.getById(id) ?: _customSchools.value.firstOrNull { it.id == id }
+
+    /**
+     * 当前学校的校区 —— 校园服务与 3D 地图的口径。
+     *
+     * @return 没收录这所学校时返回 null。**调用方必须处理 null**：
+     *   用 [currentCampusSchool] 那条 `byId` 的静默回退，会让山东理工的学生
+     *   看到烟台理工的电费、洗衣和校园卡入口。
+     */
+    fun campusForCurrentSchool(): CampusInfo? =
+        CampusConfig.forSchoolId(currentAcademicSchool()?.id)
+
+    /** 这所学校的校园服务 / 地图是否已收录（服务页与地图入口的判定）。 */
+    fun currentSchoolHasCampusConfig(): Boolean = campusForCurrentSchool() != null
+
+    /**
+     * 换学校。四件事缺一不可，漏掉任何一件都会留下"半所学校"的状态：
+     *
+     * 1. 记下教务学校（[currentAcademicSchool] 的真源）；
+     * 2. 校区跟着切 —— **只有配了对应校区才切**，没配的保持"未收录"，
+     *    服务页与地图据此显示实话而不是借烟台理工的配置；
+     * 3. 课表切到以学校命名的方案。方案表里没有学校字段，两所学校的课表会按
+     *    `课程名 + 星期 + 节次` 合并进同一个方案 —— 那不是"并存"，是混成一张表。
+     *    空方案直接改名沿用（免得留一堆空方案），有数据才新建或复用同名方案；
+     * 4. 「我的」页显示的学校名同步。
+     *
+     * @return 切换后生效的方案名，界面用它说一句"课表已切到 X"。
+     */
+    suspend fun switchAcademicSchool(school: School): String {
+        prefs.edit().putString("academic_school_id", school.id).apply()
+        _academicSchoolId.value = school.id
+        // 数据库侧也要跟着切：四张按校隔离的表（courses / homework / saved_grades / exams）
+        // 的读取条件都是 `schoolId = (SELECT schoolId FROM app_state WHERE id = 1)`。
+        // 只改 prefs 不改这行 = 界面说"换了学校"，课表却还是上一所的 —— 而且 Flow 不会刷新。
+        runCatching { app.database.appStateDao().setSchoolId(school.id) }
+        // 教师 / 学期快照 / 调课 / 时间段的主键是业务键，跨校会互相覆盖；
+        // 它们都能重算，所以换校时清空重种，而不是并存。
+        runCatching { PocketXiaoliDatabase.resetPerSchoolCaches(app, school.id) }
+        CampusConfig.forSchoolId(school.id)?.let { setSelectedCampus(it.id) }
+        // ⚠️ 宿舍必须**无条件**跟着学校重读一遍。上面那路只有"这所学校配了校区"才会走
+        // `setSelectedCampus`，而换到没收录的学校时它直接被跳过 —— 于是烟台理工绑的宿舍
+        // 留在 `_dormInfo` 里继续被消费：首页低余额提醒拿别人的房间号去查账单，
+        // 查回来的数字还会挂在这名学生眼前。冷启动不会有这个问题（初值就按学校读），
+        // 只有"在同一台设备上换学校"这条路会踩到，所以只能靠这条断言/这段代码守。
+        _dormInfo.value = dormCampusIdOrNull()?.let { loadDormInfo(it) }
+        setSchool(school.name)
+
+        val schemes = repository.allSchemes.first()
+        val activeId = _activeSchemeId.value
+        val active = schemes.firstOrNull { it.id == activeId }
+        val plan = schemePlanFor(
+            activeSchemeId = activeId,
+            activeSchemeName = active?.name ?: _activeSchemeName.value,
+            activeHasCourses = repository.getCoursesByScheme(activeId).first().isNotEmpty(),
+            existingByName = schemes.associate { it.name to it.id },
+            targetSchoolName = school.name,
+        )
+        return when (plan) {
+            SchemePlan.Keep -> school.name
+            is SchemePlan.Rename -> {
+                active?.let { repository.updateScheme(it.copy(name = school.name)) }
+                setActiveScheme(plan.schemeId, school.name)
+                school.name
+            }
+            is SchemePlan.Reuse -> {
+                setActiveScheme(plan.schemeId, school.name)
+                school.name
+            }
+            SchemePlan.Create -> {
+                repository.createScheme(school.name).also { setActiveScheme(it, school.name) }
+                school.name
+            }
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.network
 
 import android.content.Context
+import com.pocket.xiaoli.data.school.SchoolScopedPrefs
 import android.content.SharedPreferences
 import android.util.Log
 
@@ -22,7 +23,8 @@ object ZhengfangImportMemory {
     private var prefs: SharedPreferences? = null
 
     fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // 按校隔离：导入记忆里是“这所学校导过什么”。
+        prefs = SchoolScopedPrefs.of(context.applicationContext, PREFS_NAME)
     }
 
     /**

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.PocketXiaoliApplication
 import com.pocket.xiaoli.data.backup.BackupCrypto
 import com.pocket.xiaoli.data.entity.CourseEntity
+import com.pocket.xiaoli.data.feedback.FEEDBACK_MAIL
 import com.pocket.xiaoli.data.model.CourseBackup
 import com.pocket.xiaoli.ui.theme.*
 import com.google.gson.Gson
@@ -272,7 +273,7 @@ internal fun SchoolRequestDialog(
                     if (schoolName.isNotBlank()) {
                         try {
                             val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:pocketxiaoyan@outlook.com")
+                                data = Uri.parse("mailto:$FEEDBACK_MAIL")
                                 putExtra(Intent.EXTRA_SUBJECT, "口袋小鲤 - 学校信息反馈")
                                 putExtra(Intent.EXTRA_TEXT, "学校：${schoolName}\n教务系统：${systemType}\n请协助适配该校教务系统")
                             }

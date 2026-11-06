@@ -181,7 +181,16 @@ fun ProfileScreen(
 
     // ── 子页面 / 面板开关 ──
     var showAccountBinding by remember { mutableStateOf(false) }
-    var boundAccount by remember { mutableStateOf(container.loadCredential(container.selectedCampus.value.jwBaseUrl ?: "campus_bind")) }
+    // 教务绑定状态按**当前学校**的教务地址读（凭据早已按学校存，见
+    // `AccountBindingScreen.persistAcademic`）。改造前这一路读的是 `selectedCampus.jwBaseUrl`，
+    // 而那个校区对学校没收录时是借来的烟台理工本校区 —— 于是「我的」页拿烟台理工存的学号
+    // 说"这所学校已绑定"，红点与账号都不是他的。
+    val academicSchoolId by container.academicSchoolId.collectAsStateWithLifecycle()
+    val customSchools by container.customSchools.collectAsStateWithLifecycle()
+    val boundCredentialKey = remember(academicSchoolId, customSchools) {
+        container.currentAcademicSchool()?.baseUrl ?: "campus_bind"
+    }
+    var boundAccount by remember { mutableStateOf(container.loadCredential(boundCredentialKey)) }
     // 原 showColorThemeDialog / showCornerRadiusDialog / showPetDialog 已移除：
     // 前两个的能力分别被「外观方案」和「外观 → 课表格子」吸收，宠物概念整组删除。
     // 这三个 State 都是"声明了、也渲染了对话框、但从没有一处置为 true"的死分支。
@@ -437,9 +446,8 @@ fun ProfileScreen(
         electricityBalanceLoading = false
     }
 
-    LaunchedEffect(selectedCampus.id) {
-        boundAccount = selectedCampus.jwBaseUrl?.let { container.loadCredential(it) }
-            ?: container.loadCredential("campus_bind")
+    LaunchedEffect(boundCredentialKey) {
+        boundAccount = container.loadCredential(boundCredentialKey)
     }
     // 「我的」页服务格统一入口：能解析就内置打开，解析不到给提示
     fun openProfileService(
@@ -447,6 +455,13 @@ fun ProfileScreen(
         title: String,
         targetCampus: CampusInfo = selectedCampus,
     ) {
+        // ⚠️ 这所学校没配校园服务时**不借用别的学校的配置**（与服务页 `openCampusService` 同一条闸）：
+        // 「我的」四格那几格读的是同一个校区真源，山东理工的学生点电费会打开烟台理工的缴费页 ——
+        // 那不只是入口不对，是可能看到别人的账单。判据同源：`currentSchoolHasCampusConfig`。
+        if (!container.currentSchoolHasCampusConfig()) {
+            Toast.makeText(context, "这所学校的校园服务还没收录", Toast.LENGTH_SHORT).show()
+            return
+        }
         // 校园卡（易校园）：装了 App 拉起；没装进门户里的易校园入口（免登），不再丢到官网
         //
         // ⚠️ 2026-10：「我的」页四格里那格换成了「专注计时」，所以**本文件里暂时没有
@@ -718,8 +733,7 @@ fun ProfileScreen(
             onLearningCookieChanged = { learningRev++ },
             onBack = { showAccountBinding = false },
             onBoundChange = {
-                boundAccount = selectedCampus.jwBaseUrl?.let { container.loadCredential(it) }
-                    ?: container.loadCredential("campus_bind")
+                boundAccount = container.loadCredential(boundCredentialKey)
             }
         )
         return
@@ -729,6 +743,7 @@ fun ProfileScreen(
         ElectricityScreen(
             dormInfo = dormInfo,
             fallbackCampus = selectedCampus,
+            usageStore = container.electricityUsageStore,
             onBack = { showElectricityPage = false },
             onOpenWeb = { url, title -> profileServiceWeb = url to title },
             onBalanceLoaded = { loaded ->

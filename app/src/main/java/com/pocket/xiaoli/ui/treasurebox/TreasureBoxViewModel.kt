@@ -2,6 +2,7 @@ package com.pocket.xiaoli.ui.treasurebox
 
 import android.app.Application
 import android.content.Context
+import com.pocket.xiaoli.data.school.SchoolScopedPrefs
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -12,7 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class TreasureBoxViewModel(application: Application) : AndroidViewModel(application) {
-    private val prefs = application.getSharedPreferences("egg_rice_treasure", Context.MODE_PRIVATE)
+    // 按校隔离：服务页收藏跟着学校走。
+    private val prefs = SchoolScopedPrefs.of(application, "egg_rice_treasure")
     private val gson = Gson()
 
     // ── Learning Resources ──

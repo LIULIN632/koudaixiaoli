@@ -15,10 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -26,6 +28,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,14 +38,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pocket.xiaoli.core.campus.CampusConfig
+import com.pocket.xiaoli.data.school.SchoolOption
+import com.pocket.xiaoli.data.school.schoolOptions
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.SectionCaption
 import com.pocket.xiaoli.ui.import_.ImportScreen
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
-import com.pocket.xiaoli.ui.theme.ServiceAccent
-import com.pocket.xiaoli.ui.theme.serviceAccentColor
-import com.pocket.xiaoli.ui.theme.serviceAccentContainer
+import kotlinx.coroutines.launch
 
 /**
  * 首次启动的向导：**选学校 → 用教务账号登录并导入课表**。
@@ -69,59 +76,57 @@ fun FirstRunOnboardingScreen(
     onDone: () -> Unit,
 ) {
     var step by rememberSaveable { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val registrySchools = container.schoolRegistry.allSchools
+    val customSchools by container.customSchools.collectAsStateWithLifecycle()
+    // 从第二步返回时要能看出"刚才选的是哪所"——否则用户以为没选成功，再点一次、再登录一次。
+    // 读的是真源（学校已落盘），不是引导自己记的副本。
+    val selectedSchoolId by container.academicSchoolId.collectAsStateWithLifecycle()
 
-    when (step) {
-        0 -> FirstRunSchoolPicker(
-            onPick = { campusId ->
-                // 先落盘再进第二步：ImportViewModel 在构造时读 currentCampusSchool()，
-                // 顺序反了就会读到上一个校区。
-                container.setSelectedCampus(campusId)
-                step = 1
-            },
-            onSkip = onDone,
-        )
+    val options = remember(registrySchools, customSchools) {
+        schoolOptions(registrySchools + customSchools, CampusConfig.campuses)
+    }
 
-        else -> ImportScreen(
+    if (step == 1) {
+        ImportScreen(
             onBack = { step = 0 },
             onImported = onDone,
             // 这一趟本来就是来绑定账号的：默认勾上「记住密码」，用户仍可取消。
             rememberPasswordByDefault = true,
             successActionLabel = "开始使用",
         )
+        return
     }
+
+    FirstRunSchoolPicker(
+        options = options,
+        selectedSchoolId = selectedSchoolId,
+        onPick = { option ->
+            val school = container.resolveSchoolById(option.id) ?: return@FirstRunSchoolPicker
+            scope.launch {
+                container.switchAcademicSchool(school)
+                step = 1
+            }
+        },
+        onSkip = onDone,
+    )
 }
 
-/** 向导里可选的两所学校（校区 id 必须与 `CampusConfig` 对得上）。 */
-internal data class FirstRunSchool(
-    val campusId: String,
-    val title: String,
-    val subtitle: String,
-    val accent: ServiceAccent,
-)
-
-internal val FIRST_RUN_SCHOOLS = listOf(
-    FirstRunSchool(
-        campusId = "ytlg_main",
-        title = "烟台理工学院",
-        subtitle = "本校区 · 正方教务",
-        accent = ServiceAccent.ACADEMIC,
-    ),
-    FirstRunSchool(
-        campusId = "ytu_south",
-        title = "烟台大学",
-        subtitle = "南校区 · 正方教务",
-        accent = ServiceAccent.QUERY,
-    ),
-)
-
 /**
- * 第一步的纯 UI：两张学校卡 + 跳过。
+ * 第一步的纯 UI：可接入学校列表 + 跳过。
  *
- * 标 `internal` 是为了快照测试能直接渲它（不碰 AppContainer）。
+ * 判据不在这里 —— 列表由 [schoolOptions] 给出（选校白名单 ∩ 教务系统真支持）。
+ * 引导与「绑定信息 → 换学校」必须共用同一份判据，否则一边能选、一边不能选。
+ *
+ * 标 `internal` 是为了快照测试能直接渲它：不碰 AppContainer，也不碰名单 IO。
+ *
+ * @param selectedSchoolId 已经选过的学校；高亮它，让"从第二步返回"不像是白走一趟。
  */
 @Composable
 internal fun FirstRunSchoolPicker(
-    onPick: (String) -> Unit,
+    options: List<SchoolOption>,
+    selectedSchoolId: String? = null,
+    onPick: (SchoolOption) -> Unit,
     onSkip: () -> Unit,
 ) {
     val skin = LocalSkin.current
@@ -161,51 +166,20 @@ internal fun FirstRunSchoolPicker(
 
         Spacer(Modifier.height(skin.spaceSm))
 
-        FIRST_RUN_SCHOOLS.forEach { school ->
-            // AppCard 的 onClick 自带 MIUIX 按压反馈（与首页卡片同一套），
-            // 大块卡片不适合用水波纹。
-            AppCard(onClick = { onPick(school.campusId) }) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(skin.cardPaddingLarge),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(skin.radiusChip))
-                            .background(serviceAccentContainer(school.accent)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.School,
-                            contentDescription = null,
-                            tint = serviceAccentColor(school.accent),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    Spacer(Modifier.width(skin.spaceMd))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            school.title,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary,
-                        )
-                        Text(
-                            school.subtitle,
-                            fontSize = 12.sp,
-                            color = colors.textSecondary,
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = colors.textTertiary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+        // 分两组而不是平铺十几张卡：目前只有两所配了校园服务与 3D 地图，
+        // 混在一起会让人以为每所都有电费、洗衣这些入口。
+        val configured = options.filter { it.hasCampusConfig }
+        val rest = options.filter { !it.hasCampusConfig }
+        if (configured.isNotEmpty()) {
+            SectionCaption("校园服务与地图已收录")
+            configured.forEach { option ->
+                SchoolCard(option, selected = option.id == selectedSchoolId, onPick = onPick)
+            }
+        }
+        if (rest.isNotEmpty()) {
+            SectionCaption("可导入课表与成绩 · 校园服务暂未收录")
+            rest.forEach { option ->
+                SchoolCard(option, selected = option.id == selectedSchoolId, onPick = onPick)
             }
         }
 
@@ -223,6 +197,76 @@ internal fun FirstRunSchoolPicker(
             modifier = Modifier.align(Alignment.CenterHorizontally),
         ) {
             Text("先随便看看", fontSize = 13.sp, color = colors.textSecondary)
+        }
+    }
+}
+
+@Composable
+private fun SchoolCard(
+    option: SchoolOption,
+    selected: Boolean,
+    onPick: (SchoolOption) -> Unit,
+) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    // 图标底色按"校园服务收没收录"分两档：已收录用主色，未收录用中性次要色 ——
+    // 一眼能看出点进去的差别，又不用多占一行小字。
+    val accent = if (option.hasCampusConfig) colors.accentMain else colors.textSecondary
+
+    AppCard(
+        onClick = { onPick(option) },
+        // 已选中的那张描一圈主色边：从第二步返回时，这一圈就是"刚才没白选"的证据
+        border = if (selected) BorderStroke(2.dp, colors.accentMain) else null,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(skin.cardPaddingLarge),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(skin.radiusChip))
+                    .background(accent.copy(alpha = if (option.hasCampusConfig) 0.14f else 0.08f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.School,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(skin.spaceMd))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    option.name,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                )
+                Text(
+                    option.subtitle,
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                )
+            }
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "已选择",
+                    tint = colors.accentMain,
+                    modifier = Modifier.size(22.dp),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

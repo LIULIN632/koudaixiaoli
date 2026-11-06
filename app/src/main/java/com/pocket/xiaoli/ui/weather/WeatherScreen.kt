@@ -21,18 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.AcUnit
 import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.CloudQueue
-import androidx.compose.material.icons.outlined.Grain
 import androidx.compose.material.icons.outlined.NightsStay
 import androidx.compose.material.icons.outlined.Thermostat
-import androidx.compose.material.icons.outlined.Thunderstorm
 import androidx.compose.material.icons.outlined.Umbrella
 import androidx.compose.material.icons.outlined.WaterDrop
-import androidx.compose.material.icons.outlined.WbCloudy
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,9 +57,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocket.xiaoli.core.weather.WeatherCityAnchor
 import com.pocket.xiaoli.core.weather.WeatherDay
 import com.pocket.xiaoli.core.weather.WeatherHour
-import com.pocket.xiaoli.core.weather.WeatherKind
 import com.pocket.xiaoli.core.weather.WeatherRepository
 import com.pocket.xiaoli.core.weather.WeatherSnapshot
 import com.pocket.xiaoli.core.weather.dayLabel
@@ -109,6 +104,8 @@ import java.util.Locale
 @Composable
 fun WeatherScreen(
     repository: WeatherRepository,
+    /** 当前学校所在城市的取数锚点；null = 这座城市还没配坐标（页面如实说，不报别城的天气）。 */
+    anchor: WeatherCityAnchor?,
     onBack: () -> Unit,
 ) {
     val colors = LocalPocketXiaoliColors.current
@@ -172,17 +169,28 @@ fun WeatherScreen(
                 .padding(top = skin.spaceSm, bottom = skin.spaceXxl),
         ) {
             when {
-                snapshot != null -> WeatherContent(
+                // 数据与标签必须同源：锚点没了（换到没配坐标的学校）就不渲染手里那份旧快照，
+                // 否则"淄博"两个字会挂在烟台的温度上 —— 那是给错数据，不是刷新失败。
+                snapshot != null && anchor != null -> WeatherContent(
                     snapshot = snapshot,
+                    anchor = anchor,
                     staleMessage = staleMessage,
                 )
 
-                loading || result == null -> WeatherLoading()
+                loading || result == null -> WeatherLoading(anchor)
 
                 failure != null -> {
                     Spacer(Modifier.height(skin.spaceXl))
                     ErrorCard(
                         message = failure.message,
+                        onRetry = ::refresh,
+                    )
+                }
+
+                else -> {
+                    Spacer(Modifier.height(skin.spaceXl))
+                    ErrorCard(
+                        message = "这座城市还没有配天气取数坐标",
                         onRetry = ::refresh,
                     )
                 }
@@ -195,10 +203,13 @@ fun WeatherScreen(
  * 页面正文（与网络状态解耦，便于快照测试直接喂固定数据）。
  *
  * @param staleMessage 非 null 时在顶部显示「显示的是上次的天气」提醒。
+ * @param anchor 这份数据是**按哪座城市的坐标**取的。标签必须与数据同源：
+ *   以前页面写死"烟台"，接了山东理工（淄博）之后，那一行字就会挂在别人的城市上。
  */
 @Composable
 internal fun WeatherContent(
     snapshot: WeatherSnapshot,
+    anchor: WeatherCityAnchor,
     staleMessage: String? = null,
 ) {
     val skin = LocalSkin.current
@@ -212,7 +223,7 @@ internal fun WeatherContent(
             StaleBanner(message = staleMessage)
         }
 
-        WeatherHero(snapshot)
+        WeatherHero(snapshot, anchor)
 
         Column(verticalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
             ServiceSectionLabel(
@@ -252,14 +263,14 @@ internal fun WeatherContent(
             DetailsCard(snapshot)
         }
 
-        Attribution(snapshot)
+        Attribution(snapshot, anchor)
     }
 }
 
 // ─────────────────────────── 主视觉 ───────────────────────────
 
 @Composable
-private fun WeatherHero(snapshot: WeatherSnapshot) {
+private fun WeatherHero(snapshot: WeatherSnapshot, anchor: WeatherCityAnchor) {
     val current = snapshot.current
     val today = snapshot.daily.firstOrNull()
     val skin = LocalSkin.current
@@ -269,7 +280,7 @@ private fun WeatherHero(snapshot: WeatherSnapshot) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "烟台 · 城市天气",
+                        text = "${anchor.shortName} · 城市天气",
                         fontSize = 12.sp,
                         color = Color.White.copy(alpha = 0.88f),
                     )
@@ -707,7 +718,7 @@ private fun StaleBanner(message: String) {
 }
 
 @Composable
-private fun Attribution(snapshot: WeatherSnapshot) {
+private fun Attribution(snapshot: WeatherSnapshot, anchor: WeatherCityAnchor) {
     val colors = LocalPocketXiaoliColors.current
     val skin = LocalSkin.current
     Column(
@@ -724,7 +735,7 @@ private fun Attribution(snapshot: WeatherSnapshot) {
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = "按烟台市坐标请求（非校区实测）· 更新于 " +
+            text = "按${anchor.fullName}坐标请求（非校区实测）· 更新于 " +
                 snapshot.current.time.substringAfter('T').take(5),
             fontSize = 11.sp,
             color = colors.textTertiary,
@@ -733,8 +744,13 @@ private fun Attribution(snapshot: WeatherSnapshot) {
     }
 }
 
+/**
+ * 加载占位。
+ *
+ * @param anchor null = 当前学校所在城市还没配坐标；这时不假装在获取某座城的天气。
+ */
 @Composable
-private fun WeatherLoading() {
+private fun WeatherLoading(anchor: WeatherCityAnchor?) {
     val colors = LocalPocketXiaoliColors.current
     Box(
         modifier = Modifier
@@ -745,44 +761,11 @@ private fun WeatherLoading() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = colors.accentMain, strokeWidth = 3.dp)
             Spacer(Modifier.height(12.dp))
-            Text(text = "正在获取烟台天气…", fontSize = 13.sp, color = colors.textSecondary)
+            Text(
+                text = anchor?.let { "正在获取${it.shortName}天气…" } ?: "正在获取天气…",
+                fontSize = 13.sp,
+                color = colors.textSecondary,
+            )
         }
     }
 }
-
-// ─────────────────────────── 纯映射 ───────────────────────────
-
-internal fun weatherIcon(kind: WeatherKind, isDay: Boolean): ImageVector = when (kind) {
-    WeatherKind.CLEAR -> if (isDay) Icons.Outlined.WbSunny else Icons.Outlined.NightsStay
-    WeatherKind.PARTLY_CLOUDY -> if (isDay) Icons.Outlined.WbCloudy else Icons.Outlined.NightsStay
-    WeatherKind.CLOUDY -> Icons.Outlined.Cloud
-    WeatherKind.FOG -> Icons.Outlined.CloudQueue
-    WeatherKind.DRIZZLE -> Icons.Outlined.Grain
-    WeatherKind.RAIN -> Icons.Outlined.WaterDrop
-    WeatherKind.SNOW -> Icons.Outlined.AcUnit
-    WeatherKind.THUNDER -> Icons.Outlined.Thunderstorm
-}
-
-/** 图标着色：晴/多云走暖色，云雨走蓝，雷走紫，雪走提示蓝。全部由主题派生。 */
-@Composable
-internal fun weatherTint(kind: WeatherKind, isDay: Boolean): Color {
-    val colors = LocalPocketXiaoliColors.current
-    return when (kind) {
-        WeatherKind.CLEAR,
-        WeatherKind.PARTLY_CLOUDY,
-        -> if (isDay) serviceAccentColor(ServiceAccent.PAYMENT) else serviceAccentColor(ServiceAccent.STUDY)
-
-        WeatherKind.CLOUDY,
-        WeatherKind.FOG,
-        WeatherKind.DRIZZLE,
-        WeatherKind.RAIN,
-        -> serviceAccentColor(ServiceAccent.QUERY)
-
-        WeatherKind.SNOW -> colors.info
-        WeatherKind.THUNDER -> serviceAccentColor(ServiceAccent.STUDY)
-    }
-}
-
-/** `2026-10-22T06:08` → `06:08`；缺失时给一个明确的占位，而不是空白。 */
-private fun clockOf(iso: String?): String =
-    iso?.substringAfter('T')?.take(5)?.takeIf { it.isNotBlank() } ?: "—"

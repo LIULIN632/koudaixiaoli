@@ -87,8 +87,8 @@ class WeatherModelsTest {
         val snapshot = parseWeather(SAMPLE_JSON, now = 1_700_000_000_000L)
 
         assertEquals(1_700_000_000_000L, snapshot.fetchedAt)
-        assertEquals(37.47649, WEATHER_LATITUDE, 0.00001)
-        assertEquals(121.44081, WEATHER_LONGITUDE, 0.00001)
+        assertEquals(37.47649, HOME_CITY_WEATHER_ANCHOR.latitude, 0.00001)
+        assertEquals(121.44081, HOME_CITY_WEATHER_ANCHOR.longitude, 0.00001)
 
         val current = snapshot.current
         assertEquals("2026-10-22T22:45", current.time)

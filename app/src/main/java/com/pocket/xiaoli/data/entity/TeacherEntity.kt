@@ -10,5 +10,7 @@ data class TeacherEntity(
     val officeHours: String = "",
     val phone: String = "",
     val title: String = "",
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
+    /** 所属学校；空串由 `AFTER INSERT` 触发器补成当前学校。 */
+    val schoolId: String = "",
 )

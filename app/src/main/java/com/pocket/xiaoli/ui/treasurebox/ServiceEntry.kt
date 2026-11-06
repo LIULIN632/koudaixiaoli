@@ -2,8 +2,13 @@ package com.pocket.xiaoli.ui.treasurebox
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.pocket.xiaoli.data.ANCHORED_SCHOOL_IDS
 import com.pocket.xiaoli.data.CampusConfig
+import com.pocket.xiaoli.data.CampusInfo
+import com.pocket.xiaoli.core.weather.weatherAnchorForCity
 import com.pocket.xiaoli.data.CampusServiceKeys
+import com.pocket.xiaoli.data.School
+import com.pocket.xiaoli.data.model.DormInfo
 import com.pocket.xiaoli.data.service.CampusServiceCapability
 import com.pocket.xiaoli.ui.theme.ServiceAccent
 
@@ -109,6 +114,15 @@ internal data class ServiceEntry(
      */
     val capability: CampusServiceCapability = CampusServiceCapability.NATIVE,
 
+    /**
+     * 这一格要靠谁的数据才能工作 —— 决定它对哪所学校可见，见 [ServiceScope]。
+     *
+     * 默认 [ServiceScope.ANY_SCHOOL] 让**既有行为完全不变**：所有没显式标注的格子
+     * 仍然对任何学校显示（本机功能 / 全国性系统正是这一类），
+     * 也让测试里直接构造的条目不必关心这个维度。
+     */
+    val scope: ServiceScope = ServiceScope.ANY_SCHOOL,
+
     val aliases: List<String> = emptyList(),
     val onClick: () -> Unit
 ) {
@@ -183,3 +197,128 @@ internal data class ServiceSection(
     val title: String,
     val entries: List<ServiceEntry>
 )
+
+/**
+ * 一格服务**要靠谁的数据**才能工作 —— 服务页据此决定它对哪所学校可见。
+ *
+ * ## 为什么需要它（与 [CampusServiceCapability] 的分工）
+ *
+ * 能力档位回答的是"这一格接通到什么程度"，判据是**校区配置**；而 `AppContainer.selectedCampus`
+ * 对没收录的学校会静默回退到烟台理工本校区。于是档位永远是"能用"，用户点下去才被告知
+ * "这所学校还没收录" —— 界面先画了一张假的格子，再用 Toast 收回它。
+ *
+ * 本枚举回答的是另一件事：**这一格要不要本校的数据**。
+ * 判据换到「学校」这一层，未收录的格子直接不出现（2026-11 用户要求），
+ * 而不是留着等用户白点一次。
+ *
+ * ## 加新格子时怎么选
+ *
+ * 看它点开之后**读谁的数**：读 `CampusConfig` / 校区服务的选 [CAMPUS_CONFIG]，
+ * 读按城市取的数据选 [CITY_DATA]，读某所学校写死的数据源选 [ANCHORED_SCHOOL]，
+ * 本机数据或全国性系统（课表导入、学习通、番茄钟）保持默认的 [ANY_SCHOOL]。
+ * 判不准就去看 [com.pocket.xiaoli.ui.treasurebox.openCampusService] 有没有被它调用。
+ */
+internal enum class ServiceScope {
+    /** 不需要任何学校数据：本机功能或全国性系统，任何学校都显示。 */
+    ANY_SCHOOL,
+
+    /** 需要本校在 `CampusConfig` 里配了校园服务 / 校区（电费、校园卡、报修、地图…）。 */
+    CAMPUS_CONFIG,
+
+    /** 需要这座城市配了天气取数坐标（见 core 的 `WEATHER_CITY_ANCHORS`）。 */
+    CITY_DATA,
+
+    /** 需要数据源已为这所学校配好：公交站点锚点、图书馆 OPAC 目前只有烟台理工。 */
+    ANCHORED_SCHOOL,
+}
+
+/**
+ * 判可见性所需的三条事实 —— **由界面从 [com.pocket.xiaoli.di.AppContainer] 组装**，
+ * 判定本身是纯函数（[serviceEntryVisible]），这样它能被单测直接钉住。
+ */
+internal data class ServiceScopeFacts(
+    val campusConfigReady: Boolean,
+    val cityWeatherReady: Boolean,
+    val anchoredSchoolReady: Boolean,
+) {
+    companion object {
+        /** 全部可用 —— 烟台理工的学生看到完整服务页，也是快照基线的口径。 */
+        val ALL = ServiceScopeFacts(
+            campusConfigReady = true,
+            cityWeatherReady = true,
+            anchoredSchoolReady = true,
+        )
+    }
+}
+
+/**
+ * 从**当前学校**算出那三条事实 —— 判据只写这一份。
+ *
+ * ## 为什么单独成一个函数
+ *
+ * 它原来是服务页里 `remember { ... }` 的三行内联代码：内联的版本没法被测，
+ * 而这三行恰好是整件事的判据（判错了就是"格子凭空消失"或"点了才吃 Toast"）。
+ * 挪出来之后 `ServiceScopeTest` 能直接拿学校样本钉住它，
+ * 以后别的界面要按学校取舍服务也调同一个函数，不再各抄一份。
+ *
+ * @param campus 当前学校名下的校区（`AppContainer.campusForCurrentSchool()`）；
+ *   **必须由调用方传 null 而不是默认校区** —— 传进来一个借来的校区，
+ *   `campusConfigReady` 就永远是 true，整套判据当场失效。
+ */
+internal fun serviceScopeFacts(
+    school: School?,
+    campus: CampusInfo?,
+): ServiceScopeFacts = ServiceScopeFacts(
+    campusConfigReady = campus != null,
+    cityWeatherReady = weatherAnchorForCity(school?.city) != null,
+    anchoredSchoolReady = school?.id in ANCHORED_SCHOOL_IDS,
+)
+
+/**
+ * 这一格现在能不能给当前学校看。
+ *
+ * 与 [serviceEntryCapability] 是**两件事**：可见性决定"有没有这一格"，
+ * 能力档位决定"这一格标什么角标"。两者共用同一个校区/宿舍真源，但判据不同 ——
+ * 混成一个函数会出现"为了藏格子把档位改成 RESERVED"，那等于让角标替隐藏说谎。
+ */
+internal fun serviceEntryVisible(entry: ServiceEntry, facts: ServiceScopeFacts): Boolean =
+    when (entry.scope) {
+        ServiceScope.ANY_SCHOOL -> true
+        ServiceScope.CAMPUS_CONFIG -> facts.campusConfigReady
+        ServiceScope.CITY_DATA -> facts.cityWeatherReady
+        ServiceScope.ANCHORED_SCHOOL -> facts.anchoredSchoolReady
+    }
+
+/**
+ * 服务页那四节的**完整渲染前处理**：按学校过滤 → 去掉死格子 → 按能力档位排座次。
+ *
+ * ## 为什么从 composable 里搬出来
+ *
+ * 它原来内联在 `TreasureBoxScreen` 的 `remember { ... }` 里，于是"未收录学校少了哪几格"
+ * 这件事**只能靠人肉点一遍验证**。搬成纯函数后 `ServiceScopeTest` 能直接拿真实条目形状
+ * 把整条管道钉住 —— 而这条管道同时管着服务页正文、常用服务与隐藏编辑弹窗
+ *（三者都读过滤后的 `sections`），一处判错就是三处一起错。
+ *
+ * 顺序不能换：先按学校过滤，剩下的才谈档位。反过来会把已经不该出现的格子
+ * 排进座次里，"未接入"沉底那种效果会盖掉"这格不属于这所学校"。
+ */
+internal fun visibleSections(
+    sections: List<ServiceSection>,
+    facts: ServiceScopeFacts,
+    campus: CampusInfo,
+    dormInfo: DormInfo?,
+): List<ServiceSection> = sections.map { section ->
+    section.copy(
+        entries = section.entries
+            .filter { serviceEntryVisible(it, facts) }
+            // 「校园跑」这类**纯直达格子**：没配链接就不出现。
+            // 留着一格，点下去只会弹"暂未配置"——那是死格子，不是待接入。
+            // （区别于健身房那种 INFO 格子：它有站内说明页，点开有内容。）
+            .filterNot {
+                it.serviceRegistryKey == CampusServiceKeys.SCHOOL_RUN &&
+                    serviceEntryCapability(it, campus, dormInfo) == CampusServiceCapability.INFO
+            }
+            // `sortedBy` 是稳定排序，所以同档位内部保持作者手写的顺序。
+            .sortedBy { serviceEntryCapability(it, campus, dormInfo).sortRank }
+    )
+}

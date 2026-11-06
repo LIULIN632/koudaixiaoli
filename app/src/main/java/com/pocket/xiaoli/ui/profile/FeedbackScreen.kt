@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import com.pocket.xiaoli.BuildConfig
 import com.pocket.xiaoli.data.contribution.ContributionAction
+import com.pocket.xiaoli.data.feedback.FEEDBACK_MAIL
 import com.pocket.xiaoli.data.feedback.FeedbackDraft
 import com.pocket.xiaoli.data.feedback.FeedbackFormatter
 import com.pocket.xiaoli.data.feedback.FeedbackLimits
@@ -27,9 +28,6 @@ import com.pocket.xiaoli.di.AppContainer
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-
-/** 反馈正文要发出去的邮箱。改这里之前先确认这个邮箱还在收信。 */
-private const val FEEDBACK_MAIL = "pocketxiaoyan@outlook.com"
 
 /** 提 Issue 用哪个仓库：与「关于」页里展示的是同一个。 */
 private const val FEEDBACK_REPO = "LIULIN632/koudaixiaoli"
@@ -284,6 +282,7 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
             }
         },
         onCopy = { copyToClipboard(body(), "已复制，粘贴到微信 / QQ 发给开发者就行") },
+        onCopyMail = { copyToClipboard(FEEDBACK_MAIL, "邮箱已复制：$FEEDBACK_MAIL") },
         onMail = {
             val (now, ticket) = openTicket()
             val url = FeedbackFormatter.mailtoUrl(FEEDBACK_MAIL, draft, ticket, now, diagnostics)

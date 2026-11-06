@@ -78,6 +78,7 @@ class WeatherReportTest {
     fun `报告把现在的天气翻成人话并带来源`() {
         val report = weatherReport(
             snapshot(hours = listOf(hour(at = 10, code = 61, probability = 70))),
+            anchor = HOME_CITY_WEATHER_ANCHOR,
         )
 
         assertTrue("必须说明数据来自哪里，CC BY 4.0 要求署名", report.contains("烟台天气（Open-Meteo，09:20 更新）"))
@@ -92,8 +93,23 @@ class WeatherReportTest {
 
     @Test
     fun `正在降水时报告里写明降水量`() {
-        val report = weatherReport(snapshot(currentCode = 61, precipitation = 0.5))
+        val report = weatherReport(snapshot(currentCode = 61, precipitation = 0.5), HOME_CITY_WEATHER_ANCHOR)
         assertTrue(report.contains("当前降水 0.5 mm"))
+    }
+
+    /**
+     * 报告第一行的城市**必须跟着锚点**，不许写死。
+     *
+     * 改造前那一句是 `"烟台天气（Open-Meteo，…）"` 写死的：接了山东理工（淄博）之后，
+     * 模型拿到的是淄博的数字、烟台的抬头，它会照着一句假话回答"你们那儿冷不冷"。
+     */
+    @Test
+    fun `城市名跟着锚点走不写死`() {
+        val zibo = requireNotNull(weatherAnchorForCity("淄博"))
+        val report = weatherReport(snapshot(currentCode = 61, precipitation = 0.5), zibo)
+        assertTrue(report, report.startsWith("淄博天气（Open-Meteo，"))
+        assertTrue(report, !report.contains("烟台"))
+        assertTrue("脚注写的城市也得跟着换", report.contains("按淄博市坐标请求，不是校区实测"))
     }
 
     // ── 正在下雨 / 下雪 / 打雷 ──

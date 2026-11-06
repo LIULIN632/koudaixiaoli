@@ -17,15 +17,15 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface AcademicSnapshotDao {
 
-    @Query("SELECT * FROM academic_snapshot WHERE id = 1 LIMIT 1")
+    @Query("SELECT * FROM academic_snapshot WHERE id = 1 AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1) LIMIT 1")
     fun observe(): Flow<AcademicSnapshotEntity?>
 
-    @Query("SELECT * FROM academic_snapshot WHERE id = 1 LIMIT 1")
+    @Query("SELECT * FROM academic_snapshot WHERE id = 1 AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1) LIMIT 1")
     suspend fun get(): AcademicSnapshotEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: AcademicSnapshotEntity)
 
-    @Query("DELETE FROM academic_snapshot")
+    @Query("DELETE FROM academic_snapshot WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun clear()
 }

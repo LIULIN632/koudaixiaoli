@@ -14,10 +14,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface CourseDao {
     // ── Courses ──
-    @Query("SELECT * FROM courses WHERE schemeId = :schemeId ORDER BY dayOfWeek, startSlot")
+    @Query("SELECT * FROM courses WHERE schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY dayOfWeek, startSlot")
     fun getCoursesByScheme(schemeId: Long): Flow<List<CourseEntity>>
 
-    @Query("SELECT * FROM courses ORDER BY dayOfWeek, startSlot")
+    @Query("SELECT * FROM courses WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY dayOfWeek, startSlot")
     fun getAllCourses(): Flow<List<CourseEntity>>
 
     @Query("SELECT * FROM courses WHERE id = :id")
@@ -49,16 +49,16 @@ interface CourseDao {
     @Query("DELETE FROM courses WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    @Query("DELETE FROM courses")
+    @Query("DELETE FROM courses WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteAll()
 
-    @Query("DELETE FROM courses WHERE schemeId = :schemeId")
+    @Query("DELETE FROM courses WHERE schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteByScheme(schemeId: Long)
 
-    @Query("DELETE FROM courses WHERE dayOfWeek = :day AND startSlot = :startSlot AND endSlot = :endSlot AND schemeId = :schemeId")
+    @Query("DELETE FROM courses WHERE dayOfWeek = :day AND startSlot = :startSlot AND endSlot = :endSlot AND schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteByTimeSlot(day: Int, startSlot: Int, endSlot: Int, schemeId: Long)
 
-    @Query("DELETE FROM courses WHERE name = :name AND schemeId = :schemeId")
+    @Query("DELETE FROM courses WHERE name = :name AND schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteByName(name: String, schemeId: Long)
 
     // ── Schemes ──
@@ -87,10 +87,10 @@ interface CourseDao {
     suspend fun getSchemeCount(): Int
 
     // ── Terms（学期） ──
-    @Query("SELECT * FROM terms ORDER BY sortOrder, id")
+    @Query("SELECT * FROM terms WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY sortOrder, id")
     fun getAllTerms(): Flow<List<TermEntity>>
 
-    @Query("SELECT * FROM terms ORDER BY sortOrder, id")
+    @Query("SELECT * FROM terms WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY sortOrder, id")
     suspend fun getAllTermsOnce(): List<TermEntity>
 
     @Query("SELECT * FROM terms WHERE id = :id")
@@ -105,17 +105,17 @@ interface CourseDao {
     @Query("DELETE FROM terms WHERE id = :id")
     suspend fun deleteTerm(id: Long)
 
-    @Query("SELECT COUNT(*) FROM terms")
+    @Query("SELECT COUNT(*) FROM terms WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun getTermCount(): Int
 
     // ── Time slots ──
-    @Query("SELECT * FROM time_slots ORDER BY slot")
+    @Query("SELECT * FROM time_slots WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY slot")
     fun getAllTimeSlots(): Flow<List<TimeSlotEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTimeSlots(slots: List<TimeSlotEntity>)
 
-    @Query("DELETE FROM time_slots")
+    @Query("DELETE FROM time_slots WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteAllTimeSlots()
 
     /** 原子替换全部时间段：删除+插入在同一事务内，避免第二步失败把表清空 */
@@ -126,10 +126,10 @@ interface CourseDao {
     }
 
     // ── Homework ──
-    @Query("SELECT * FROM homework WHERE schemeId = :schemeId ORDER BY createdAt DESC")
+    @Query("SELECT * FROM homework WHERE schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY createdAt DESC")
     fun getHomeworkByScheme(schemeId: Long): Flow<List<HomeworkEntity>>
 
-    @Query("SELECT * FROM homework ORDER BY createdAt DESC")
+    @Query("SELECT * FROM homework WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY createdAt DESC")
     fun getAllHomework(): Flow<List<HomeworkEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -151,7 +151,7 @@ interface CourseDao {
      * 而边框要按**截止档位**分色，就得把 `dueDate` 一起带出来 ——
      * 一门课几条作业时取最紧那一档（见 `data/HomeworkDue.worstDueStage`）。
      */
-    @Query("SELECT * FROM homework WHERE schemeId = :schemeId AND completed = 0")
+    @Query("SELECT * FROM homework WHERE schemeId = :schemeId AND completed = 0 AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     fun getActiveHomework(schemeId: Long): Flow<List<HomeworkEntity>>
 
     // ── Tasks ──
@@ -192,7 +192,7 @@ interface CourseDao {
 
     // ── Scheme cascade deletion ──
 
-    @Query("DELETE FROM homework WHERE schemeId = :schemeId")
+    @Query("DELETE FROM homework WHERE schemeId = :schemeId AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun deleteHomeworkByScheme(schemeId: Long)
 
     @Query("DELETE FROM tasks WHERE schemeId = :schemeId")

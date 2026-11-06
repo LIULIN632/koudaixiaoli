@@ -57,6 +57,42 @@ import org.json.JSONObject
  * 同一屏 30 秒内不重复请求（[REALTIME_TTL_MILLIS]）、并发用 [fetchMutex] 合流
  * （连点刷新只发一次）、附近站列表一天一次（[STATIONS_TTL_MILLIS]）。
  */
+
+/**
+ * 这次抓取**为什么**没拿到看板 —— 界面据此决定该让用户去查网络，还是实话说是接口。
+ *
+ * ⚠️ 实测记录（2026-11-06）：`https://h5.mygolbs.com/ApiData.do` 对 CMD=105 与 CMD=106
+ * 都回同一段 44 字符的 base64（换站名、换坐标、改 GET、加浏览器 UA 都一样，HTTP 仍是 200），
+ * 已经不是 2026-11-04 抓到那份明文 JSON（`MygolbsParseTest` 的夹具就是当时抓的）。
+ * 本项目不猜加密签名（与不接车来了同一条纪律，见 `memory/01-constraints.md`），
+ * 所以这里能做的只有**把失败说准**：接口应答了，就不是用户的网络问题。
+ */
+enum class BusFetchProblem {
+    /** 请求没成 / HTTP 非 2xx。这时候"检查网络"才是对的话。 */
+    NO_RESPONSE,
+
+    /** 接口应答了，但给的内容读不出看板（解析失败或 `status` 不是 "1"）。 */
+    ANSWERED_WITHOUT_DATA,
+}
+
+/**
+ * 失败文案的唯一真源。
+ *
+ * 拆成纯函数是因为这三句话的**归因**正是最容易错的地方：把接口的事说成用户的网络，
+ * 用户会去重启路由器；把缓存说成实时，他会拿旧时刻表出门。
+ *
+ * @param hasCachedLines 屏幕上还留着上次刷到的线路 —— 这时必须一并说清"下面那批数字是上次的"。
+ */
+internal fun busFailureText(problem: BusFetchProblem, hasCachedLines: Boolean): String = when (problem) {
+    BusFetchProblem.NO_RESPONSE ->
+        if (hasCachedLines) "没能连上实时公交，下面是上次刷新到的到站信息"
+        else "没能连上实时公交，检查网络后再刷新"
+
+    BusFetchProblem.ANSWERED_WITHOUT_DATA ->
+        if (hasCachedLines) "实时公交接口这次没给回能用的数据（不是你的网络问题），下面是上次刷新到的到站信息"
+        else "实时公交接口这次没给回能用的数据（不是你的网络问题）"
+}
+
 class BusRepository(
     private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -102,8 +138,8 @@ class BusRepository(
         val current = _state.value
         if (!force && !isStale(current.capturedAtMillis)) return@withLock current
         _state.value = current.copy(loading = true, error = null)
-        val board = withContext(Dispatchers.IO) { fetchBoard(current.stationName) }
-        finish(current, board)
+        val outcome = withContext(Dispatchers.IO) { fetchBoard(current.stationName) }
+        finish(current, outcome)
     }
 
     /**
@@ -118,25 +154,22 @@ class BusRepository(
         return fetchMutex.withLock {
             val current = _state.value.copy(stationName = trimmed, lines = emptyList(), error = null)
             _state.value = current
-            val board = withContext(Dispatchers.IO) { fetchBoard(trimmed) }
-            finish(current, board)
+            val outcome = withContext(Dispatchers.IO) { fetchBoard(trimmed) }
+            finish(current, outcome)
         }
     }
 
-    /** 抓取失败时保留上一次的数据与时间戳，只加一句人话说明。 */
-    private fun finish(previous: State, board: BusBoard?): State {
-        val next = when {
-            board == null -> previous.copy(
+    /** 抓取失败时保留上一次的数据与时间戳，只加一句**说对原因**的话。 */
+    private fun finish(previous: State, outcome: BoardOutcome): State {
+        val next = when (outcome) {
+            is BoardOutcome.Failed -> previous.copy(
                 loading = false,
                 fromNetwork = false,
-                error = if (previous.lines.isEmpty()) {
-                    "没能连上实时公交，检查网络后再刷新"
-                } else {
-                    "没能连上实时公交，下面是上次刷新到的到站信息"
-                },
+                error = busFailureText(outcome.problem, previous.lines.isNotEmpty()),
             )
 
-            else -> {
+            is BoardOutcome.Loaded -> {
+                val board = outcome.board
                 val rejected = acceptReason(board, previous)
                 if (rejected != null) {
                     previous.copy(loading = false, fromNetwork = false, error = rejected)
@@ -155,14 +188,20 @@ class BusRepository(
     }
 
     /** 一次抓取 = CMD=105（本站线路 + 实时）；附近站过期时再补一发 CMD=106。 */
-    private fun fetchBoard(stationName: String): BusBoard? {
-        val raw = post(stationBoardForm(stationName)) ?: return null
+    private fun fetchBoard(stationName: String): BoardOutcome {
+        val raw = post(stationBoardForm(stationName))
+        if (raw == null) return BoardOutcome.Failed(BusFetchProblem.NO_RESPONSE)
         val lines = parseLines(raw)
         if (lines.isEmpty()) {
-            // 接口正常应答但这个站查不到线路：给一张空板子，让界面说实话，
-            // 而网络异常（拿不到 status）走 null 分支
+            // 接口正常应答但这个站查不到线路：给一张空板子，让界面说实话；
+            // 应答本身读不出 JSON（或 status 不是 "1"）→ 说清是**接口**没给回能用的数据，
+            // 不能让人去查自己的网络（见 BusFetchProblem 的实测记录）。
             val status = runCatching { JSONObject(raw).optString("status") }.getOrDefault("")
-            return if (status == "1") BusBoard(stationName, emptyList(), emptyList(), nowMillis(), true) else null
+            return if (status == "1") {
+                BoardOutcome.Loaded(BusBoard(stationName, emptyList(), emptyList(), nowMillis(), true))
+            } else {
+                BoardOutcome.Failed(BusFetchProblem.ANSWERED_WITHOUT_DATA)
+            }
         }
         val stations = if (stationsCapturedAt <= 0L ||
             nowMillis() - stationsCapturedAt > STATIONS_TTL_MILLIS
@@ -171,7 +210,19 @@ class BusRepository(
         } else {
             _state.value.stations
         }
-        return BusBoard(stationName, lines, stations, nowMillis(), true)
+        return BoardOutcome.Loaded(BusBoard(stationName, lines, stations, nowMillis(), true))
+    }
+
+    /**
+     * 一次抓取的两种下场。
+     *
+     * 改造前 `fetchBoard` 只返回 `BusBoard?`，"拿不到"就统一被 `finish` 说成"没能连上"——
+     * 可上游今天明明应答了（只是给的内容读不懂），把接口的事推成用户的网络，
+     * 用户会去重启路由器，而真正该说的是"这项服务这次取不到数"。
+     */
+    private sealed interface BoardOutcome {
+        data class Loaded(val board: BusBoard) : BoardOutcome
+        data class Failed(val problem: BusFetchProblem) : BoardOutcome
     }
 
     /** CMD=106：按学校锚点取附近站。失败返回 null（保留上次列表，不清空）。 */

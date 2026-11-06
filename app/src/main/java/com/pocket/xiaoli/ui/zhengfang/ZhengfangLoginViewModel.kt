@@ -86,9 +86,9 @@ abstract class ZhengfangLoginViewModel(
 ) : ViewModel(), ZhengfangLoginState {
 
     // ── 学校选择（专用客户端：锁定当前校区学校）──
-    private val campusSchool: School? = appContainer.currentCampusSchool()
-    override val campusOnly: Boolean get() = campusSchool != null
-    protected val _selectedSchool = MutableStateFlow<School?>(campusSchool)
+    private val lockedSchool: School? = appContainer.currentAcademicSchool()
+    override val campusOnly: Boolean get() = lockedSchool != null
+    protected val _selectedSchool = MutableStateFlow<School?>(lockedSchool)
     override val selectedSchool: StateFlow<School?> = _selectedSchool
 
     /** 绑定信息里的账号：优先当前学校教务地址，兼容旧的 campus_bind 键 */
@@ -116,7 +116,7 @@ abstract class ZhengfangLoginViewModel(
         _searchQuery, appContainer.favoriteSchoolIds, appContainer.customSchools
     ) { query, favIds, customs ->
         if (campusOnly) {
-            return@combine listOfNotNull(campusSchool)
+            return@combine listOfNotNull(lockedSchool)
         }
         val registrySchools = schoolRegistry.filter(JwSystemType.ZHENGFANG, query)
         val matchingCustoms = customs.filter {
@@ -142,7 +142,7 @@ abstract class ZhengfangLoginViewModel(
     override val error: StateFlow<String?> = _error
 
     init {
-        boundCredentialFor(campusSchool)?.let { cred ->
+        boundCredentialFor(lockedSchool)?.let { cred ->
             _username.value = cred.first
             _password.value = cred.second
         }
@@ -164,7 +164,7 @@ abstract class ZhengfangLoginViewModel(
     override fun updateSearch(query: String) { _searchQuery.value = query }
 
     override fun selectSchool(school: School) {
-        if (campusOnly && school.id != campusSchool?.id) return
+        if (campusOnly && school.id != lockedSchool?.id) return
         _selectedSchool.value = school
         // 自动回填已记忆的账号密码
         val cred = boundCredentialFor(school)

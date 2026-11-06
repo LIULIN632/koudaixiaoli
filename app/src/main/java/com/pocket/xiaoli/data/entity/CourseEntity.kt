@@ -64,6 +64,15 @@ data class CourseEntity(
      * 照岱宗 `CustomCourseEntity.courseType`（"日程" / "自定义"）设计。
      */
     val kind: String = KIND_COURSE,
+
+    /**
+     * 这份数据属于哪所学校（`SchoolScope.current(context)` 的 id）。
+     *
+     * 空串 = 老数据或插入时没打标，由 `app_state` + 触发器补上（见 `MIGRATION_21_22`）；
+     * 读取必须带 `schoolId = (SELECT schoolId FROM app_state WHERE id = 1)`，
+     * 否则换学校后会把别校的数据显示出来。
+     */
+    val schoolId: String = "",
 ) {
     /** 是否是用户自建日程（不是课）。 */
     val isAgenda: Boolean get() = kind == KIND_AGENDA
@@ -98,5 +107,7 @@ data class CourseEntity(
 data class TimeSlotEntity(
     @PrimaryKey val slot: Int,    // 1-12
     val startTime: String,        // "08:00"
-    val endTime: String           // "08:45"
+    val endTime: String,          // "08:45"
+    /** 所属学校；空串由 `AFTER INSERT` 触发器补成当前学校。 */
+    val schoolId: String = "",
 )

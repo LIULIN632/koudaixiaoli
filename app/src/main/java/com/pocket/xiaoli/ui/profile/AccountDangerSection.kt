@@ -80,7 +80,13 @@ internal data class PendingDanger(
  * 靠人工维持一致）。搬到这儿之后测试直接调这个函数，改文案只需改一处。
  */
 internal data class AccountDangerStates(
-    /** 校区名，进「解绑教务」那条的文案。 */
+    /**
+     * 「解绑教务」那条里写的学校名。
+     *
+     * 参数名仍叫 campusName（测试与调用点都按这个名字传），但传进来的值 2026-11-05 起
+     * 是**学校名**：凭据早已按 `currentAcademicSchool().baseUrl` 存，文案写校区名会把
+     * 未收录学校说成烟台理工，而删的是另一所学校的账号。
+     */
     val campusName: String,
     val jwBound: Boolean,
     /** null = 还没查过；只有确认已登录（true）才给"退出登录态"那条。 */

@@ -315,6 +315,18 @@ fun TreasureBoxScreen(
     val courseware by CoursewareRepository.state.collectAsStateWithLifecycle()
     val selectedCampus by appContainer.selectedCampus.collectAsStateWithLifecycle()
     val dormInfo by appContainer.dormInfo.collectAsStateWithLifecycle()
+    // ── 当前**学校**这一层的事实（判服务格子的可见性）──
+    //
+    // `selectedCampus` 对学校没收录时会静默回退到烟台理工本校区，所以它不能回答
+    // "这所学校配了没有"；判据必须是学校 id，两个 flow 一起 collect 才能让自建学校也跟上。
+    val academicSchoolId by appContainer.academicSchoolId.collectAsStateWithLifecycle()
+    val customSchools by appContainer.customSchools.collectAsStateWithLifecycle()
+    val scopeFacts = remember(academicSchoolId, customSchools) {
+        serviceScopeFacts(
+            school = appContainer.currentAcademicSchool(),
+            campus = appContainer.campusForCurrentSchool(),
+        )
+    }
     // ⚠️ 必须 collect 而不是读 `store.current`：后者不参与快照系统，拨了开关不会触发重组
     //（与 `TabAppearanceStore` KDoc 里那条"读 prefs 改了不重组"是同一个坑）。
     val tabAppearance by appContainer.tabAppearanceStore.state.collectAsStateWithLifecycle()
@@ -328,8 +340,12 @@ fun TreasureBoxScreen(
     val taskTotal = tasks.size
 
     val serviceSummaries = remember { mutableStateMapOf<String, ServiceSummary>() }
-    LaunchedEffect(selectedCampus.id, dormInfo) {
+    LaunchedEffect(selectedCampus.id, dormInfo, scopeFacts.campusConfigReady) {
         serviceSummaries.clear()
+        // ⚠️ 学校没配校区时**一条摘要都不拉**：这几条摘要会拿用户存的账号去打
+        // `selectedCampus` 的服务系统，而那个校区对未收录学校是借来的烟台理工本校区 ——
+        // 结果是别人的账单页/余额显示在他的服务页上。格子已经按学校过滤掉了，这里补上数据层那道闸。
+        if (!scopeFacts.campusConfigReady) return@LaunchedEffect
         DormServiceRouter.dormServiceKeys.forEach { key ->
             CampusServiceAdapterRegistry.loadSummary(
                 key = key,
@@ -374,6 +390,16 @@ fun TreasureBoxScreen(
     }
 
     fun openCampusService(key: String, title: String) {
+        // ⚠️ **第二道闸**，不是主判据：要靠校区配置的格子已经按学校过滤掉了
+        //（`ServiceScope.CAMPUS_CONFIG` → `visibleSections`），正常路径走不到这里。
+        // 留着它是因为"加一格但忘了标 scope"这种漏法没有便宜的测法（入口列表内联在 composable 里），
+        // 而漏掉的后果是拿别人的配置当这所学校的 —— 宁可在这里说一句实话。
+        // 判据与「绑定信息 → 学校」那句提示、地图入口、`ProfileScreen.openProfileService` 同源
+        //（`currentSchoolHasCampusConfig`）。
+        if (!appContainer.currentSchoolHasCampusConfig()) {
+            Toast.makeText(context, "这所学校的校园服务还没收录", Toast.LENGTH_SHORT).show()
+            return
+        }
         // 今日校园：**装了官方 App 就直接拉起**（需求方反馈："还是网页的那种形式，
         // 不是手机 App 那个"）；没装才进我们的入口页 —— 那一页的活儿是
         // 门户登录态、服务直达、初始密码，以及"去应用商店安装"。
@@ -445,6 +471,7 @@ fun TreasureBoxScreen(
         ElectricityScreen(
             dormInfo = dormInfo,
             fallbackCampus = selectedCampus,
+            usageStore = appContainer.electricityUsageStore,
             onBack = { subPage = null },
             onOpenWeb = { url, t ->
                 if (onOpenServiceWeb != null) onOpenServiceWeb.invoke(url, t) else openUrl(context, url)
@@ -616,6 +643,7 @@ fun TreasureBoxScreen(
     if (subPage == ServiceSubPage.Weather) {
         WeatherScreen(
             repository = appContainer.weatherRepository,
+            anchor = appContainer.weatherAnchorForCurrentSchool(),
             onBack = { subPage = null },
         )
         return
@@ -791,10 +819,12 @@ fun TreasureBoxScreen(
                 ServiceEntry("修课情况", "学分 · 绩点 · 培养方案", Icons.Outlined.Info, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Info, accent = ServiceAccent.ACADEMIC) {
                     subPage = ServiceSubPage.AcademicQuery
                 },
-                ServiceEntry("评教", "教学评价 · 问卷", Icons.Outlined.RateReview, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.RateReview, accent = ServiceAccent.ACADEMIC) {
+                ServiceEntry("评教", "教学评价 · 问卷", Icons.Outlined.RateReview, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.RateReview, accent = ServiceAccent.ACADEMIC,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.EVALUATION, "评教")
                 },
-                ServiceEntry("到梦空间", "第二课堂 · 活动报名", Icons.Outlined.EmojiEvents, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.EmojiEvents, accent = ServiceAccent.STUDY) {
+                ServiceEntry("到梦空间", "第二课堂 · 活动报名", Icons.Outlined.EmojiEvents, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.EmojiEvents, accent = ServiceAccent.STUDY,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     // 不直开网页：那是个 min-width:1200px 的桌面站，而且登录只有扫码，
                     // 二维码显示在这台手机上 —— 扫不了自己。先给一屏说清状况的入口页。
                     subPage = ServiceSubPage.SecondClass
@@ -802,7 +832,7 @@ fun TreasureBoxScreen(
                 // 校园跑（支付宝阳光跑）：一键打开签到小程序，省掉在操场排队等"开页面"。
                 // 这一格**只有配了直达链接的校区才渲染**（过滤在下面的 `sections`），
                 // 链接按校区配在 `CampusServiceRegistry.SCHOOL_RUN_ALIPAY`。
-                ServiceEntry("校园跑", "支付宝阳光跑 · 一键打开", Icons.Outlined.DirectionsRun, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsRun, accent = ServiceAccent.STUDY, serviceKey = CampusServiceKeys.SCHOOL_RUN, aliases = listOf("阳光跑", "跑步打卡", "乐跑", "体育")) {
+                ServiceEntry("校园跑", "支付宝阳光跑 · 一键打开", Icons.Outlined.DirectionsRun, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsRun, accent = ServiceAccent.STUDY, serviceKey = CampusServiceKeys.SCHOOL_RUN, scope = ServiceScope.CAMPUS_CONFIG, aliases = listOf("阳光跑", "跑步打卡", "乐跑", "体育")) {
                     openCampusService(CampusServiceKeys.SCHOOL_RUN, "校园跑")
                 },
                 ServiceEntry("学习通", "网课 · 作业 · 考试", Icons.AutoMirrored.Outlined.MenuBook, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.MenuBook, accent = ServiceAccent.STUDY) {
@@ -818,7 +848,8 @@ fun TreasureBoxScreen(
                     val url = LearningPlatform.ZHIHUISHU.loginUrl
                     if (onOpenServiceWeb != null) onOpenServiceWeb(url, "知到") else openUrl(context, url)
                 },
-                ServiceEntry("图书馆", "馆藏 · 借阅 · 座位", Icons.Outlined.Bookmarks, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Bookmarks, accent = ServiceAccent.QUERY) {
+                ServiceEntry("图书馆", "馆藏 · 借阅 · 座位", Icons.Outlined.Bookmarks, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Bookmarks, accent = ServiceAccent.QUERY,
+                    scope = ServiceScope.ANCHORED_SCHOOL) {
                     subPage = ServiceSubPage.Library
                 },
                 ServiceEntry("学习笔记", "本地笔记 · 后续公开共享", Icons.Outlined.Checklist, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Checklist, accent = ServiceAccent.STUDY) {
@@ -843,7 +874,8 @@ fun TreasureBoxScreen(
                 // ⚠️ 座位**不再单独占一格**：座位入口在「图书馆」页内（`LibraryScreen` 的原生
                 // 座位动作）。这里曾经并列一张「图书馆座位」卡，与图书馆页里那条动作指向同一个
                 // `ServiceSubPage.LibrarySeat`，用户看到两张卡会犹豫点哪个 —— 2026-10 反馈。
-                ServiceEntry("空教室查询", "找自习室 · 空闲教室", Icons.Outlined.MeetingRoom, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.MeetingRoom, accent = ServiceAccent.QUERY) {
+                ServiceEntry("空教室查询", "找自习室 · 空闲教室", Icons.Outlined.MeetingRoom, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.MeetingRoom, accent = ServiceAccent.QUERY,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.CLASSROOM, "空教室查询")
                 },
                 ServiceEntry("考试安排", "粘贴通知 · 自动识别 · 加入待办", Icons.AutoMirrored.Outlined.EventNote, Color.Unspecified, Color.Unspecified, iconFilled = Icons.AutoMirrored.Filled.EventNote, accent = ServiceAccent.ACADEMIC) {
@@ -861,7 +893,8 @@ fun TreasureBoxScreen(
                 ServiceEntry("普通话考试", "报名 · 成绩查询", Icons.Outlined.RecordVoiceOver, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.RecordVoiceOver, accent = ServiceAccent.ACADEMIC) {
                     openUrl(context, "https://bm.cltt.org/")
                 },
-                ServiceEntry("转专业", "政策 · 申请 · 结果", Icons.Outlined.SwapHoriz, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.SwapHoriz, accent = ServiceAccent.ACADEMIC) {
+                ServiceEntry("转专业", "政策 · 申请 · 结果", Icons.Outlined.SwapHoriz, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.SwapHoriz, accent = ServiceAccent.ACADEMIC,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.TRANSFER_MAJOR, "转专业")
                 },
                 ServiceEntry("专升本", "政策 · 报名 · 合作推广", Icons.Outlined.Upgrade, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Upgrade, accent = ServiceAccent.ACADEMIC) {
@@ -883,18 +916,21 @@ fun TreasureBoxScreen(
             entries = listOf(
                 // 天气放生活区第一格：出门前看一眼是高频动作，不该埋在中段。
                 // 数据源是 Open-Meteo（免 Key、开源），坐标是烟台市 —— 见 WeatherScreen 的 KDoc。
-                ServiceEntry("天气", "实时 · 24 小时 · 7 天", Icons.Outlined.WbSunny, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.WbSunny, accent = ServiceAccent.QUERY) {
+                ServiceEntry("天气", "实时 · 24 小时 · 7 天", Icons.Outlined.WbSunny, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.WbSunny, accent = ServiceAccent.QUERY,
+                    scope = ServiceScope.CITY_DATA) {
                     subPage = ServiceSubPage.Weather
                 },
                 // 公交到站紧跟天气：两格都是「出门前看一眼」，也都只打一个免 Key、无 SDK 的公开接口。
                 // 数据源与取舍写在 `data/bus/BusRepository.kt` 的 KDoc（含为什么不走车来了）。
-                ServiceEntry("公交到站", "本校站 · 下一班还有几站", Icons.Outlined.Tram, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Tram, accent = ServiceAccent.QUERY) {
+                ServiceEntry("公交到站", "本校站 · 下一班还有几站", Icons.Outlined.Tram, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Tram, accent = ServiceAccent.QUERY,
+                    scope = ServiceScope.ANCHORED_SCHOOL) {
                     subPage = ServiceSubPage.BusArrival
                 },
-                ServiceEntry("校园卡", "余额 · 充值 · 消费", Icons.Outlined.CreditCard, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.CreditCard, accent = ServiceAccent.PAYMENT) {
+                ServiceEntry("校园卡", "余额 · 充值 · 消费", Icons.Outlined.CreditCard, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.CreditCard, accent = ServiceAccent.PAYMENT,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.CAMPUS_CARD, "校园卡")
                 },
-                ServiceEntry("烟台乘车码", "公交 · 扫码乘车", Icons.Outlined.DirectionsBus, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsBus, accent = ServiceAccent.PAYMENT, serviceKey = CampusServiceKeys.TRANSIT_CODE) {
+                ServiceEntry("烟台乘车码", "公交 · 扫码乘车", Icons.Outlined.DirectionsBus, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsBus, accent = ServiceAccent.PAYMENT, serviceKey = CampusServiceKeys.TRANSIT_CODE, scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.TRANSIT_CODE, "烟台乘车码")
                 },
                 ServiceEntry(
@@ -902,44 +938,58 @@ fun TreasureBoxScreen(
                     "当前：${DormServiceRouter.serviceCampus(dormInfo, selectedCampus).laundryProvider ?: selectedCampus.laundryProvider ?: "待配置"}",
                     Icons.Outlined.LocalLaundryService,
                     Color.Unspecified,
-                    Color.Unspecified, iconFilled = Icons.Filled.LocalLaundryService, accent = ServiceAccent.LIFE
+                    Color.Unspecified, iconFilled = Icons.Filled.LocalLaundryService,
+                    accent = ServiceAccent.LIFE, scope = ServiceScope.CAMPUS_CONFIG
                 ) {
                     openCampusService(CampusConfig.SERVICE_LAUNDRY, "洗衣")
                 },
-                ServiceEntry("校园网", "认证 · 套餐 · 故障", Icons.Outlined.Wifi, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Wifi, accent = ServiceAccent.LIFE) {
+                ServiceEntry("校园网", "认证 · 套餐 · 故障", Icons.Outlined.Wifi, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Wifi, accent = ServiceAccent.LIFE,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.NETWORK, "校园网")
                 },
                 ServiceEntry("快递", "淘宝 / 拼多多取件码", Icons.Outlined.LocalShipping, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.LocalShipping, accent = ServiceAccent.LIFE) {
                     subPage = ServiceSubPage.ExpressPickup
                 },
-                ServiceEntry("通知公告", "学校通知 · 学院公告", Icons.Outlined.Campaign, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Campaign, accent = ServiceAccent.INFO) {
+                ServiceEntry("通知公告", "学校通知 · 学院公告", Icons.Outlined.Campaign, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Campaign, accent = ServiceAccent.INFO,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.NOTICE, "通知公告")
                 },
-                ServiceEntry("宿舍电费", dormInfo?.label?.let { "已绑定 $it" } ?: "余额 · 充值 · 用电", Icons.Outlined.FlashOn, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.FlashOn, accent = ServiceAccent.ENERGY) {
+                ServiceEntry("宿舍电费", dormInfo?.label?.let { "已绑定 $it" } ?: "余额 · 充值 · 用电", Icons.Outlined.FlashOn, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.FlashOn, accent = ServiceAccent.ENERGY,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.ELECTRICITY, "宿舍电费")
                 },
                 // ⚠️ 副标题**不要写「预约」**。趣智校园的公开接口里没有预约能力
                 //（26 个接口只有查询设备 / 开阀 / 关阀），承诺一个做不到的功能是对用户撒谎。
                 // 这里走的是原有的「跳趣智校园 App」路径；原生控制页在「我的 → 洗澡」。
-                ServiceEntry("洗澡", "澡堂 · 淋浴 · 热水", Icons.Outlined.HotTub, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.HotTub, accent = ServiceAccent.LIFE) {
+                ServiceEntry("洗澡", "澡堂 · 淋浴 · 热水", Icons.Outlined.HotTub, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.HotTub, accent = ServiceAccent.LIFE,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.SHOWER, "洗澡")
                 },
-                ServiceEntry("热水", "直饮水 · 热水机", Icons.Outlined.LocalFireDepartment, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.LocalFireDepartment, accent = ServiceAccent.LIFE) {
+                ServiceEntry("热水", "直饮水 · 热水机", Icons.Outlined.LocalFireDepartment, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.LocalFireDepartment, accent = ServiceAccent.LIFE,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.HOT_WATER, "热水")
                 },
-                ServiceEntry("报修", "宿舍 · 教室 · 网络", Icons.Outlined.Build, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Build, accent = ServiceAccent.LIFE) {
+                ServiceEntry("报修", "宿舍 · 教室 · 网络", Icons.Outlined.Build, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Build, accent = ServiceAccent.LIFE,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.REPAIR, "报修")
                 },
                 ServiceEntry("返乡大巴", "线路参考 · 合作推广", Icons.Outlined.DirectionsBus, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsBus, accent = ServiceAccent.INFO) {
                     subPage = ServiceSubPage.BusInfo
                 },
-                ServiceEntry("地图导航", "校园地点 · 外部导航", Icons.Outlined.Map, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Map, accent = ServiceAccent.INFO) {
-                    if (onOpenCampusMap != null) onOpenCampusMap() else openMap(context, selectedCampus.name)
+                ServiceEntry("地图导航", "校园地点 · 外部导航", Icons.Outlined.Map, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Map, accent = ServiceAccent.INFO,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
+                    // 同一条判据：3D 地图与外部导航的检索词都来自校区配置，
+                    // 没收录的学校点进去会看到烟台理工的楼栋 —— 那是别人的校园，不是"地图没数据"。
+                    if (!appContainer.currentSchoolHasCampusConfig()) {
+                        Toast.makeText(context, "这所学校的校园地图还没收录", Toast.LENGTH_SHORT).show()
+                    } else if (onOpenCampusMap != null) onOpenCampusMap() else openMap(context, selectedCampus.name)
                 },
-                ServiceEntry("今日校园", "智慧校园 · 统一认证", Icons.Outlined.Today, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Today, accent = ServiceAccent.INFO) {
+                ServiceEntry("今日校园", "智慧校园 · 统一认证", Icons.Outlined.Today, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Today, accent = ServiceAccent.INFO,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceCatalog.KEY_TODAY_CAMPUS, "今日校园")
                 },
-                ServiceEntry("就业", "招聘 · 宣讲会 · 岗位", Icons.Outlined.Work, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Work, accent = ServiceAccent.INFO) {
+                ServiceEntry("就业", "招聘 · 宣讲会 · 岗位", Icons.Outlined.Work, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Work, accent = ServiceAccent.INFO,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     openCampusService(CampusServiceKeys.JOB, "就业")
                 },
                 ServiceEntry("今天吃什么", "随机抽签解决选择困难", Icons.Outlined.Restaurant, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Restaurant, accent = ServiceAccent.LIFE) {
@@ -995,7 +1045,8 @@ fun TreasureBoxScreen(
                 ServiceEntry("驾校", "学车流程 · 选校要点", Icons.Outlined.DirectionsCar, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.DirectionsCar, accent = ServiceAccent.INFO) {
                     subPage = ServiceSubPage.DrivingInfo
                 },
-                ServiceEntry("教室分布图", "楼栋 · 楼层 · 教室录入", Icons.Outlined.MeetingRoom, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.MeetingRoom, accent = ServiceAccent.QUERY) {
+                ServiceEntry("教室分布图", "楼栋 · 楼层 · 教室录入", Icons.Outlined.MeetingRoom, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.MeetingRoom, accent = ServiceAccent.QUERY,
+                    scope = ServiceScope.CAMPUS_CONFIG) {
                     onOpenRoomLayout?.invoke()
                 },
                 ServiceEntry("好物清单", "大学好物，早买早享受", Icons.Outlined.Star, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Star, accent = ServiceAccent.INFO) {
@@ -1072,28 +1123,20 @@ fun TreasureBoxScreen(
     // 判定全部委托 `CampusServiceResolver.capabilityOf`，与真正打开服务时走同一套
     // spec 查找与宿舍路由，所以不会出现"界面标着能用、点下去弹预留"。
     //
-    // ⚠️ 判定写成**顶层纯函数** `serviceEntryCapability(...)` 而不是这里的局部函数：
-    // 局部函数会把整个 composable 作用域捕获进 lambda，`remember` 的键就失去意义。
+    // ⚠️ 判定写成**顶层纯函数**而不是这里的局部函数：局部函数会把整个 composable 作用域
+    // 捕获进 lambda，`remember` 的键就失去意义。整条前处理管道现在收在 [visibleSections] 里
+    //（按学校过滤 → 去掉死格子 → 按能力排座次），那样它才**测得到** ——
+    // "未收录学校少了哪几格"以前只能靠人肉点一遍。
     //
     // 座次键必须**与能力有关**，否则切换宿舍楼（会改变生活服务走哪个校区）后
     // 顺序不会重算 —— 那正是"界面说能用、实际不能用"的另一种形态。
-    // `sortedBy` 是稳定排序，所以同档位内部保持作者手写的顺序。
-    val sections = remember(authoredSections, selectedCampus.id, dormInfo) {
-        authoredSections.map { section ->
-            section.copy(
-                entries = section.entries
-                    // 「校园跑」这类**纯直达格子**：没配链接就不出现。
-                    // 留着一格，点下去只会弹"暂未配置"——那是死格子，不是待接入。
-                    // （区别于健身房那种 INFO 格子：它有站内说明页，点开有内容。）
-                    .filterNot {
-                        it.serviceRegistryKey == CampusServiceKeys.SCHOOL_RUN &&
-                            serviceEntryCapability(it, selectedCampus, dormInfo) == CampusServiceCapability.INFO
-                    }
-                    .sortedBy {
-                        serviceEntryCapability(it, selectedCampus, dormInfo).sortRank
-                    }
-            )
-        }
+    //
+    // ⚠️ 档位判据读 `selectedCampus`，而它对**没收录的学校**会静默回退到烟台理工本校区，
+    // 于是档位永远说"能用"、点下去才吃到一句"这所学校还没收录"：先画一张假格子再用 Toast 收回它。
+    // 所以排档位之前先按**学校**过滤（[scopeFacts]）。常用服务与编辑弹窗读的是过滤后的
+    // `sections`，因此一并消失。
+    val sections = remember(authoredSections, selectedCampus.id, dormInfo, scopeFacts) {
+        visibleSections(authoredSections, scopeFacts, selectedCampus, dormInfo)
     }
 
     // ── 常用服务：用户自选，最多 4 个 ──

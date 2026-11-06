@@ -18,13 +18,12 @@ import kotlin.math.roundToInt
  * 本项目不引入任何第三方统计 SDK 的前提也成立：请求里只有坐标，
  * 没有设备号、没有账号、没有用户标识。
  *
- * ## 为什么坐标是「烟台市」而不是某个校区
+ * ## 为什么坐标是城市级而不是某个校区
  *
  * `CampusConfig` 里的校区**没有经纬度**，校园地图数据也明确写着
- * 「不要用猜测值填坐标」。所以这一版按**城市级**坐标请求
- *（[WEATHER_LATITUDE] / [WEATHER_LONGITUDE] 取自 Open-Meteo geocoding
- * 对英文名 "Yantai" 的返回：37.47649, 121.44081），页面上也如实写成「烟台」，
- * 不假装是校区实测。将来若拿到校区坐标，只改这两个常量即可。
+ * 「不要用猜测值填坐标」。所以取数按 [WEATHER_CITY_ANCHORS] 里那**一座城市**的坐标请求
+ *（按当前学校所在城市查表，来源见该 KDoc），页面也如实写「按烟台市的坐标请求（非校区实测）」，
+ * 不假装是校区实测。将来若拿到校区坐标，改的也是这张表，不是某个页面。
  *
  * ## 为什么这一份在共享核心里
  *
@@ -407,10 +406,54 @@ private fun JsonArray?.optStringAt(index: Int): String =
     runCatching { this?.get(index)?.let { if (it.isJsonNull) "" else it.asStringOrThrow("array") } ?: "" }
         .getOrDefault("")
 
-/** 请求的坐标：烟台市（城市级，来源见 [WeatherSnapshot] 的 KDoc）。 */
-const val WEATHER_LATITUDE = 37.47649
+/**
+ * 天气取数的**城市锚点** —— 这座城市叫什么、按哪对坐标请求。
+ *
+ * ## 为什么是"表"而不是两个常量
+ *
+ * 改造前这里写死烟台市一对坐标，于是天气页对任何学校都说"烟台"：
+ * 山东理工（淄博）与燕京理工（廊坊）的学生要么看不到天气，要么看到另一座城市的温度。
+ * 现在按学校所在城市查这张表；**查不到就不取数**（宁可少一格，不报一座错城）。
+ *
+ * ## 坐标来源（可复核）
+ *
+ * Open-Meteo geocoding 接口，`language=zh&format=json`，2026-11-06 实测：
+ * 烟台市 `1787093 → 37.47649, 121.44081`；淄博市 `1785286 → 36.79056, 118.06333`；
+ * 廊坊市 `1804540 → 39.52079, 116.71471`。都是**城市级**坐标，不是校区实测 ——
+ * `CampusConfig` 里没有经纬度，校园地图数据也明确写着"不要用猜测值填坐标"，
+ * 所以页面文案写「按烟台市的坐标请求（非校区实测）」，不假装是本校。
+ *
+ * ⚠️ 只用城市名查会踩坑：`name=烟台` 命中的是辽宁的烟台镇（40.60898, 122.66429），
+ * `name=廊坊` 直接查不到 —— 所以登记时按**市**名取值，键用学校 `city` 字段那种短名。
+ *
+ * @param cityKey 与 `School.city` 同形的短名（"烟台"），查表用。
+ * @param shortName 页面主标题用（"烟台 · 城市天气"）。
+ * @param fullName 脚注用（"按烟台市坐标请求"）—— 带"市"才与 geocoding 那条结果对得上。
+ */
+data class WeatherCityAnchor(
+    val cityKey: String,
+    val shortName: String,
+    val fullName: String,
+    val latitude: Double,
+    val longitude: Double,
+)
 
-const val WEATHER_LONGITUDE = 121.44081
+/** 已配好取数坐标的城市。加一所学校所在城市 = 往这里加一行，并补 [weatherAnchorForCity] 的测试。 */
+val WEATHER_CITY_ANCHORS: List<WeatherCityAnchor> = listOf(
+    WeatherCityAnchor("烟台", "烟台", "烟台市", 37.47649, 121.44081),
+    WeatherCityAnchor("淄博", "淄博", "淄博市", 36.79056, 118.06333),
+    WeatherCityAnchor("廊坊", "廊坊", "廊坊市", 39.52079, 116.71471),
+)
+
+/** 主场城市（烟台理工与桌面端都用它 —— 桌面端目前没有选校概念，调用点要自己说清）。 */
+val HOME_CITY_WEATHER_ANCHOR: WeatherCityAnchor = WEATHER_CITY_ANCHORS.first()
+
+/** 按学校填的城市名查锚点；**没配的城市返回 null**，调用方必须处理（拿默认城市兜底等于报错城）。 */
+fun weatherAnchorForCity(city: String?): WeatherCityAnchor? =
+    city?.trim()?.takeIf { it.isNotEmpty() }?.let { key ->
+        // 允许 "烟台" / "烟台市" 两种写法：自建学校的城市是用户自己填的。
+        WEATHER_CITY_ANCHORS.firstOrNull { key == it.cityKey || key == it.fullName }
+    }
 
 /** 一次请求的小时条数上限。 */
 private const val HOURLY_COUNT = 24

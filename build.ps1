@@ -31,6 +31,18 @@
     沿用上一次的档位）；**-NoBump 同版本重打**则完全不动这个字段 —— 因为「10% → 50% →
     100%」这三档本来就只改 feed，不该重新打包。
 
+.PARAMETER Beta
+    出的是**内测包**：照常递增版本号、出包、校验签名，但**完全不动 feed**。
+
+    为什么需要它：`build.ps1` 默认会把刚打出来的版本同步进 `app` 块 —— 那是「稳定版已发」
+    的声明。内测包不能这么写：它比稳定版新、却没进稳定通道，写进 app 就是让所有客户端
+    都来下载一个"稳定版"，而那个地址还没传包（必然 404）。
+
+    正确顺序（见 docs/发版纪律.md §6）：
+        .\build.ps1 -Beta                    # 0.2.12 / vc113，feed 一个字都不动
+        pwsh tools/deploy/publish-gitee.ps1 -Version 0.2.12 -OnlyApk
+        pwsh tools/deploy/publish-beta.ps1 -Version 0.2.12 -Notes '内测 A|内测 B' -Push
+
 .EXAMPLE
     .\build.ps1
     递增版本号并打包。
@@ -42,12 +54,17 @@
 .EXAMPLE
     .\build.ps1 -Rollout 10
     打包并把这一版只放给 10% 的设备（其余人看不到更新提示，公告照常可见）。
+
+.EXAMPLE
+    .\build.ps1 -Beta
+    出内测包：递增版本号并打包，但不动 announce\feed.json（稳定版仍指向上一个版本）。
 #>
 [CmdletBinding()]
 param(
     [switch]$NoBump,
     [switch]$SkipSignCheck,
-    [ValidateRange(0, 100)][int]$Rollout
+    [ValidateRange(0, 100)][int]$Rollout,
+    [switch]$Beta
 )
 
 Set-StrictMode -Version Latest
@@ -285,7 +302,17 @@ if (-not $SkipSignCheck) {
 # 而"记得手改"在一个人维护的项目里就是一定会忘的那一步。
 Write-Step '同步 announce\feed.json'
 $FeedFile = Join-Path $Root 'announce\feed.json'
-if (-not (Test-Path $FeedFile)) {
+if ($Beta) {
+    # 内测包：包已经打好了，但 feed 一个字节都不能动。
+    # 写进 app 块就等于宣布"稳定版是这个版本"，而它的附件地址还没传（客户端会 404）；
+    # 写进 beta 块也不该在这做 —— 那要等 APK 传到发行版之后由 publish-beta.ps1 写，
+    # 它才能顺手校验 sha256 与远端回验。这里只把接下来要跑的两条命令打出来。
+    Write-Warn '内测包模式：不修改 announce\feed.json（稳定版仍指向上一个版本）'
+    Write-Info "  包：$apkPath"
+    Write-Info '  下一步：'
+    Write-Info "    pwsh tools/deploy/publish-gitee.ps1 -Version $newVn -OnlyApk"
+    Write-Info "    pwsh tools/deploy/publish-beta.ps1 -Version $newVn -Notes '内测 A|内测 B' -Push"
+} elseif (-not (Test-Path $FeedFile)) {
     Write-Warn "找不到 $FeedFile，跳过（客户端将退回读 Release 的老路）"
 } else {
     $feedRaw = Get-Content $FeedFile -Raw -Encoding UTF8
@@ -320,6 +347,18 @@ if (-not (Test-Path $FeedFile)) {
     $feedRaw = [regex]::Replace($feedRaw, '("versionName"\s*:\s*)"[^"]*"', "`${1}`"$newVn`"")
     $feedRaw = [regex]::Replace($feedRaw, '("apkUrl"\s*:\s*)"[^"]*"', "`${1}`"$apkUrl`"")
     $feedRaw = [regex]::Replace($feedRaw, '("sha256"\s*:\s*)"[^"]*"', "`${1}`"$apkSha`"")
+
+    # 发布时间：以前 build.ps1 与 release.ps1 **都不写**这个字段，于是 feed 上永远挂着
+    # 第一次手写的那一天（实测停在 2026-10-19），客户端「更新时间」长期是错的。
+    # 只在真的升了版本时刷 —— -NoBump 同版本重打不该让时间跳一下。
+    if ($newVc -ne $oldVc) {
+        $stamp = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
+        $rxPublished = [regex]'("publishedAt"\s*:\s*)"[^"]*"'
+        if ($rxPublished.IsMatch($feedRaw)) {
+            # 只换第一处：desktop 块也有同名字段，它有自己的发布节奏
+            $feedRaw = $rxPublished.Replace($feedRaw, "`${1}`"$stamp`"", 1)
+        }
+    }
 
     # 灰度档位（app.rollout）—— 客户端拿它决定「这台设备此刻看不看得到这一版」，
     # 判定见 AppFeedView.build + ReleaseGate.isRolloutHit。

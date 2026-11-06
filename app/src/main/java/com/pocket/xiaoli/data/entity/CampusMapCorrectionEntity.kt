@@ -18,4 +18,6 @@ data class CampusMapCorrectionEntity(
     @ColumnInfo(name = "floor_id") val floorId: String? = null,
     @ColumnInfo(name = "payload") val payload: String = "",
     @ColumnInfo(name = "updated_at") val updatedAt: Long = 0L,
+    /** 所属学校；空串由触发器补标。 */
+    val schoolId: String = "",
 )

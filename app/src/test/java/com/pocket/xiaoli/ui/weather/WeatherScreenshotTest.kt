@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.pocket.xiaoli.core.weather.HOME_CITY_WEATHER_ANCHOR
 import com.pocket.xiaoli.core.weather.WeatherCurrent
 import com.pocket.xiaoli.core.weather.WeatherDay
 import com.pocket.xiaoli.core.weather.WeatherHour
@@ -153,13 +154,13 @@ class WeatherScreenshotTest {
 
     @Test
     fun `天气页 顶部`() {
-        render { WeatherContent(sampleSnapshot()) }
+        render { WeatherContent(sampleSnapshot(), HOME_CITY_WEATHER_ANCHOR) }
         composeRule.onRoot().captureRoboImage("src/test/screenshots/260-weather-vivid.png")
     }
 
     @Test
     fun `天气页 滚动到下半屏`() {
-        render { WeatherContent(sampleSnapshot()) }
+        render { WeatherContent(sampleSnapshot(), HOME_CITY_WEATHER_ANCHOR) }
         // 滚到页脚署名的第二行（整页最底），`今日详情` 整张卡与两行署名会一起进入视野；
         // 只滚到「今日详情」标题的话标题会贴在屏幕最底，卡里的瓦片一张都拍不到。
         composeRule.onNodeWithText("按烟台市坐标请求（非校区实测）· 更新于 22:45").performScrollTo()
@@ -169,13 +170,13 @@ class WeatherScreenshotTest {
 
     @Test
     fun `天气页 深色`() {
-        render(dark = true) { WeatherContent(sampleSnapshot()) }
+        render(dark = true) { WeatherContent(sampleSnapshot(), HOME_CITY_WEATHER_ANCHOR) }
         composeRule.onRoot().captureRoboImage("src/test/screenshots/262-weather-dark.png")
     }
 
     @Test
     fun `天气页 极简皮肤`() {
-        render(skin = SkinStyle.MINIMAL) { WeatherContent(sampleSnapshot()) }
+        render(skin = SkinStyle.MINIMAL) { WeatherContent(sampleSnapshot(), HOME_CITY_WEATHER_ANCHOR) }
         composeRule.onRoot().captureRoboImage("src/test/screenshots/263-weather-minimal.png")
     }
 
@@ -184,6 +185,7 @@ class WeatherScreenshotTest {
         render {
             WeatherContent(
                 snapshot = sampleSnapshot(),
+                anchor = HOME_CITY_WEATHER_ANCHOR,
                 staleMessage = "无法连接天气服务，请检查网络后重试",
             )
         }
@@ -193,7 +195,7 @@ class WeatherScreenshotTest {
     /** 360dp 窄屏：守 7 天列表的六列挤压与 hero 的三枚胶囊。 */
     @Test
     fun `天气页 360dp 窄屏`() {
-        render(width = 360.dp) { WeatherContent(sampleSnapshot()) }
+        render(width = 360.dp) { WeatherContent(sampleSnapshot(), HOME_CITY_WEATHER_ANCHOR) }
         composeRule.onRoot().captureRoboImage("src/test/screenshots/265-narrow360-weather.png")
     }
 
@@ -204,7 +206,7 @@ class WeatherScreenshotTest {
      */
     @Test
     fun `天气页 字体放大`() {
-        render(fontScale = 1.3f) { WeatherContent(sampleSnapshot()) }
+        render(fontScale = 1.3f) { WeatherContent(sampleSnapshot(), HOME_CITY_WEATHER_ANCHOR) }
         composeRule.onRoot().captureRoboImage("src/test/screenshots/266-largefont-weather.png")
     }
 

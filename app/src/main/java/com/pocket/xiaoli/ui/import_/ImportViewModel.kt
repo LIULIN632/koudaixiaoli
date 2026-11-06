@@ -44,19 +44,19 @@ class ImportViewModel(
 
     private val _selectedSchool = MutableStateFlow<School?>(null)
     val selectedSchool: StateFlow<School?> = _selectedSchool
-    private val campusSchool: School? = appContainer.currentCampusSchool()
+    private val lockedSchool: School? = appContainer.currentAcademicSchool()
 
-    val campusOnly: Boolean get() = campusSchool != null
+    val campusOnly: Boolean get() = lockedSchool != null
 
     /** 已绑定账号：优先当前校区教务地址，兼容旧的 campus_bind。 */
-    val boundCredentials: Pair<String, String>? = campusSchool?.let { school ->
+    val boundCredentials: Pair<String, String>? = lockedSchool?.let { school ->
         appContainer.loadCredential(school.baseUrl) ?: appContainer.loadCredential("campus_bind")
     }
 
     val hasBoundAccount: Boolean get() = boundCredentials != null
 
     init {
-        campusSchool?.let { school ->
+        lockedSchool?.let { school ->
             _selectedSystem.value = school.jwType
             _selectedSchool.value = school
         } ?: run {
@@ -81,7 +81,7 @@ class ImportViewModel(
         _searchQuery, _selectedSystem, _favoriteIds, appContainer.customSchools
     ) { query, system, favIds, customSchools ->
         if (campusOnly) {
-            return@combine listOfNotNull(campusSchool).filter {
+            return@combine listOfNotNull(lockedSchool).filter {
                 query.isBlank() || it.name.contains(query, ignoreCase = true)
             }
         }
@@ -130,7 +130,7 @@ class ImportViewModel(
     }
 
     fun selectSchool(school: School?) {
-        if (campusOnly && school?.id != campusSchool?.id) return
+        if (campusOnly && school?.id != lockedSchool?.id) return
         _selectedSchool.value = school
     }
 

@@ -241,7 +241,9 @@ class AccountBindingScreenshotTest {
             passwordVisible = false,
             verify = BindingActionUi.Failed(
                 message = "学号或密码不正确，请核对后重试",
-                hint = "核对学号与密码后重试；改过密码请填新密码。教务系统维护时可选「仅保存」。",
+                // 与生产同一句来源（以前这里是手抄的字面量，改了会静默分叉）。
+                // 烟台理工在实测名单里 → 走 `loginProven = true` 那支，文案与改造前逐字相同。
+                hint = academicFailureHint(loginProven = true),
             ),
         ),
         // 验证进行中：转圈 + 进度文案（慢网下"有没有在跑"必须看得出来）

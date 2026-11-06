@@ -159,7 +159,7 @@ fun ServiceWebScreen(
         // 智慧校园与教务的密码经常只改一边，用教务那份去登校园服务会白填一次
         val credential = runCatching {
             container.loadCasCredential()
-                ?: container.currentCampusSchool()?.baseUrl?.let { base ->
+                ?: container.currentAcademicSchool()?.baseUrl?.let { base ->
                     container.loadCredential(base) ?: container.loadCredential("campus_bind")
                 }
         }.getOrNull() ?: return

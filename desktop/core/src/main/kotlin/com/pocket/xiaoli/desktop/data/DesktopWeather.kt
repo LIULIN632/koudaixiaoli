@@ -1,5 +1,6 @@
 package com.pocket.xiaoli.desktop.data
 
+import com.pocket.xiaoli.core.weather.HOME_CITY_WEATHER_ANCHOR
 import com.pocket.xiaoli.core.weather.WeatherRepository
 import com.pocket.xiaoli.core.weather.WeatherSnapshot
 import java.util.concurrent.TimeUnit
@@ -32,6 +33,10 @@ object DesktopWeather {
         force: Boolean = false,
     ): WeatherRepository.Result = WeatherRepository(
         store = StoreWeatherCache(read, write),
+        // 桌面端**固定烟台**：它没有选校概念，也就没有「这所学校在哪座城市」这件事。
+        // 核心故意把 anchorOf 做成必填 —— 每个端都要自己说清按哪座城取数，
+        // 将来桌面端接选校时改这一行即可，不会有一个静默默认留在核心里。
+        anchorOf = { HOME_CITY_WEATHER_ANCHOR },
         client = client,
     ).load(force)
 

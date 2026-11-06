@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,6 +72,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pocket.xiaoli.data.CampusConfig
+import com.pocket.xiaoli.data.school.SchoolOption
+import com.pocket.xiaoli.data.school.isLoginProven
+import com.pocket.xiaoli.data.school.schoolOptions
 import com.pocket.xiaoli.data.CampusInfo
 import com.pocket.xiaoli.data.jwTypeLabel
 import com.pocket.xiaoli.data.learning.LearningPlatform
@@ -152,7 +156,30 @@ fun AccountBindingScreen(
     val initialCred = remember(initialCampus.id) {
         initialCampus.jwBaseUrl?.let { container.loadCredential(it) }
     }
-    var campusId by remember { mutableStateOf(initialCampus.id) }
+    // 可接入的学校列表与首次引导共用同一份判据（`schoolOptions`）：
+    // 一边能选、一边不能选，用户就会以为两处说的是两套话。
+    val academicSchoolId by container.academicSchoolId.collectAsStateWithLifecycle()
+    val customSchoolsForOptions by container.customSchools.collectAsStateWithLifecycle()
+    val registrySchools = container.schoolRegistry.allSchools
+    val schoolChoices = remember(registrySchools, customSchoolsForOptions) {
+        schoolOptions(registrySchools + customSchoolsForOptions, CampusConfig.campuses)
+    }
+    // 当前接入的学校：没选过就是本校区的学校（老用户）
+    val currentSchoolId = academicSchoolId ?: initialCampus.schoolId.orEmpty()
+    // ── 学校这一层的三件事，全部**不许回退到默认校区** ──
+    //
+    // `container.selectedCampus` 对学校没收录的设备会静默兜底成烟台理工本校区
+    //（`CampusConfig.byId` 的默认回退）。改造前本页把它当校区真源用，于是：
+    // - 宿舍绑定的落盘键变成 `dorm_ytlg_main`（山东理工学生的宿舍编号存进烟台理工的档），
+    //   电费页拿别人的宿舍查别人的账户；
+    // - 「解绑教务」的文案写着烟台理工，删的却是另一所学校的凭据。
+    // 现在按**当前学校**取校区：没收录就是 null，调用方必须处理。
+    val currentSchool = remember(currentSchoolId, customSchoolsForOptions) {
+        container.currentAcademicSchool()
+    }
+    val campus = remember(currentSchoolId, customSchoolsForOptions) {
+        container.campusForCurrentSchool()
+    }
     var studentId by remember { mutableStateOf(initialCred?.first.orEmpty()) }
     var password by remember { mutableStateOf(initialCred?.second.orEmpty()) }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -164,9 +191,10 @@ fun AccountBindingScreen(
     // 改动字段时把验证结果清掉 —— 上一次的"✓ 账号密码正确"对**新填的**值不作数。
     var submitted by remember { mutableStateOf(false) }
     val verifyVm: AcademicVerifyViewModel = viewModel(
-        // 每个校区一个实例：VM 在构造时锁定 `currentCampusSchool()`，
-        // 复用同一个实例会导致"切了学校，验证还打旧学校"。
-        key = "academic_verify_$campusId",
+        // **按学校**分实例，不是按校区：VM 在构造时锁定 `currentAcademicSchool()`，
+        // 而换到一所没有配校区的学校（山东理工 / 燕京理工）时选中的校区并不会跟着变
+        //（未收录学校没有自己的校区），用校区当 key 就会复用旧实例 —— 结果是"学校换了、验证还打旧学校"。
+        key = "academic_verify_$currentSchoolId",
         factory = AcademicVerifyViewModel.Factory(
             container.zhengfangClient,
             container.schoolRegistry,
@@ -185,7 +213,7 @@ fun AccountBindingScreen(
         )
         verifyError != null -> BindingActionUi.Failed(
             message = verifyError!!,
-            hint = "核对学号与密码后重试；改过密码请填新密码。教务系统维护时可选「仅保存」。",
+            hint = academicFailureHint(currentSchool?.isLoginProven() == true),
         )
         else -> BindingActionUi.Idle
     }
@@ -195,14 +223,14 @@ fun AccountBindingScreen(
     // 待二次确认的销毁性操作（见 PendingDanger）。
     // 改造前这里是 `showUnbindConfirm: Boolean`，只有「解绑教务」用它。
     var pendingDanger by remember { mutableStateOf<PendingDanger?>(null) }
-    var dormBuilding by remember { mutableStateOf(container.dormInfoFor(initialCampus.id)?.building.orEmpty()) }
-    var dormRoom by remember { mutableStateOf(container.dormInfoFor(initialCampus.id)?.room.orEmpty()) }
+    var dormBuilding by remember { mutableStateOf(campus?.let { container.dormInfoFor(it.id) }?.building.orEmpty()) }
+    var dormRoom by remember { mutableStateOf(campus?.let { container.dormInfoFor(it.id) }?.room.orEmpty()) }
     var dormServiceCampusId by remember {
-        mutableStateOf(container.dormInfoFor(initialCampus.id)?.serviceCampusId.orEmpty())
+        mutableStateOf(campus?.let { container.dormInfoFor(it.id) }?.serviceCampusId.orEmpty())
     }
     // 缴费系统用的宿舍编号（见 DormInfo.dormCode）：与房间号分开存，可留空
     var dormCode by remember {
-        mutableStateOf(container.dormInfoFor(initialCampus.id)?.dormCode.orEmpty())
+        mutableStateOf(campus?.let { container.dormInfoFor(it.id) }?.dormCode.orEmpty())
     }
 
     // ── 今日校园（智慧校园统一认证）──
@@ -378,29 +406,41 @@ fun AccountBindingScreen(
         }
     }
 
-    val campus = CampusConfig.byId(campusId)
     val isBound = studentId.isNotBlank()
 
-    fun switchCampus(target: CampusInfo) {
-        if (target.underConstruction) return
-        // ⚠️ 立刻写回 AppContainer：验证用的 `AcademicVerifyViewModel` 在构造时读
-        // `currentCampusSchool()`（见基类），只改页面里的 `campusId` 不会让它换学校，
-        // 结果就是"界面上选了烟大，验证却还在打烟理"。下面 `viewModel(key = campusId)`
-        // 再按新校区取一个新的 VM。
-        container.setSelectedCampus(target.id)
-        campusId = target.id
-        val cred = target.jwBaseUrl?.let { container.loadCredential(it) }
-        studentId = cred?.first.orEmpty()
-        password = cred?.second.orEmpty()
-        val dorm = container.dormInfoFor(target.id)
-        dormBuilding = dorm?.building.orEmpty()
-        dormRoom = dorm?.room.orEmpty()
-        dormCode = dorm?.dormCode.orEmpty()
-        dormServiceCampusId = dorm?.serviceCampusId.orEmpty()
-        // ⚠️ 换校区必须清掉上一条验证结论：否则在新校区的表单下面还挂着
-        // 旧校区的「学号或密码不正确」，看着像是新填的这组账号被判了错。
-        submitted = false
-        verifyVm.reset()
+    /**
+     * 换接入的学校。动作与后果都在 [AppContainer.switchAcademicSchool] 里（教务真源、
+     * 校区、课表方案、显示校名四处一起改），这里只负责把**本页**的表单状态跟着刷一遍。
+     *
+     * 不需要二次确认：换回来就行 —— 旧学校的课表留在它自己的方案里，谁也没被删。
+     * 判据是那句老规矩：这一步做错了，用户自己恢复不了吗？
+     */
+    fun switchSchool(option: SchoolOption) {
+        if (option.id == currentSchoolId) return
+        val school = container.resolveSchoolById(option.id) ?: return
+        scope.launch {
+            container.switchAcademicSchool(school)
+            val cred = container.loadCredential(school.baseUrl)
+            studentId = cred?.first.orEmpty()
+            password = cred?.second.orEmpty()
+            // 宿舍跟着走**新学校名下的校区**：未收录就是 null，表单清空、入口也一起消失。
+            // 改造前这里是 `container.dormInfoFor(selectedCampus.value.id)`，
+            // 而那 id 对未收录学校还是烟台理工本校区 —— 换完学校表单里留着别人的楼栋。
+            val dorm = container.campusForCurrentSchool()?.let { container.dormInfoFor(it.id) }
+            dormBuilding = dorm?.building.orEmpty()
+            dormRoom = dorm?.room.orEmpty()
+            dormCode = dorm?.dormCode.orEmpty()
+            dormServiceCampusId = dorm?.serviceCampusId.orEmpty()
+            // 上一条验证结论对新学校不作数（与 switchCampus 同一条理由）
+            submitted = false
+            // 换校不等于清空：原学校的课表/成绩留在它自己的方案里，换回去还在。
+            // 这句提示是为了避免用户以为“换校把数据弄丢了”，而去找卸载重装。
+            Toast.makeText(
+                context,
+                "已切到${school.name}；原学校的课表与成绩仍保留，换回去还在",
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     /** 教务表单的**本地**校验（格式层面）。真验证在 [AcademicVerifyViewModel]。 */
@@ -416,29 +456,33 @@ fun AccountBindingScreen(
      *（那边的注释还写着"保存完回清单"）。现在两边一致：落盘 → 回清单。
      */
     fun persistAcademic(): Boolean {
-        val target = CampusConfig.byId(campusId)
-        if (target.underConstruction) return false
+        val school = container.currentAcademicSchool() ?: return false
         val sid = studentId.trim()
         if (sid.isBlank() || password.isBlank()) return false
-        container.setSelectedCampus(target.id)
-        // 学校名称由校区决定，不再让用户手填（旧字段已删）。
-        container.setSchool(target.schoolName.orEmpty())
+        container.setSchool(school.name)
+        // ⚠️ 凭据按**这所学校的教务地址**存，不再按校区。
+        // 改造前这里取的是 `CampusConfig.byId(campusId).jwBaseUrl`：换到一所没配校区的学校
+        //（山东理工 / 燕京理工）时 campusId 仍是本校，于是新学校的密码被存进烟台理工的键下，
+        // 下次自动登录直接打错教务系统 —— 用户看到的是"账号密码不正确"，锅却背在账号上。
+        container.saveCredential(school.baseUrl, sid, password)
+        // 旧的单值兜底键继续写：还有六处读它（ServiceWebScreen / TodayCampus / ProfileScreen…），
+        // 它们暂时仍按"这台设备最近一次绑定"来理解。
         container.saveCredential("campus_bind", sid, password)
-        target.jwBaseUrl?.let { container.saveCredential(it, sid, password) }
         onBoundChange()
         return true
     }
 
     fun unbind() {
-        val target = CampusConfig.byId(campusId)
-        target.jwBaseUrl?.let { container.deleteCredential(it) }
-        if (target.id == container.selectedCampus.value.id) {
+        val school = container.currentAcademicSchool()
+        val name = school?.name ?: savedSchool
+        school?.let { container.deleteCredential(it.baseUrl) }
+        if (school == null || school.id == container.currentCampusSchool()?.id) {
             container.deleteCredential("campus_bind")
         }
         studentId = ""
         password = ""
         onBoundChange()
-        Toast.makeText(context, "已解绑 ${target.name} 的教务账号", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "已解绑 $name 的教务账号", Toast.LENGTH_SHORT).show()
     }
 
     /** 当前打开的二级页；null = 停在主页面（绑定状态清单）。 */
@@ -458,7 +502,7 @@ fun AccountBindingScreen(
     // "有可管理的账号吗" —— 主页面入口与二级页那张卡共用同一个条件。
     // 用它把入口也一起挡掉：否则四个账号都没绑时，点进去会是一张空卡。
     val dangerStates = AccountDangerStates(
-        campusName = campus.name,
+        campusName = currentSchool?.name ?: campus?.name.orEmpty(),
         jwBound = isBound,
         portalLoggedIn = portalLoggedIn,
         casBound = casBound,
@@ -521,6 +565,7 @@ fun AccountBindingScreen(
                 visible = activeSubPage == null,
                 onNavigate = { subPage = it },
                 campus = campus,
+                schoolJwTypeLabel = currentSchool?.jwType?.label,
                 savedSchool = savedSchool,
                 isBound = isBound,
                 studentId = studentId,
@@ -554,25 +599,36 @@ fun AccountBindingScreen(
                 title = "学校",
                 subtitle = "选哪所学校，就用哪所学校的教务系统与校园服务",
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                    // 校区与教务是同一件事：选了学校就同时决定了教务地址和后面的服务商，
-                    // 不再让用户先选一次校区、再手填一次学校名称（那两处以前可以对不上）。
-                    CampusConfig.campuses
-                        .filterNot { it.underConstruction }
-                        .forEach { item ->
-                            FilterChip(
-                                selected = item.id == campusId,
-                                onClick = { switchCampus(item) },
-                                label = { Text(item.schoolName ?: item.name, fontSize = 13.sp) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = colors.accentMain,
-                                    selectedLabelColor = androidx.compose.ui.graphics.Color.White,
-                                ),
-                            )
-                        }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(skin.spaceSm),
+                ) {
+                    // 学校 = 教务地址 = 校园服务口径，一处决定；候选与首次引导同源（`schoolOptions`）。
+                    // 以前这里只列 `CampusConfig` 的两所校区，于是名单里那 10 所烟台院校和
+                    // 点名接入的山东理工、燕京理工**根本点不到** —— 数据可选、入口不可达。
+                    schoolChoices.forEach { option ->
+                        FilterChip(
+                            selected = option.id == currentSchoolId,
+                            onClick = { switchSchool(option) },
+                            label = { Text(option.name, fontSize = 13.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.accentMain,
+                                selectedLabelColor = androidx.compose.ui.graphics.Color.White,
+                            ),
+                        )
+                    }
                 }
+                val currentChoice = schoolChoices.firstOrNull { it.id == currentSchoolId }
                 Text(
-                    "当前：${campus.name} · ${campus.jwTypeLabel}",
+                    text = when {
+                        currentChoice == null -> "当前：$currentSchoolId"
+                        currentChoice.hasCampusConfig ->
+                            "当前：${currentChoice.name} · ${currentChoice.systemLabel}"
+                        // 没配校区的学校必须说清缺的是什么：否则用户往下翻找电费、洗衣入口，
+                        // 找到的是烟台理工的 —— 那不是降级，是拿别人的配置冒充他的学校。
+                        else ->
+                            "当前：${currentChoice.name} · 这所学校的校园服务与地图还没收录，课表和成绩照常可用"
+                    },
                     fontSize = 12.sp,
                     color = colors.textTertiary,
                 )
@@ -602,7 +658,10 @@ fun AccountBindingScreen(
                     studentIdError = studentIdError,
                     passwordError = passwordError,
                     verify = verifyState,
-                    canVerify = campus.jwBaseUrl != null,
+                    // 能不能验证只看**当前学校**有没有教务地址。改造前这里是 `campus.jwBaseUrl != null`，
+                    // 而那个校区对未收录学校是借来的烟台理工 —— 于是"能验证"是假的，
+                    // 点下去验证的却是另一所学校的教务系统。
+                    canVerify = currentSchool?.baseUrl?.isNotBlank() == true,
                     // 「验证并保存」：先本地校验（省一次注定失败的联网），再真的登一次。
                     // 登录成功时基类已把凭据写进本机，这里再把 campus_bind / 当前校区一并落盘。
                     onVerifyAndSave = {
@@ -643,30 +702,43 @@ fun AccountBindingScreen(
             // 改造前它是一个弹窗：一个完整表单（两个转轮 + 服务校区 + 编号输入 + 实时摘要 +
             // 保存/解绑）挤在 AlertDialog 里，转轮最高只给到 168dp，两段说明也没地方放。
             // 现在它是整页（DormBindingContent）：字段分组进卡、转轮放宽、说明各归其位。
-            if (activeSubPage == BindSubPage.DORM) {
+            //
+            // ⚠️ 只有**本校配了校区**才渲染这一页（清单里那一行也一起消失，见 BindingStatusCard）：
+            // 宿舍是按校区存的，未收录学校存进去的是烟台理工的档，电费页会拿别人的宿舍编号
+            // 查别人的账户 —— 少一个入口可以接受，给错数据不行。
+            val dormCampus = campus
+            if (activeSubPage == BindSubPage.DORM && dormCampus != null) {
                 DormBindingContent(
                     initialBuilding = dormBuilding,
                     initialRoom = dormRoom,
                     initialDormCode = dormCode,
-                    preferredCampusId = campusId,
+                    preferredCampusId = dormCampus.id,
                     canUnbind = dormBuilding.isNotBlank() || dormRoom.isNotBlank(),
                     onConfirm = { building, room, serviceCampusId, code ->
-                        dormBuilding = building
-                        dormRoom = room
-                        dormServiceCampusId = serviceCampusId.orEmpty()
-                        dormCode = code
-                        container.setDormInfoFor(campusId, building, room, serviceCampusId, code)
-                        Toast.makeText(context, "已保存宿舍 $building $room", Toast.LENGTH_SHORT).show()
+                        if (container.setDormInfoFor(dormCampus.id, building, room, serviceCampusId, code)) {
+                            dormBuilding = building
+                            dormRoom = room
+                            dormServiceCampusId = serviceCampusId.orEmpty()
+                            dormCode = code
+                            Toast.makeText(context, "已保存宿舍 $building $room", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // 提示必须跟着真结果：存不进去还说"已保存"，用户会带着一个
+                            // 没落盘的表单回清单，下次进来发现又是未绑定。
+                            Toast.makeText(context, "这所学校的宿舍服务还没收录", Toast.LENGTH_SHORT).show()
+                        }
                         // 保存完回清单 —— 用户进这一页的唯一目的就是把它绑好
                         subPage = null
                     },
                     onUnbind = {
-                        dormBuilding = ""
-                        dormRoom = ""
-                        dormServiceCampusId = ""
-                        dormCode = ""
-                        container.setDormInfoFor(campusId, "", "")
-                        Toast.makeText(context, "已解绑宿舍", Toast.LENGTH_SHORT).show()
+                        if (container.setDormInfoFor(dormCampus.id, "", "")) {
+                            dormBuilding = ""
+                            dormRoom = ""
+                            dormServiceCampusId = ""
+                            dormCode = ""
+                            Toast.makeText(context, "已解绑宿舍", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "这所学校的宿舍服务还没收录", Toast.LENGTH_SHORT).show()
+                        }
                         subPage = null
                     },
                 )
@@ -857,9 +929,49 @@ fun AccountBindingScreen(
  * 直接引用 `AppContainer.lastImport` 那条真实记录 —— 成功导入过课表本身就是账号能用的证据。
  * 宿舍不在三行之列（它有自己的一张卡），但也不该从总览里消失，收成末尾一行小字。
  */
+/**
+ * 教务验证失败时那句提示。
+ *
+ * ## 为什么按"这所学校实测过没有"分两句
+ *
+ * 正方是一套被很多学校采购的系统，在烟台理工跑通**不等于**在山东理工跑通（版本、路径、
+ * 验证码策略都可能不同）。以前失败只说"核对学号与密码后重试"，一所没实测过的学校的学生
+ * 就会反复改密码、怀疑自己记错了 —— 而真正的原因可能是这个 App 还没在这台服务器上验证过。
+ * 这句话只在**失败时**出现，不在选校列表里给每所学校挂「待验证」标签：逐校实测目前只有 1 所，
+ * 12 行里挂 11 个同样的标记，标记就变成装饰（与服务页角标那条纪律一致）。
+ *
+ * 文案是纯函数，快照测试与生产调用同一个来源 —— 以前测试里那份是手抄的字面量，改了会静默分叉。
+ */
+internal fun academicFailureHint(loginProven: Boolean): String =
+    if (loginProven) {
+        "核对学号与密码后重试；改过密码请填新密码。教务系统维护时可选「仅保存」。"
+    } else {
+        "核对学号与密码后重试；改过密码请填新密码。" +
+            "这所学校的教务登录本 App 还没实测过，失败未必是你的账号问题 —— 可先「仅保存」，再试网页导入。"
+    }
+
+/**
+ * 「五项都已绑好」那句里的中文数词。
+ *
+ * 为什么按实际条数算而不是写死"五"：宿舍那一格跟着**校区有没有收录**出现，
+ * 未收录学校只有四项，写死"五"就是在数一个不存在的东西。
+ * 烟台理工五项时输出与改造前逐字一致（快照基线因此不动）。
+ */
+private fun countInChinese(count: Int): String = when (count) {
+    1 -> "一"
+    2 -> "两"
+    3 -> "三"
+    4 -> "四"
+    5 -> "五"
+    else -> count.toString()
+}
+
 @Composable
 internal fun BindingStatusCard(
-    campus: CampusInfo,
+    /** 当前学校名下的校区；**null = 这所学校的校园服务还没收录**，宿舍那一行随之消失。 */
+    campus: CampusInfo?,
+    /** 当前学校的教务类型展示名，只在 `campus` 为 null 时兜底用（未收录学校没有校区配置）。 */
+    schoolJwTypeLabel: String? = null,
     savedSchool: String,
     isBound: Boolean,
     studentId: String,
@@ -887,12 +999,16 @@ internal fun BindingStatusCard(
     if (!visible) return
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
-    val schoolText = savedSchool.ifBlank { campus.schoolName.orEmpty() }.ifBlank { "未设置学校" }
+    val schoolText = savedSchool.ifBlank { campus?.schoolName.orEmpty() }.ifBlank { "未设置学校" }
     // 五项的「绑好了没」，顺序与下面清单、与页面卡片顺序一致 ——
     // 它只回答"绑齐了没"，与"最近一次导入成功没"是两件事（后者归「教务」行的红点）。
-    val bindItems = listOf(
+    //
+    // ⚠️ 「宿舍」项跟着**校区有没有收录**走，与清单里那一行同一个判据：
+    // 未收录学校没有宿舍可绑，把"宿舍"算进缺项等于告诉他"还差一项就能用校园服务了"，
+    // 而他怎么点都点不到那一格。
+    val bindItems = listOfNotNull(
         Triple("教务", isBound, ServiceAccent.ACADEMIC),
-        Triple("宿舍", dormLabel != null, ServiceAccent.LIFE),
+        if (campus != null) Triple("宿舍", dormLabel != null, ServiceAccent.LIFE) else null,
         Triple("今日校园", casBound, ServiceAccent.INFO),
         Triple("校园卡", cardBound, ServiceAccent.PAYMENT),
         Triple("学习通", chaoxingBound, ServiceAccent.STUDY),
@@ -900,8 +1016,8 @@ internal fun BindingStatusCard(
     val boundCount = bindItems.count { it.second }
     val missing = bindItems.filterNot { it.second }.map { it.first }
     val progressHint = when {
-        missing.isEmpty() -> "五项都已绑好，校园服务都能用了"
-        missing.size == bindItems.size -> "五项都还没绑，点下面任意一行开始"
+        missing.isEmpty() -> "${countInChinese(bindItems.size)}项都已绑好，校园服务都能用了"
+        missing.size == bindItems.size -> "${countInChinese(bindItems.size)}项都还没绑，点下面任意一行开始"
         else -> "还差 ${missing.size} 项：${missing.joinToString("、")}"
     }
     val importExtra = when {
@@ -1023,7 +1139,7 @@ internal fun BindingStatusCard(
                     icon = Icons.Outlined.HomeWork,
                     accent = ServiceAccent.ACADEMIC,
                     title = "教务",
-                    detail = "${campus.jwTypeLabel} · $schoolText",
+                    detail = "${campus?.jwTypeLabel ?: schoolJwTypeLabel ?: "待配置"} · $schoolText",
                     onClick = { onNavigate(BindSubPage.ACADEMIC) },
                     // 「最近导入…」走**通栏**第二行。塞进 detail 会被省略号吃掉时间
                     // （那个时间正是这一行存在的意义），详见 ChecklistRow 的 extra 说明。
@@ -1039,16 +1155,21 @@ internal fun BindingStatusCard(
 
                 // 下面这几行的**顺序与页面上的卡片顺序一致**（教务 → 宿舍 → 今日校园 →
                 // 校园卡 → 学习平台）：用户扫完清单往下滚，能逐项对上，不用来回找。
-                ChecklistRow(
-                    state = if (dormLabel != null) BindState.OK else BindState.TODO,
-                    icon = Icons.Outlined.Home,
-                    accent = ServiceAccent.LIFE,
-                    title = "宿舍",
-                    detail = dormLabel ?: "未绑定 · 绑定后自动匹配生活服务商",
-                    onClick = { onNavigate(BindSubPage.DORM) },
-                )
+                //
+                // ⚠️ 「宿舍」这一行随**校区有没有收录**走：未收录学校的宿舍根本没地方存
+                //（`dorm_<校区>` 那个键不属于他），留一行"未绑定"等于让人去绑一个不会生效的东西。
+                if (campus != null) {
+                    ChecklistRow(
+                        state = if (dormLabel != null) BindState.OK else BindState.TODO,
+                        icon = Icons.Outlined.Home,
+                        accent = ServiceAccent.LIFE,
+                        title = "宿舍",
+                        detail = dormLabel ?: "未绑定 · 绑定后自动匹配生活服务商",
+                        onClick = { onNavigate(BindSubPage.DORM) },
+                    )
 
-                HorizontalDivider(color = colors.borderDivider)
+                    HorizontalDivider(color = colors.borderDivider)
+                }
 
                 // ── 今日校园 ──
                 ChecklistRow(

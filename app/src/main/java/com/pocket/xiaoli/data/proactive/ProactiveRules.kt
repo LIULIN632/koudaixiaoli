@@ -73,6 +73,8 @@ data class ProactiveSignals(
     val cardBalance: Double? = null,
     /** 宿舍电费余额（元）；null = 本机没有可用值。 */
     val electricityBalance: Double? = null,
+    /** 电费提醒线（元）。由 [com.pocket.xiaoli.data.electricity.ElectricityAlertSettings] 提供，缺省用常量。 */
+    val electricityAlertBelow: Double = ProactiveRules.LOW_BALANCE_ELECTRICITY,
     val nextCourseName: String? = null,
     val minutesToClass: Long? = null,
     val newGradeCount: Int = 0,
@@ -171,11 +173,14 @@ object ProactiveRules {
      * 余额低到多少才值得开口（元）。
      *
      * ⚠️ 两个都是**先验值，无数据支撑**：校园卡 50 元沿用参考实现；
-     * 电费给 20 元，因为宿舍电费的常见余额量级本来就比校园卡小一个数量级
-     * （几十块能撑很久，欠费才是真急事）。要调就改这里。
+     * 电费给 10 元（2026-11-05 从 20 下调：19 元还能撑好几天，那时提醒等于催充值），
+     * 因为宿舍电费的常见余额量级本来就比校园卡小一个数量级（几十块能撑很久，欠费才是真急事）。
+     *
+     * 电费这条只是**兜底默认**：真正的口径在 `data/electricity/ElectricityAlertSettings`，
+     * 用户可调，且点过「知道了」24 小时内不再打扰。
      */
     const val LOW_BALANCE_CARD = 50.0
-    const val LOW_BALANCE_ELECTRICITY = 20.0
+    const val LOW_BALANCE_ELECTRICITY = 10.0
 
     /** 「快上课了」的提前量（分钟）。 */
     const val CLASS_AHEAD_MINUTES = 30L
@@ -298,7 +303,7 @@ object ProactiveRules {
             }
             // 宿舍电费余额
             val electricity = s.electricityBalance
-            if (electricity != null && electricity < LOW_BALANCE_ELECTRICITY) {
+            if (electricity != null && electricity < s.electricityAlertBelow) {
                 add(
                     ProactiveMessage(
                         id = ID_BALANCE_ELECTRICITY,

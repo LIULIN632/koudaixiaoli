@@ -161,3 +161,11 @@ pocket-server*.tar.gz
 
 # 竞品调研时抓的参考截图（临时看过就算，不是项目素材）
 .research-tmp/
+
+# 会话临时目录（node 编译缓存等）：绝不入库
+/.tmp-tmp/
+/.tmp-step*.py
+
+# 会话里用过的临时脚本/数据，不入库
+/.tmp-*
+/.courseware-repo

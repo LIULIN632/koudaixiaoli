@@ -148,6 +148,28 @@ object CampusConfig {
 
     val defaultCampus: CampusInfo = campuses.first()
 
-    fun byId(id: String?): CampusInfo =
-        campuses.firstOrNull { it.id == id } ?: defaultCampus
+    /**
+     * 按 id 取校区；**未知 id 会静默回退到默认校区**（烟台理工本校区）。
+     *
+     * ⚠️ 这个回退只在"必须拿到一个校区才能继续"的老调用点上有意义。
+     * 想知道"这所学校到底有没有被收录"必须用 [byIdOrNull] 或 [forSchoolId]，
+     * 否则一个山东理工大学的学生会看到烟台理工的电费、洗衣和校园卡入口 ——
+     * 那不是降级，是拿别人的配置冒充他的学校。
+     */
+    fun byId(id: String?): CampusInfo = byIdOrNull(id) ?: defaultCampus
+
+    /** 按 id 取校区，未知返回 null（调用方必须处理"没收录"这种状态）。 */
+    fun byIdOrNull(id: String?): CampusInfo? =
+        id?.let { target -> campuses.firstOrNull { it.id == target } }
+
+    /**
+     * 学校 → 校区。**没收录的学校返回 null**，这是刻意的：
+     * 校园服务（电费 / 洗衣 / 热水 / 校园卡）与 3D 地图目前只配了烟台理工与烟大南校区，
+     * 其余学校要显示成"这所学校还没配置"，而不是悄悄借用默认校区的配置。
+     */
+    fun forSchoolId(schoolId: String?): CampusInfo? =
+        schoolId?.let { id -> campuses.firstOrNull { it.schoolId == id } }
+
+    /** 这所学校的校园服务与地图是否已收录（服务页与地图入口的判定口径）。 */
+    fun hasCampusFor(schoolId: String?): Boolean = forSchoolId(schoolId) != null
 }

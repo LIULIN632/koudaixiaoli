@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.pocket.xiaoli.data.entity.AppStateEntity
 import com.pocket.xiaoli.data.entity.AssistantConversationEntity
 import com.pocket.xiaoli.data.entity.AssistantMessageEntity
 import com.pocket.xiaoli.data.entity.AcademicSnapshotEntity
@@ -23,6 +24,7 @@ import com.pocket.xiaoli.data.entity.defaultTimeSlots
 import com.pocket.xiaoli.data.entity.matchesLegacyTimeSlots
 import com.pocket.xiaoli.data.entity.TeacherEntity
 import com.pocket.xiaoli.data.entity.TermEntity
+import com.pocket.xiaoli.data.dao.AppStateDao
 import com.pocket.xiaoli.data.dao.AssistantChatDao
 import com.pocket.xiaoli.data.dao.AcademicSnapshotDao
 import com.pocket.xiaoli.data.dao.CourseDao
@@ -38,8 +40,10 @@ import com.pocket.xiaoli.data.dao.ExamDao
 import com.pocket.xiaoli.data.entity.FocusSessionEntity
 import com.pocket.xiaoli.data.dao.FocusSessionDao
 
-@Database(entities = [CourseEntity::class, TimeSlotEntity::class, SchemeEntity::class, HomeworkEntity::class, TaskEntity::class, GoodItemEntity::class, TreeHoleEntity::class, TeacherEntity::class, SavedGradeEntity::class, SpecialWorkDayEntity::class, CampusMapCorrectionEntity::class, AssistantConversationEntity::class, AssistantMessageEntity::class, ExamEntity::class, AcademicSnapshotEntity::class, FocusSessionEntity::class, TermEntity::class], version = 21, exportSchema = true)
+@Database(entities = [AppStateEntity::class, CourseEntity::class, TimeSlotEntity::class, SchemeEntity::class, HomeworkEntity::class, TaskEntity::class, GoodItemEntity::class, TreeHoleEntity::class, TeacherEntity::class, SavedGradeEntity::class, SpecialWorkDayEntity::class, CampusMapCorrectionEntity::class, AssistantConversationEntity::class, AssistantMessageEntity::class, ExamEntity::class, AcademicSnapshotEntity::class, FocusSessionEntity::class, TermEntity::class], version = 22, exportSchema = true)
 abstract class PocketXiaoliDatabase : RoomDatabase() {
+    abstract fun appStateDao(): AppStateDao
+
     abstract fun courseDao(): CourseDao
     abstract fun teacherDao(): TeacherDao
     abstract fun savedGradeDao(): SavedGradeDao
@@ -436,10 +440,62 @@ abstract class PocketXiaoliDatabase : RoomDatabase() {
             }
         }
 
-        /** Ensure default scheme exists on fresh installs (DB created at v4, no migration runs). */
-        private val CALLBACK = object : Callback() {
+        /**
+         * 21 → 22：给「按校隔离」的四张表加 `schoolId`，并让**插入自动打标**。
+         *
+         * 三个刻意的设计：
+         * 1. `app_state` 只有一行（`id = 1`），存"当前学校 id"。**查询里用子查询读它**，
+         *    而不是把 schoolId 加进每个 DAO 方法签名 —— 后者要改上百个调用点，
+         *    而用子查询时 DAO 签名不变，漏改的表现是"查不到"，不是"看到别校数据"（fail-closed）。
+         * 2. `AFTER INSERT` 触发器在 `schoolId = ''` 时补标：这样**所有既有插入路径都不用改**，
+         *    也不会因为某个仓储忘了传值而写出查不到的孤儿行。
+         * 3. 回填用迁移当时的 `academic_school_id`：老数据全部属于用户当前那所学校，
+         *    这是唯一能自动判断的归属。
+         */
+        private fun migration21To22(schoolId: String): Migration = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY NOT NULL, schoolId TEXT NOT NULL)")
+                db.execSQL("INSERT OR IGNORE INTO app_state (id, schoolId) VALUES (1, ?)", arrayOf<Any>(schoolId))
+                SCOPED_TABLES.forEach { table ->
+                    db.execSQL("ALTER TABLE $table ADD COLUMN schoolId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("UPDATE $table SET schoolId = ?", arrayOf<Any>(schoolId))
+                    db.execSQL(
+                        "CREATE TRIGGER IF NOT EXISTS stamp_$table AFTER INSERT ON $table " +
+                            "WHEN NEW.schoolId = '' BEGIN " +
+                            "UPDATE $table SET schoolId = (SELECT schoolId FROM app_state WHERE id = 1) " +
+                            "WHERE rowid = NEW.rowid; END"
+                    )
+                }
+            }
+        }
+
+        /** 已经接入「按校隔离」的表；加新表时**同时**要改 DAO 的读取条件，见各 DAO 的 KDoc。 */
+        /** 没存过学校 id 时的兜底：与 `SchoolRegistry` 的锚定校一致。 */
+        private const val DEFAULT_SCHOOL_ID = "YIT"
+
+        internal val SCOPED_TABLES = listOf(
+            "courses", "homework", "saved_grades", "exams",
+            "terms", "teachers", "academic_snapshot", "special_work_day",
+            "campus_map_corrections", "time_slots",
+        )
+
+        /**
+         * 新建库（首装）走的是 `onCreate`，**不经过迁移**，所以这里必须把迁移里那两件事
+         * 再做一遍：播种 `app_state`、给四张表建打标触发器。少这一步的表现是
+         * 「首装后所有课都查不出来」（schoolId 全是 ''，而 app_state 有值）。
+         */
+        private fun callback(schoolId: String) = object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
+                db.execSQL("INSERT OR IGNORE INTO app_state (id, schoolId) VALUES (1, ?)", arrayOf<Any>(schoolId))
+                SCOPED_TABLES.forEach { table ->
+                    db.execSQL(
+                        "CREATE TRIGGER IF NOT EXISTS stamp_$table AFTER INSERT ON $table " +
+                            "WHEN NEW.schoolId = '' BEGIN " +
+                            "UPDATE $table SET schoolId = (SELECT schoolId FROM app_state WHERE id = 1) " +
+                            "WHERE rowid = NEW.rowid; END"
+                    )
+                }
                 db.execSQL("INSERT OR IGNORE INTO schemes (id, name, sortOrder, termId) VALUES (0, '默认课表', 0, 0)")
                 db.execSQL("INSERT OR IGNORE INTO terms (id, name, startDate, totalWeeks, sortOrder) VALUES (0, '默认学期', '', 20, 0)")
                 defaultTimeSlots.forEach { slot ->
@@ -451,12 +507,65 @@ abstract class PocketXiaoliDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * 按校清空「可重算」的四张表，并重新播种默认时间段。
+         *
+         * 这四张表的主键是业务键（教师名 / 快照 id / 日期 / 第几节），换校后同键的行会互相覆盖；
+         * 它们都能重新拉或重新填，所以换校时直接清空，而不是试图让两所学校并存。
+         * ⚠️ `terms` 与 `courses` 不在此列 —— 它们按 `schoolId` 并存，换校不清。
+         */
+        fun resetPerSchoolCaches(context: Context, schoolId: String) {
+            val db = getInstance(context)
+            db.openHelper.writableDatabase.apply {
+                execSQL("DELETE FROM teachers")
+                execSQL("DELETE FROM academic_snapshot")
+                execSQL("DELETE FROM special_work_day")
+                execSQL("DELETE FROM time_slots")
+                execSQL("INSERT OR REPLACE INTO app_state (id, schoolId) VALUES (1, ?)", arrayOf<Any>(schoolId))
+                defaultTimeSlots.forEach { slot ->
+                    execSQL(
+                        "INSERT OR REPLACE INTO time_slots (slot, startTime, endTime) VALUES (?,?,?)",
+                        arrayOf<Any>(slot.slot, slot.startTime, slot.endTime),
+                    )
+                }
+            }
+        }
+
+        /**
+         * 仅供测试：关掉并清空单例。
+         *
+         * DB 是「单例 + 文件」，两条用例共用一个进程时会互相看到对方的数据；
+         * 而 Room 的 `close()` 是幂等的，所以这里直接关、置空即可。
+         */
+        @androidx.annotation.VisibleForTesting
+        fun closeForTest() {
+            synchronized(this) {
+                INSTANCE?.close()
+                INSTANCE = null
+            }
+        }
+
         fun getInstance(context: Context): PocketXiaoliDatabase {
             return INSTANCE ?: synchronized(this) {
+                val schoolId = context
+                    .getSharedPreferences("pocket_xiaoli_prefs", Context.MODE_PRIVATE)
+                    .getString("academic_school_id", null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: DEFAULT_SCHOOL_ID
                 INSTANCE ?: Room.databaseBuilder(context, PocketXiaoliDatabase::class.java, "pocket_xiaoli.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
-                    .addCallback(CALLBACK)
-                    .build().also { INSTANCE = it }
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, migration21To22(schoolId))
+                    .addCallback(callback(schoolId))
+                    .build().also {
+                        // app_state 与 prefs 是"同一件事的两种存储"：prefs 供 UI/切校即时读，
+                        // app_state 供 SQL 过滤。每进程启动对齐一次，避免迁移或异常退出后两者不一致。
+                        runCatching {
+                            it.openHelper.writableDatabase.execSQL(
+                                "INSERT OR REPLACE INTO app_state (id, schoolId) VALUES (1, ?)",
+                                arrayOf<Any>(schoolId),
+                            )
+                        }
+                        INSTANCE = it
+                    }
             }
         }
     }

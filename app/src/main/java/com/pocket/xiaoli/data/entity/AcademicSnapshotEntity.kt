@@ -30,6 +30,8 @@ data class AcademicSnapshotEntity(
     val typesJson: String = "",
     /** 各类型的课程明细（含成绩/学时/补考/重修/建议修读学年学期） */
     val coursesJson: String = "",
+    /** 所属学校；空串由触发器补标。 */
+    val schoolId: String = "",
 ) {
     companion object {
         const val SINGLETON_ID = 1

@@ -10,18 +10,18 @@ import com.pocket.xiaoli.data.entity.SpecialWorkDayEntity
 @Dao
 interface SpecialWorkDayDao {
 
-    @Query("SELECT * FROM special_work_day")
+    @Query("SELECT * FROM special_work_day WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun getAll(): List<SpecialWorkDayEntity>
 
-    @Query("SELECT * FROM special_work_day WHERE origin_date = :originDate")
+    @Query("SELECT * FROM special_work_day WHERE origin_date = :originDate AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun find(originDate: String): SpecialWorkDayEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: SpecialWorkDayEntity)
 
-    @Query("DELETE FROM special_work_day WHERE origin_date = :originDate")
+    @Query("DELETE FROM special_work_day WHERE origin_date = :originDate AND schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun delete(originDate: String)
 
-    @Query("DELETE FROM special_work_day")
+    @Query("DELETE FROM special_work_day WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
     suspend fun clear()
 }
