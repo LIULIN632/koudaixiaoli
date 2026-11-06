@@ -1,0 +1,386 @@
+{
+  "campus": "ytu_south",
+  "source": "app/src/main/assets/campus_map/ytu_south/campus_3d.json",
+  "glb": "app/src/main/assets/campus_map/ytu_south/campus.glb",
+  "center": {
+    "lat": 37.45674,
+    "lng": 121.46573
+  },
+  "coordinateSystem": "glTF Y-up 局部米制：+X=东, +Y=上, +Z=南，原点在 center",
+  "objects": [
+    {
+      "node": "Building_canteen1",
+      "anchor": "Anchor_canteen1",
+      "kind": "osm",
+      "id": "way/453030922",
+      "name": "十餐厅",
+      "category": "dining",
+      "levels": 3,
+      "levelsEstimated": false,
+      "heightMeters": 9.9,
+      "anchorPosition": [
+        115.61,
+        65.99,
+        9.9
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_canteen2",
+      "anchor": "Anchor_canteen2",
+      "kind": "osm",
+      "id": "way/453030923",
+      "name": "十餐厅",
+      "category": "dining",
+      "levels": 2,
+      "levelsEstimated": false,
+      "heightMeters": 6.6,
+      "anchorPosition": [
+        94.29,
+        51.73,
+        6.6
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac1",
+      "anchor": "Anchor_fac1",
+      "kind": "osm",
+      "id": "way/1409807709",
+      "name": "(未命名)",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        108.76,
+        -83.26,
+        3.3
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac2",
+      "anchor": "Anchor_fac2",
+      "kind": "osm",
+      "id": "way/1409807710",
+      "name": "(未命名)",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        142.85,
+        -67.1,
+        3.3
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac3",
+      "anchor": "Anchor_fac3",
+      "kind": "osm",
+      "id": "way/1409807711",
+      "name": "工程实训车间",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        107.94,
+        -43.19,
+        3.3
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac4",
+      "anchor": "Anchor_fac4",
+      "kind": "osm",
+      "id": "way/1409807712",
+      "name": "(未命名)",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        114.7,
+        -31.26,
+        3.3
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm1",
+      "anchor": "Anchor_dorm1",
+      "kind": "osm",
+      "id": "way/1429499333",
+      "name": "7号学生公寓南区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -6.1,
+        -44.33,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm2",
+      "anchor": "Anchor_dorm2",
+      "kind": "osm",
+      "id": "way/1429499334",
+      "name": "7号学生公寓",
+      "category": "dorm",
+      "levels": 4,
+      "levelsEstimated": false,
+      "heightMeters": 13.2,
+      "anchorPosition": [
+        36.1,
+        -40.4,
+        13.2
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm3",
+      "anchor": "Anchor_dorm3",
+      "kind": "osm",
+      "id": "way/1429499335",
+      "name": "7号学生公寓北区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        15.97,
+        -2.82,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm4",
+      "anchor": "Anchor_dorm4",
+      "kind": "osm",
+      "id": "way/1429499336",
+      "name": "9号学生公寓南区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -190.98,
+        50.35,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm5",
+      "anchor": "Anchor_dorm5",
+      "kind": "osm",
+      "id": "way/1429499337",
+      "name": "9号学生公寓",
+      "category": "dorm",
+      "levels": 4,
+      "levelsEstimated": false,
+      "heightMeters": 13.2,
+      "anchorPosition": [
+        -149.01,
+        53.85,
+        13.2
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm6",
+      "anchor": "Anchor_dorm6",
+      "kind": "osm",
+      "id": "way/1429499338",
+      "name": "9号学生公寓北区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -169.11,
+        91.44,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm7",
+      "anchor": "Anchor_dorm7",
+      "kind": "osm",
+      "id": "way/1429499339",
+      "name": "10号学生公寓南区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -277.72,
+        95.56,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm8",
+      "anchor": "Anchor_dorm8",
+      "kind": "osm",
+      "id": "way/1429499340",
+      "name": "10号学生公寓",
+      "category": "dorm",
+      "levels": 4,
+      "levelsEstimated": false,
+      "heightMeters": 13.2,
+      "anchorPosition": [
+        -298.46,
+        132.86,
+        13.2
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm9",
+      "anchor": "Anchor_dorm9",
+      "kind": "osm",
+      "id": "way/1429499341",
+      "name": "10号学生公寓北区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -256.51,
+        137.01,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm10",
+      "anchor": "Anchor_dorm10",
+      "kind": "osm",
+      "id": "way/1429499342",
+      "name": "8号学生公寓北区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -69.04,
+        40.84,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm11",
+      "anchor": "Anchor_dorm11",
+      "kind": "osm",
+      "id": "way/1429499343",
+      "name": "8号学生公寓南区",
+      "category": "dorm",
+      "levels": 6,
+      "levelsEstimated": false,
+      "heightMeters": 19.8,
+      "anchorPosition": [
+        -90.25,
+        -0.61,
+        19.8
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_dorm12",
+      "anchor": "Anchor_dorm12",
+      "kind": "osm",
+      "id": "way/1429499344",
+      "name": "8号学生公寓",
+      "category": "dorm",
+      "levels": 4,
+      "levelsEstimated": false,
+      "heightMeters": 13.2,
+      "anchorPosition": [
+        -110.95,
+        36.69,
+        13.2
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_jx1",
+      "anchor": "Anchor_jx1",
+      "kind": "osm",
+      "id": "way/1429499347",
+      "name": "教学楼",
+      "category": "teaching",
+      "levels": 4,
+      "levelsEstimated": false,
+      "heightMeters": 13.2,
+      "anchorPosition": [
+        -189.02,
+        170.66,
+        13.2
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac5",
+      "anchor": "Anchor_fac5",
+      "kind": "osm",
+      "id": "way/1429499354",
+      "name": "(未命名)",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        -68.46,
+        95.78,
+        3.3
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac6",
+      "anchor": "Anchor_fac6",
+      "kind": "osm",
+      "id": "way/1468793466",
+      "name": "(未命名)",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        132.86,
+        27.97,
+        3.3
+      ],
+      "inGlb": true
+    },
+    {
+      "node": "Building_fac7",
+      "anchor": "Anchor_fac7",
+      "kind": "osm",
+      "id": "way/1468793473",
+      "name": "南校医务室",
+      "category": "facility",
+      "levels": 1,
+      "levelsEstimated": true,
+      "heightMeters": 3.3,
+      "anchorPosition": [
+        -128.15,
+        -5.97,
+        3.3
+      ],
+      "inGlb": true
+    }
+  ]
+}

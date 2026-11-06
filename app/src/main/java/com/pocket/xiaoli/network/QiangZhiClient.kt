@@ -118,7 +118,14 @@ class QiangZhiClient {
         }.getOrNull()
     }
 
-    /** 裸域名 → app.do 端点；已是 /app.do 则保持；/jsxsd 路径 → 去掉路径 */
+    /**
+     * 裸域名 → app.do 端点；已是 /app.do 则保持。
+     *
+     * ⚠️ 路径**不是**一律丢掉：强智部署在带上下文路径的位置时（燕京理工的 `/yjlgxy_jsxsd/`），
+     * API 在 `<ctx>/app.do`、网页端在 `<ctx>/jsxsd/...`，把路径砍了就只剩一个打不开的裸域名。
+     * 判据是路径里有没有 `jsxsd` 这一段 —— 没有的地址维持老行为（只认 host），
+     * 已对接的六所强智学校一个字都不动。
+     */
     fun normalizeBaseUrl(rawUrl: String): String {
         val trimmed = rawUrl.trim()
         if (trimmed.isBlank()) return ""
@@ -133,25 +140,27 @@ class QiangZhiClient {
             val host = uri.host ?: return ""
             val scheme = uri.scheme ?: "https"
             val port = if (uri.port > 0) ":${uri.port}" else ""
-            "$scheme://$host$port/app.do"
+            "$scheme://$host$port${qiangzhiContextPath(uri.path)}/app.do"
         } catch (_: Exception) {
             ""
         }
     }
 
-    /** Web 端根地址（去掉 /app.do 与子路径） */
-    private fun webBaseUrl(baseUrl: String): String {
-        val normalized = normalizeBaseUrl(baseUrl).removeSuffix("/app.do")
-        return try {
-            val uri = URI(normalized)
-            val host = uri.host ?: return normalized
-            val scheme = uri.scheme ?: "https"
-            val port = if (uri.port > 0) ":${uri.port}" else ""
-            "$scheme://$host$port"
-        } catch (_: Exception) {
-            normalized
-        }
+    /**
+     * 强智的上下文路径：`/yjlgxy_jsxsd/` → `/yjlgxy_jsxsd`；其余 → 空串。
+     *
+     * 取到 `jsxsd` 那一段为止：后面再挂 `/xk/LoginToXk` 之类的都是它下面的东西，
+     * 而它前面的 `/yjlgxy`（门户页）不是教务本体。
+     */
+    private fun qiangzhiContextPath(path: String?): String {
+        val segments = path?.trim('/')?.split('/')?.filter { it.isNotBlank() }.orEmpty()
+        val idx = segments.indexOfFirst { it.contains("jsxsd", ignoreCase = true) }
+        if (idx < 0) return ""
+        return "/" + segments.take(idx + 1).joinToString("/")
     }
+
+    /** Web 端根地址 = 归一化结果去掉 `/app.do`（上下文路径要留着）。 */
+    internal fun webBaseUrl(baseUrl: String): String = baseUrl.removeSuffix("/app.do")
 
     // ── HTTP 基础 ──
 

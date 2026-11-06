@@ -544,7 +544,7 @@ fun WebImportScreen(
                             favoriteIds = favoriteIds,
                             onSelect = pickSchool,
                             onToggleFavorite = { viewModel.toggleFavorite(it) },
-                            footer = "列表只收烟台院校，外地学校可点上方「添加自己的学校」手动添加",
+                            footer = "列表收烟台院校与燕京理工、山东理工，其他外地学校可点上方「添加自己的学校」手动添加",
                         )
                     }
                 }

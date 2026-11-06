@@ -3,6 +3,9 @@ package com.pocket.xiaoli.data.agent
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.pocket.xiaoli.core.agent.SseLineParser
+import com.pocket.xiaoli.core.agent.SseLineResult
+import com.pocket.xiaoli.core.agent.ToolCallAccumulator
 import com.pocket.xiaoli.util.NetworkErrorText
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -212,7 +215,7 @@ class AssistantLlmClient {
                             if (partial.isNotBlank()) {
                                 trySend(
                                     LlmStreamEvent.Completed(
-                                        ChatMessage(ChatRole.ASSISTANT, content = partial, toolCalls = toolAcc.build())
+                                        ChatMessage(ChatRole.ASSISTANT, content = partial, toolCalls = toolAcc.build().toToolCalls())
                                     )
                                 )                            } else {
                                 trySend(LlmStreamEvent.Failed(describeNetworkError(e)))
@@ -227,7 +230,7 @@ class AssistantLlmClient {
                             ChatMessage(
                                 role = ChatRole.ASSISTANT,
                                 content = textBuilder.toString(),
-                                toolCalls = toolAcc.build(),
+                                toolCalls = toolAcc.build().toToolCalls(),
                             ),
                             truncated = truncated,
                         )
@@ -241,65 +244,40 @@ class AssistantLlmClient {
     }
 
     /** 按 OpenAI 协议拼请求体。工具用 JSON 字符串原样挂上，避免二次解析。 */
-    private fun buildRequestBody(config: AssistantLlmConfig, request: LlmRequest): JsonObject {
-        val root = JsonObject()
-        root.addProperty("model", config.model)
-        root.addProperty("stream", true)
-        root.addProperty("temperature", request.temperature)
+    /**
+     * 请求体交给 `:core` 的 AgentWire —— 与桌面端同一份序列化。
+     *
+     * 这里只做「本端模型 → 共享模型」的映射；协议形状（tool_calls 的位置、
+     * tool 行的 tool_call_id）不再由两端各自决定。
+     */
+    private fun buildRequestBody(config: AssistantLlmConfig, request: LlmRequest): JsonObject =
+        com.pocket.xiaoli.core.agent.AgentWire.buildRequestBody(
+            model = config.model,
+            temperature = request.temperature,
+            messages = com.pocket.xiaoli.core.agent.AgentWire.withSystem(
+                request.messages.map { it.toAgentMessage() },
+                config.effectiveSystemPrompt(),
+            ),
+            toolsJson = request.toolsJson,
+        )
 
-        val messages = JsonArray()
-        val hasSystem = request.messages.any { it.role == ChatRole.SYSTEM }
-        if (!hasSystem) {
-            messages.add(systemMessage(config.effectiveSystemPrompt()))
-        }
-        request.messages.forEach { messages.add(it.toJson()) }
-        root.add("messages", messages)
 
-        val tools = request.toolsJson
-        if (!tools.isNullOrBlank()) {
-            runCatching { JsonParser.parseString(tools).asJsonArray }.getOrNull()?.let {
-                if (it.size() > 0) {
-                    root.add("tools", it)
-                    root.addProperty("tool_choice", "auto")
-                }
-            }
-        }
-        return root
-    }
 
-    private fun systemMessage(text: String): JsonObject = JsonObject().apply {
-        addProperty("role", "system")
-        addProperty("content", text)
-    }
-
-    private fun ChatMessage.toJson(): JsonObject = JsonObject().apply {
-        addProperty("role", role.name.lowercase())
-        when (role) {
-            ChatRole.TOOL -> {
-                addProperty("content", content)
-                addProperty("tool_call_id", toolCallId.orEmpty())
-            }
-            else -> {
-                // assistant 带 tool_calls 时，content 允许为空字符串
-                addProperty("content", content)
-                if (toolCalls.isNotEmpty()) {
-                    val arr = JsonArray()
-                    toolCalls.forEach { call ->
-                        arr.add(JsonObject().apply {
-                            addProperty("id", call.id)
-                            addProperty("type", "function")
-                            add("function", JsonObject().apply {
-                                addProperty("name", call.name)
-                                // arguments 必须是**字符串**（里面是 JSON），不是对象
-                                addProperty("arguments", call.argumentsJson)
-                            })
-                        })
-                    }
-                    add("tool_calls", arr)
-                }
-            }
-        }
-    }
+    /** 本端模型 → 共享协议模型（只映射，不序列化）。 */
+    private fun ChatMessage.toAgentMessage(): com.pocket.xiaoli.core.agent.AgentMessage =
+        com.pocket.xiaoli.core.agent.AgentMessage(
+            role = when (role) {
+                ChatRole.SYSTEM -> com.pocket.xiaoli.core.agent.AgentRole.SYSTEM
+                ChatRole.USER -> com.pocket.xiaoli.core.agent.AgentRole.USER
+                ChatRole.ASSISTANT -> com.pocket.xiaoli.core.agent.AgentRole.ASSISTANT
+                ChatRole.TOOL -> com.pocket.xiaoli.core.agent.AgentRole.TOOL
+            },
+            content = content,
+            toolCalls = toolCalls.map {
+                com.pocket.xiaoli.core.agent.AgentToolCall(it.id, it.name, it.argumentsJson)
+            },
+            toolCallId = toolCallId,
+        )
 
     private fun describeHttpError(code: Int, body: String): String {
         // 从错误体里捞服务商给的可读信息，捞不到再退回状态码

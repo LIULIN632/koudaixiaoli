@@ -195,7 +195,10 @@ private fun AcademicCourseRow(item: AcademicCourseItem, showGradePoint: Boolean)
         CourseStatusTone.PASSED -> colors.success
         CourseStatusTone.IN_PROGRESS -> colors.info
         CourseStatusTone.FAILED -> colors.danger
-        CourseStatusTone.UNTAKEN -> colors.textTertiary
+        // 未修不是错误，而是"你还没修的那一块" —— 与条右端「差 4.0」同一个琥珀档
+        //（`creditGapColor` 的 GAP/NONE 也是 warning）。以前用 `textTertiary` 灰，
+        // 一列里全是灰条灰角标，既看不出待办、又和"状态未知"分不开。
+        CourseStatusTone.UNTAKEN -> colors.warning
     }
     val headline = item.headlineGrade()
     // 补考/重修与"成绩≠最大成绩"是同一类信息（这门课不止一次），压成成绩下面的一行小字，
@@ -406,8 +409,8 @@ internal data class CreditSegment(
  *
  * 构成条把 3~7 个平台排进同一根横杠，每块一个色；往下滚两屏，树里又是这些平台的行，
  * 却全是同一个主色 —— 同一个东西在一张页上换了身衣服，两处就对不上。
- * 现在树里**平台层那一行整张卡（底色 + 描边）用它自己的段色**，
- * 模块层借**父平台**的段色画左侧色条，构成条上那块是什么颜色，树里它那一支就是什么颜色。
+ * 现在树里**平台层那一行的段色带（底色 + 左缘色脊）用它自己的段色**，
+ * 模块层借**父平台**的段色画那根色脊，构成条上那块是什么颜色，树里它那一支就是什么颜色。
  *
  * 进度条本身不参与：它按层级给色（平台 = 金属金，其余 = 主色，修满 = 绿），
  * 颜色在这页只回答"是哪一块"，不回答"是哪一级"。

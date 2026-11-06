@@ -270,6 +270,8 @@ class AssistantAgentLoop(
         "get_academic_progress" -> "修课进度"
         "find_classroom" -> "教室位置"
         "find_campus_service" -> "校园服务"
+        "search_library" -> "资料库"
+        // 2026-10-30 前的会话历史里工具还叫这个名字，留着只为老记录不显示成英文函数名。
         "search_knowledge" -> "校园知识库"
         else -> toolName
     }

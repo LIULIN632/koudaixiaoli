@@ -112,4 +112,42 @@ sealed interface AssistantCard {
             val tag: String = "",
         )
     }
+
+    /**
+     * 命中的**资料条目**（`search_library` 的界面产物）。
+     *
+     * 只收**资料站**的命中（`lib:`）：知识库/题库/帮助的出处已经在下方来源条里，
+     * 再在卡片上列一遍是同一份信息渲染两次 —— 卡片在这里唯一多出来的东西是
+     * 「这份资料能不能下载」以及文件元信息（学科·课程·类型·大小）。
+     *
+     * 因此：没有资料站命中时 [ToolOutcome.card] 为 null，界面不渲染空卡片。
+     *
+     * ⚠️ [Row.downloadable] 为 false 时必须**明写「暂不可下载」**：
+     * 索引里登记了文件、但 `urls` 还是空的（还没传上去）是正常中间态，
+     * 给一个点了没反应的按钮比不给按钮更糟。
+     */
+    data class MaterialList(
+        val header: String = "",
+        val rows: List<Row> = emptyList(),
+        val hint: String = "",
+    ) : AssistantCard {
+
+        /**
+         * 一行资料。
+         *
+         * [marker] 与回灌模型正文里的 `[L1]` 同源（见 [AssistantSource.marker] 的说明）；
+         * [summary] 是作者手写的摘要（文件类）或正文首段（正文类），**不是**模型生成的内容。
+         * [provider] 是提供者署名，渲染在行的右下角 —— 署名是投稿的动力，
+         * 混进 [meta] 会被当成"又一个元信息"划过去，所以单独占右下角。
+         */
+        data class Row(
+            val marker: String,
+            val title: String,
+            val meta: String = "",
+            val summary: String = "",
+            val downloadable: Boolean = false,
+            val fileId: String = "",
+            val provider: String = "",
+        )
+    }
 }

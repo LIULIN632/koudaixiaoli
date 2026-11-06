@@ -12,12 +12,12 @@ internal object Campus3DTestAssets {
             ?: error("campus_3d.json not found")
     }
 
-    fun loadResult(): Campus3DMapLoadResult {
+    fun loadResult(campusId: String = "ytlg_main"): Campus3DMapLoadResult {
         val source = Campus3DMapDataSource { path ->
             File(assetRoot, "assets/$path").takeIf { it.isFile }?.readText()
         }
-        return source.load("ytlg_main")
+        return source.load(campusId)
     }
 
-    fun loadScene(): Campus3DScene = loadResult().scene
+    fun loadScene(campusId: String = "ytlg_main"): Campus3DScene = loadResult(campusId).scene
 }

@@ -2,9 +2,13 @@ package com.pocket.xiaoli.data.weather
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.pocket.xiaoli.core.weather.WeatherCache
 
 /**
  * 天气缓存的落盘层：上一次的**原始 JSON** + 写入时刻。
+ *
+ * 实现共享核心的 [WeatherCache] —— 仓储（`com.pocket.xiaoli.core.weather`）不认识
+ * SharedPreferences，各端自己把落盘方式接上；桌面端另有它自己的实现。
  *
  * ## 为什么存原文而不是解析后的对象
  *
@@ -19,23 +23,23 @@ import android.content.SharedPreferences
  *
  * `AppContainer` 的「清空全部数据」按 `shared_prefs/` 目录枚举，不需要额外登记。
  */
-class WeatherStore(context: Context) {
+class WeatherStore(context: Context) : WeatherCache {
 
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun cachedJson(): String? = prefs.getString(KEY_CACHED_JSON, null)
+    override fun cachedJson(): String? = prefs.getString(KEY_CACHED_JSON, null)
 
-    fun cachedAt(): Long = prefs.getLong(KEY_CACHED_AT, 0L)
+    override fun cachedAt(): Long = prefs.getLong(KEY_CACHED_AT, 0L)
 
-    fun save(json: String, at: Long) {
+    override fun save(json: String, at: Long) {
         prefs.edit()
             .putString(KEY_CACHED_JSON, json)
             .putLong(KEY_CACHED_AT, at)
             .apply()
     }
 
-    fun clear() {
+    override fun clear() {
         prefs.edit().clear().apply()
     }
 

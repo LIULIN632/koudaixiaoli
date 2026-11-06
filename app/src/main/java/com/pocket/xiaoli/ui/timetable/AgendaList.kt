@@ -174,7 +174,7 @@ internal fun AgendaList(
                 )
             )
             items(dayCourses, key = { "agenda-${it.id}" }) { course ->
-                AgendaRow(course, slotMap, colors, skin)
+                AgendaRow(course, slotMap, colors)
             }
         }
     }
@@ -185,8 +185,8 @@ private fun AgendaRow(
     course: CourseEntity,
     slotMap: Map<Int, TimeSlotEntity>,
     colors: com.pocket.xiaoli.ui.theme.PocketXiaoliColors,
-    skin: com.pocket.xiaoli.ui.theme.SkinTokens,
 ) {
+    val skin = LocalSkin.current
     val dark = LocalDarkMode.current
     val colorMode = LocalCourseColorMode.current
     val colorIndex = course.colorIndexFor(colorMode)

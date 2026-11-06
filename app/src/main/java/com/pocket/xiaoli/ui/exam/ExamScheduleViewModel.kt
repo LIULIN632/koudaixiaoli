@@ -2,10 +2,10 @@ package com.pocket.xiaoli.ui.exam
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.pocket.xiaoli.core.exam.ExamNoticeParser
+import com.pocket.xiaoli.core.exam.ExamSchedule
 import com.pocket.xiaoli.data.entity.ExamEntity
 import com.pocket.xiaoli.data.entity.toExamEntities
-import com.pocket.xiaoli.data.exam.ExamNoticeParser
-import com.pocket.xiaoli.data.exam.ExamSchedule
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.di.AppContainer
 import kotlinx.coroutines.flow.MutableStateFlow

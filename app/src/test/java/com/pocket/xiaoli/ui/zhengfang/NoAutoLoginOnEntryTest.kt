@@ -16,7 +16,7 @@ import org.junit.Test
  *
  * 改成"只预填表单、由用户点一下"之后，这件事**没有任何运行时信号可以断言**：
  * 页面渲出来是一样的（表单本来就会预填），单测与基准图全绿，只有真机上那一下自动联网能看出来。
- * 所以判据只能落在**源码**上 —— 与 `TabRouteInputFocusTest` / `HomeNoBubbleTipTest` 同一思路。
+ * 所以判据只能落在**源码**上 —— 与 `TabRouteInputFocusTest` / `NoBubbleTipTest` 同一思路。
  *
  * ## 例外
  *

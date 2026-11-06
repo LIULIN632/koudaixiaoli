@@ -22,7 +22,7 @@ import java.io.File
  *
  * ## 判据为什么落在源码上
  *
- * 与 `HomeNoBubbleTipTest` / `InlinePasswordTransformationTest` / `TabRouteInputFocusTest` 同一档次：
+ * 与 `NoBubbleTipTest` / `InlinePasswordTransformationTest` / `TabRouteInputFocusTest` 同一档次：
  * 被守的东西（一个方法签名、一个 `Captcha` 类名）**在截图与语义树里都不存在**，
  * 只有源码里有。断言接口声明的方法集合"精确等于白名单"，就没有含糊空间 ——
  * 加了写方法会红，**改了读方法名字**也会红（那是 UI 要跟着改的信号，值得被看见）。
@@ -182,7 +182,7 @@ class SecondClassBoundaryTest {
     /**
      * 粗暴剥掉 `//` 行注释与 `/* */` 块注释。
      *
-     * 与 `HomeNoBubbleTipTest.stripComments` 同一档次的启发式：不做字符串字面量感知，
+     * 与 `NoBubbleTipTest.stripComments` 同一档次的启发式：不做字符串字面量感知，
      * 只用来**减少假阳性**。判错的代价是"多报一次、人来确认"，不是漏放。
      */
     private fun stripComments(source: String): String =

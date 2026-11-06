@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.pocket.xiaoli.data.exam.ExamSchedule
+import com.pocket.xiaoli.core.exam.ExamSchedule
 
 /**
  * 一条已确认的考试安排。

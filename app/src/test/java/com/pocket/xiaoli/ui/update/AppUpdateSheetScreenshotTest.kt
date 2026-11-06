@@ -33,7 +33,8 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * 更新抽屉内容基线。
  *
- * `WindowBottomSheet` 是独立窗口，JVM 截图抓不到（与 `RecommendSheet` 同一条限制），
+ * 外壳原来是 `WindowBottomSheet`（独立窗口，JVM 截图抓不到；2026-10-30 换成页内浮层
+ * `AppOverlaySheet`，外壳本身改由 `AppOverlaySheetTest` 拍），这里拍的是正文，
  * 所以这里只渲内容本体，但套上同样的「底部卡片」外壳，盯住三件最容易改坏的事：
  *
  * 1. 三条说明在窄屏上是否被压成碎句；

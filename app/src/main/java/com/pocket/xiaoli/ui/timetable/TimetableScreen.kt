@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -53,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.PocketXiaoliApplication
 import com.pocket.xiaoli.data.entity.CourseEntity
+import com.pocket.xiaoli.data.worstDueStage
 import com.pocket.xiaoli.ui.glass.LocalBottomBarInset
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -64,11 +64,9 @@ import com.pocket.xiaoli.ui.profile.SemesterSettingsPage
 import com.pocket.xiaoli.ui.components.SemesterCalibrateDialog
 import com.pocket.xiaoli.ui.components.TimetableEmptyState
 import com.pocket.xiaoli.ui.theme.*
-import com.pocket.xiaoli.util.CourseShortName
 import com.pocket.xiaoli.util.HolidayCalendar
 import com.pocket.xiaoli.util.HolidayMark
 import com.pocket.xiaoli.util.HolidaySchedule
-import com.pocket.xiaoli.util.MinuteOfDay
 import com.pocket.xiaoli.util.parseSemesterStart
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -205,8 +203,15 @@ fun TimetableScreen(
     // ⚠️ 位置很重要：必须写在 `if (showSemesterSettings) { ...; return }` **之前**。
     // 它原本在 return 之后，于是"打开学期设置页时这次组合少一个 collect、关掉时多一个"——
     // Composable 内的条件调用会让 Compose 的槽位表错位。提前到所有 early return 之前即可。
-    val homeworkCourseNames by app.repository.getActiveHomeworkCourseNames(schemeId)
+    val activeHomework by app.repository.getActiveHomework(schemeId)
         .collectAsStateWithLifecycle(initialValue = emptyList())
+    // 课程名 → 这门课**最紧**那条作业的截止档位。
+    // ⚠️ 用 Map 而不是 Set：**键的存在就是"有作业"**，值可以为 null（没写日期，或写了
+    // 「下周交」这种解析不出的话）—— 那种仍然要给高亮边框，只是不升到危险色。
+    val homeworkStageByCourse = remember(activeHomework) {
+        activeHomework.groupBy { it.courseName }
+            .mapValues { (_, items) -> worstDueStage(items.map { it.dueDate }) }
+    }
 
     // ⚠️ 同理提到 early return 之前：`LaunchedEffect` 属于"按槽位记账"的调用，
     // 打开/关闭学期设置页时它会插入或消失，导致同一 Composable 的调用数量前后不一致。
@@ -563,7 +568,7 @@ fun TimetableScreen(
                         gridBgColor = gridBgColor,
                         otherWeekAlpha = otherWeekAlpha,
                         verticalLayout = verticalLayout,
-                        homeworkCourseNames = homeworkCourseNames.toSet(),
+                        homeworkStageByCourse = homeworkStageByCourse,
                         // 底栏是浮层，这里**不再**在外面给网格让高度 ——
                         // 那样会在网格与底栏之间空出一条死白，底栏悬在空白上既没有东西可模糊，
                         // 看起来也就是"tab 后面多了一块白板"。改成把留白交给网格内部的滚动内容。
@@ -640,394 +645,6 @@ fun TimetableScreen(
     }
 
 
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CourseEditorDialog(
-    course: CourseEntity,
-    currentWeek: Int,
-    availableSlots: List<Int> = emptyList(),
-    onDismiss: () -> Unit,
-    onSave: (CourseEntity) -> Unit,
-    onDelete: (CourseEntity) -> Unit,
-    onLocate: (String) -> Unit = {},
-    onOpenRoomLayout: (String) -> Unit = {},
-    onOpenCourseNavigation: (String) -> Unit = {},
-) {
-    val skin = LocalSkin.current
-    val colors = LocalPocketXiaoliColors.current
-    var name by remember { mutableStateOf(course.name) }
-    var shortName by remember { mutableStateOf(course.shortName) }
-    var credits by remember { mutableStateOf(course.credits) }
-    var teacher by remember { mutableStateOf(course.teacher) }
-    var room by remember { mutableStateOf(course.room) }
-    var dayOfWeek by remember { mutableStateOf(course.dayOfWeek) }
-    var startSlot by remember { mutableStateOf(course.startSlot) }
-    var endSlot by remember { mutableStateOf(course.endSlot) }
-    var weekType by remember { mutableStateOf(course.weekType) }
-    var weeks by remember { mutableStateOf(course.weeks) }
-    // ── 照岱宗 CustomCourseEntity：类型 / 备注 / 分钟级时间 ──
-    var kind by remember { mutableStateOf(course.kind) }
-    var note by remember { mutableStateOf(course.note) }
-    var useMinuteTime by remember {
-        mutableStateOf(course.startMinute >= 0 || course.endMinute >= 0)
-    }
-    var startMinuteText by remember { mutableStateOf(MinuteOfDay.format(course.startMinute)) }
-    var endMinuteText by remember { mutableStateOf(MinuteOfDay.format(course.endMinute)) }
-    // 节次下拉不再写死 1..12：跟随「时间段管理」里配的节次；课程自己的节次永远在列表里
-    val slotOptions = remember(availableSlots, course.startSlot, course.endSlot) {
-        (availableSlots.ifEmpty { (1..12).toList() } + course.startSlot + course.endSlot)
-            .distinct().sorted()
-    }
-    // 初值取**生效色**（未钉住时是按课名派生的那个）：否则用户打开编辑器看到的颜色
-    // 与课表里不一致，会以为"颜色设置坏了"。
-    var colorIndex by remember { mutableStateOf(course.effectiveColorIndex) }
-    // 用户有没有**主动**点过调色板 —— 决定保存时是否把颜色钉住（colorPinned）
-    var colorTouched by remember { mutableStateOf(false) }
-
-    val isEditing = course.id != 0L
-    val weekdays = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-
-    // Parse weeks string into range
-    val parsedWeeks = remember(weeks) {
-        val nums = weeks.split(",").mapNotNull { it.trim().toIntOrNull() }.sorted()
-        if (nums.isNotEmpty()) nums.first() to nums.last() else 1 to 16
-    }
-    var startWeek by remember { mutableIntStateOf(parsedWeeks.first) }
-    var endWeek by remember { mutableIntStateOf(parsedWeeks.second) }
-
-    // Original parsed weeks for dirty detection
-    val origParsedWeeks = remember(course.id) {
-        val nums = course.weeks.split(",").mapNotNull { it.trim().toIntOrNull() }.sorted()
-        if (nums.isNotEmpty()) nums.first() to nums.last() else 1 to 16
-    }
-
-    // Dirty state detection
-    val hasChanges = name != course.name ||
-        shortName != course.shortName ||
-        credits != course.credits ||
-        teacher != course.teacher ||
-        room != course.room ||
-        dayOfWeek != course.dayOfWeek ||
-        startSlot != course.startSlot ||
-        endSlot != course.endSlot ||
-        weekType != course.weekType ||
-        kind != course.kind ||
-        note != course.note ||
-        useMinuteTime != (course.startMinute >= 0 || course.endMinute >= 0) ||
-        startMinuteText != MinuteOfDay.format(course.startMinute) ||
-        endMinuteText != MinuteOfDay.format(course.endMinute) ||
-        (colorTouched && colorIndex != course.effectiveColorIndex) ||
-        startWeek != origParsedWeeks.first ||
-        endWeek != origParsedWeeks.second
-
-    var showExitConfirm by remember { mutableStateOf(false) }
-
-    // Initialize weekType from existing course data
-    LaunchedEffect(course.id) {
-        if (course.id != 0L) {
-            // Only set once per dialog open
-            weekType = course.weekType
-        }
-    }
-
-    val showWeekRange = weekType == "all" || weekType == "odd" || weekType == "even"
-
-    AlertDialog(
-        onDismissRequest = { if (hasChanges) showExitConfirm = true else onDismiss() },
-        title = { Text(if (isEditing) "编辑课程" else "添加课程", fontWeight = FontWeight.ExtraBold) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(skin.spaceSm)
-            ) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("课程名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                // ── 类型：课程 / 日程（照岱宗 CustomCourseEntity.courseType）──
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSmall)) {
-                    FilterChip(
-                        selected = kind == CourseEntity.KIND_COURSE,
-                        onClick = { kind = CourseEntity.KIND_COURSE },
-                        label = { Text("课程", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = kind == CourseEntity.KIND_AGENDA,
-                        onClick = { kind = CourseEntity.KIND_AGENDA },
-                        label = { Text("日程", fontSize = 12.sp) }
-                    )
-                }
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it },
-                    label = { Text(if (kind == CourseEntity.KIND_AGENDA) "日程备注" else "备注（可选）") },
-                    maxLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                // ── 课表里的简称（可选）──
-                //
-                // 课表格子只有几厘米宽，长课名会被截成「工程会计与财」这种**开头相同、分不出来**的样子。
-                // 这里让用户自己给一个短名；留空则用内置表 / 规则推出来的（见 CourseShortName）。
-                // ⚠️ 只影响**格子**里的显示，详情、导出、搜索一律用全名 —— 简称是退让，不是正式名。
-                OutlinedTextField(
-                    value = shortName,
-                    onValueChange = { shortName = it },
-                    label = { Text("课表简称（可选）") },
-                    placeholder = {
-                        Text(
-                            CourseShortName.suggest(name)?.let { "留空则显示「$it」" } ?: "留空则显示全名",
-                            fontSize = 12.sp,
-                        )
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                    OutlinedTextField(value = credits, onValueChange = { credits = it }, label = { Text("学分") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(value = teacher, onValueChange = { teacher = it }, label = { Text("教师") }, singleLine = true, modifier = Modifier.weight(1f))
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(value = room, onValueChange = { room = it }, label = { Text("教室/地点") }, singleLine = true, modifier = Modifier.weight(1f))
-                    if (room.isNotBlank()) {
-                        TextButton(onClick = { onOpenRoomLayout(room.trim()) }) {
-                            Text("分布图", color = colors.accentMain)
-                        }
-                        TextButton(onClick = { onLocate(room.trim()) }) {
-                            Text("地图", color = colors.textSecondary)
-                        }
-                        TextButton(onClick = { onOpenCourseNavigation(room.trim()) }) {
-                            Text("导航", color = colors.textSecondary)
-                        }
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                    var dayExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = dayExpanded, onExpandedChange = { dayExpanded = it }, modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(value = weekdays[dayOfWeek - 1], onValueChange = {}, readOnly = true, label = { Text("星期") }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true))
-                        ExposedDropdownMenu(expanded = dayExpanded, onDismissRequest = { dayExpanded = false }) {
-                            weekdays.forEachIndexed { i, d -> DropdownMenuItem(text = { Text(d) }, onClick = { dayOfWeek = i + 1; dayExpanded = false }) }
-                        }
-                    }
-                    var startExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = startExpanded, onExpandedChange = { startExpanded = it }, modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(value = "第${startSlot}节", onValueChange = {}, readOnly = true, label = { Text("开始节次") }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true))
-                        ExposedDropdownMenu(expanded = startExpanded, onDismissRequest = { startExpanded = false }) {
-                            slotOptions.forEach { s -> DropdownMenuItem(text = { Text("第${s}节") }, onClick = { startSlot = s; if (endSlot < s) endSlot = s; startExpanded = false }) }
-                        }
-                    }
-                    var endExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = endExpanded, onExpandedChange = { endExpanded = it }, modifier = Modifier.weight(1f)) {
-                        OutlinedTextField(value = "第${endSlot}节", onValueChange = {}, readOnly = true, label = { Text("结束节次") }, modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true))
-                        ExposedDropdownMenu(expanded = endExpanded, onDismissRequest = { endExpanded = false }) {
-                            slotOptions.filter { it >= startSlot }.forEach { s -> DropdownMenuItem(text = { Text("第${s}节") }, onClick = { endSlot = s; endExpanded = false }) }
-                        }
-                    }
-                }
-
-                // ── 时间口径：按节次（默认）或按分钟（照岱宗 minuteOfDay）──
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSmall)) {
-                    FilterChip(
-                        selected = !useMinuteTime,
-                        onClick = { useMinuteTime = false },
-                        label = { Text("按节次", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = useMinuteTime,
-                        onClick = { useMinuteTime = true },
-                        label = { Text("按时间", fontSize = 12.sp) }
-                    )
-                }
-                if (useMinuteTime) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                        OutlinedTextField(
-                            value = startMinuteText,
-                            onValueChange = { startMinuteText = it },
-                            label = { Text("开始 HH:mm") },
-                            placeholder = { Text("10:00") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = endMinuteText,
-                            onValueChange = { endMinuteText = it },
-                            label = { Text("结束 HH:mm") },
-                            placeholder = { Text("11:40") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    Text(
-                        "填了时间就按分钟排，不再受节次表限制；留空回退到上面的节次。",
-                        fontSize = 11.sp,
-                        color = colors.textTertiary
-                    )
-                }
-
-                // ── Week type selector ──
-                Text("周次类型", fontSize = 13.sp, color = colors.textTertiary)
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSmall)) {
-                    FilterChip(
-                        selected = weekType == "all",
-                        onClick = { weekType = "all" },
-                        label = { Text("全周", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = weekType == "thisWeek",
-                        onClick = { weekType = "thisWeek" },
-                        label = { Text("仅本周", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = weekType == "odd",
-                        onClick = { weekType = "odd" },
-                        label = { Text("单周", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = weekType == "even",
-                        onClick = { weekType = "even" },
-                        label = { Text("双周", fontSize = 12.sp) }
-                    )
-                }
-
-                // ── Week range (shown for all/odd/even, hidden for thisWeek) ──
-                if (showWeekRange) {
-                    Text("课程周数范围", fontSize = 13.sp, color = colors.textTertiary)
-                    Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
-                        var sExp by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = sExp,
-                            onExpandedChange = { sExp = it },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = "第${startWeek}周开始",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("开始周") },
-                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                            )
-                            ExposedDropdownMenu(expanded = sExp, onDismissRequest = { sExp = false }) {
-                                (1..25).forEach { w ->
-                                    DropdownMenuItem(
-                                        text = { Text("第${w}周") },
-                                        onClick = { startWeek = w; if (endWeek < w) endWeek = w; sExp = false }
-                                    )
-                                }
-                            }
-                        }
-                        var eExp by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = eExp,
-                            onExpandedChange = { eExp = it },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            OutlinedTextField(
-                                value = "第${endWeek}周结束",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("结束周") },
-                                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                            )
-                            ExposedDropdownMenu(expanded = eExp, onDismissRequest = { eExp = false }) {
-                                (startWeek..30).forEach { w ->
-                                    DropdownMenuItem(
-                                        text = { Text("第${w}周") },
-                                        onClick = { endWeek = w; eExp = false }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Text(
-                        text = "共${endWeek - startWeek + 1}周：${startWeek}-${endWeek}周",
-                        fontSize = 11.sp,
-                        color = colors.textSecondary,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                } else {
-                    // For "仅本周"
-                    Text(
-                        text = "仅第 ${currentWeek} 周显示",
-                        fontSize = 12.sp,
-                        color = colors.accentMain,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSmall)) {
-                    CourseColors.forEachIndexed { i, c ->
-                        Box(modifier = Modifier.size(32.dp).invisibleTouchTarget().clip(CircleShape).background(c).clickable {
-                            colorIndex = i
-                            // 点过就"钉住"：从此不再按课名自动改色（用户手选优先）
-                            colorTouched = true
-                        }, contentAlignment = Alignment.Center) {
-                            if (i == colorIndex) Box(modifier = Modifier.size(14.dp).clip(CircleShape).background(Color.White))
-                        }
-                    }
-                }
-                Text(
-                    "不选就按课程名自动配色（同一门课在任何一天都同色）；点一下即固定成你选的颜色。",
-                    fontSize = 11.sp,
-                    color = colors.textTertiary,
-                    lineHeight = 15.sp,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val generatedWeeks = when (weekType) {
-                        "thisWeek" -> currentWeek.toString()
-                        else -> (startWeek..endWeek).joinToString(",") { it.toString() }
-                    }
-                    val finalWeekType = when (weekType) {
-                        "thisWeek" -> "all"  // "仅本周" stored with weeks = single week, type = all
-                        else -> weekType
-                    }
-                    onSave(course.copy(
-                        name = name, credits = credits, teacher = teacher, room = room,
-                        dayOfWeek = dayOfWeek, startSlot = startSlot, endSlot = endSlot,
-                        weekType = finalWeekType, weeks = generatedWeeks, colorIndex = colorIndex,
-                        shortName = shortName.trim(),
-                        kind = kind,
-                        note = note.trim(),
-                        startMinute = if (useMinuteTime) {
-                            MinuteOfDay.parse(startMinuteText) ?: MinuteOfDay.NONE
-                        } else MinuteOfDay.NONE,
-                        endMinute = if (useMinuteTime) {
-                            MinuteOfDay.parse(endMinuteText) ?: MinuteOfDay.NONE
-                        } else MinuteOfDay.NONE,
-                        // 点过调色板 → 钉住；本来已钉住的继续钉住（改别的字段不该把颜色放回自动）
-                        colorPinned = colorTouched || course.colorPinned
-                    ))
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = colors.accentMain)
-            ) { Text("保存") }
-        },
-        dismissButton = {
-            Row {
-                if (isEditing) TextButton(onClick = { onDelete(course) }) { Text("删除", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = { if (hasChanges) showExitConfirm = true else onDismiss() }) { Text("取消") }
-            }
-        }
-    )
-
-    if (showExitConfirm) {
-        AlertDialog(
-            onDismissRequest = { showExitConfirm = false },
-            title = { Text("放弃更改？", fontWeight = FontWeight.Bold) },
-            text = { Text("你有未保存的修改，退出后将丢失所有更改。") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showExitConfirm = false
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("放弃") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExitConfirm = false }) { Text("继续编辑") }
-            }
-        )
-    }
 }
 
 // ═══════════════════════════════════════════

@@ -2,7 +2,6 @@ package com.pocket.xiaoli.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -25,8 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocket.xiaoli.ui.components.FieldActionChip
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 
@@ -136,7 +135,7 @@ internal fun AddTodoForm(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(skin.spaceSm)
     ) {
         OutlinedTextField(
             value = state.content,
@@ -207,11 +206,10 @@ internal fun AddTodoForm(
                 shape = RoundedCornerShape(skin.radiusChip)
             )
             if (state.courses.isNotEmpty()) {
-                TextButton(
-                    onClick = { state.usePicker = true; state.course = "" },
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("从已有课程选择 →", color = colors.accentMain, fontSize = 12.sp)
+                // 裸文字 + 「→」读起来像一句说明，不像一个能点的出口 —— 换成有边界的动作胶囊。
+                FieldActionChip("从已有课程选择") {
+                    state.usePicker = true
+                    state.course = ""
                 }
             }
         }

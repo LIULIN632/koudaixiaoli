@@ -263,7 +263,9 @@ fun RoomDataViewerScreen(
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    itemsIndexed(currentPage.rows) { index, row ->
+                    // 开发者看数据的页：整页行是"换表/翻页"时一次性替换的，行本身无状态，
+                    // 用下标当 key 就够（有比没有好：让这一处过 itemsIndexed 的 key 规则）
+                    itemsIndexed(currentPage.rows, key = { index, _ -> index }) { index, row ->
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()

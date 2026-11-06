@@ -4,39 +4,24 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * 「刚X / n 分钟前X / n 小时前X / n 天前X / 日期 X」—— 相对时间说人话的**唯一一份**实现。
+ * 「刚X / n 分钟前X / n 小时前X / n 天前X / 日期 X」—— **分档规则在共享层**
+ * （`core/text/RelativeTimeCore.kt`），本文件只保留 Android 原有的包路径与签名。
  *
- * ## 为什么不在各处各写一遍
+ * 为什么抽走：同样的分档 Windows 端也写了一份，口径还不一样（桌面超过 7 天就报日期、
+ * 日期格式也不同）。现在两端共用一套分档，只保留「时区转本地日期」这件平台相关的事在这里。
  *
- * 修课情况快照要说"更新于 3 天前"，更新检查要说"3 分钟前查过"。改造前这套分档
- * 只长在 `AcademicSnapshot` 里，第二个消费者要么抄一遍（两套口径迟早不一致，
- * 一个是"3 天前"一个变成"3日"没人管得住），要么就只能不说时间。
- *
- * ## 为什么超过 30 天改口报日期
- *
- * "45 天前"用户读不出是哪一回，而"2026-09-12"能直接和别的事对上。
- *
- * @param past 过去某个时刻（epoch millis）；`<= 0` 表示**根本没有这个时刻**，返回空串 ——
- *   缺时间戳时宁可不写这句，也不能编出一个"刚X"或"0 分钟前X"的假精确。
- * @param verb 跟在时长后面的那个动作，如「更新」「查过」。
+ * @param past 过去某个时刻（epoch millis）；`<= 0` 表示根本没有这个时刻，返回空串
+ * @param verb 跟在时长后面的动作，如「更新」「查过」；可以为空
  */
 internal fun relativeSinceLabel(
     past: Long,
     verb: String,
     now: Long = System.currentTimeMillis(),
-): String {
-    if (past <= 0L) return ""
-    val minutes = (now - past) / 60_000
-    return when {
-        minutes < 1 -> "刚$verb"
-        minutes < 60 -> "${minutes} 分钟前$verb"
-        minutes < 60 * 24 -> "${minutes / 60} 小时前$verb"
-        minutes < 60 * 24 * 30 -> "${minutes / (60 * 24)} 天前$verb"
-        // 动词可以是空串（笔记那种只要"3 分钟前"、不要后缀），拼完要 trim，
-        // 否则日期那一档会留下一个看得见的尾空格。
-        else -> (
-            Instant.ofEpochMilli(past).atZone(ZoneId.systemDefault())
-                .toLocalDate().toString() + " " + verb
-            ).trim()
-    }
-}
+): String = com.pocket.xiaoli.core.text.relativeSinceLabel(
+    pastMillis = past,
+    nowMillis = now,
+    verb = verb,
+    formatDate = { millis ->
+        Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+    },
+)

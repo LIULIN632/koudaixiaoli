@@ -1,0 +1,46 @@
+校园 3D 沙盘数据说明 · 烟台大学南校区
+
+主数据：campus_3d.json
+数据来源：OpenStreetMap（https://www.openstreetmap.org）
+版权署名：地图数据 © OpenStreetMap 贡献者
+许可协议：Open Database License (ODbL) 1.0
+          https://opendatacommons.org/licenses/odbl/1-0/
+生成脚本：tools/campus-map-data/build_campus_3d.py --campus ytu_south
+抓取方式：Overpass 镜像（overpass-api.de 在本机不通，改用 overpass.openstreetmap.fr）
+生成日期：2026-11-04
+坐标系：WGS-84（原始 OSM 坐标，未做 GCJ-02 偏移）
+
+边界与裁剪：
+- 校区边界取 OSM way/1029549347「烟台大学(南校区)」，简化后 11 个点。
+- 抓取用的是边界的外接矩形，矩形里混着校区外的社会建筑
+  （烟台南山皇冠假日酒店、南山世纪大厦、33 层住宅塔楼等），
+  生成时按「多数顶点落在校区边界内」剔除，共剔掉 9 栋。
+- 交叉校验：OSM 边界中心 37.45751,121.46499 与高德「烟台大学南区」POI
+  经 GCJ-02→WGS-84 纠偏后的 37.45748,121.46500 相差不到 10 米，两条独立来源对得上。
+
+字段口径：
+- 22 栋楼：12 dorm / 7 facility / 2 dining / 1 teaching，其中 5 栋 OSM 没有 name，保持空名。
+- 层数 15 栋来自 OSM building:levels（学生公寓 6 层、教学楼 4 层、餐厅 2–3 层），
+  另外 7 栋 OSM 没标层数，按面积给保守值并置 levelsEstimated=true，仅用于示意，不是实测。
+- 楼名来自 OSM 原名「烟台大学南校区7号学生公寓」这类带校区前缀的写法，
+  展示名去掉前缀（→「7号学生公寓」），原名完整保留在 sourceName 字段。
+- 运动场地 10 处（篮球场 / 网球场 / 足球场 / 田径场）与步道 13 条来自 OSM 矢量数据。
+- 水系与绿地为 0：OSM 在该校区范围内没有绘制水体与绿地要素，因此这里不画，
+  也不拿影像描点凑数。
+
+没有的内容（不要凭这些字段做推断）：
+- 没有 campus_3d_traced.json —— 本校区的楼栋轮廓全部来自 OSM，无影像描点补充。
+- 没有楼栋出入口、门牌、室内平面与楼层房间数据。
+- 没有可通行的校园道路网络：OSM 的 13 条 footway/path 只连成 9 个分量、20 处断头路，
+  22 栋里 12 栋能接上最大分量（analyze_path_graph.py 实测）。所以地图能显示、不能算路。
+- 烟大南校区在本 App 里只对接后勤类服务（电费、洗浴），不含教务导入；
+  因此「今日有课」图层在该校区通常为空，这是数据边界，不是渲染缺陷。
+
+派生产物（离线建模管线，App 当前不加载）：
+- campus.glb：0.83 MB / 15,321 三角面 / 7 材质 / 22 个 Building_ 节点 + 22 个 Anchor_ 节点，
+  由 tools/campus-map-data/build_campus_glb.py --campus ytu_south 生成，check_glb.py 契约 PASS。
+- campus_glb_manifest.json：把 GLB 节点名（Building_dorm1 这类按楼名/顺序生成的 key）
+  逐一绑回 campus_3d.json 的 OSM id。App 端将来接 3D 渲染时只认 id，不靠楼名匹配。
+- 坐标系：glTF Y-up 局部米制，+X=东、+Y=上、+Z=南，原点在 campus_3d.json 的 center。
+
+使用要求：在应用内展示地图时需保留 OpenStreetMap 署名与 ODbL 链接。

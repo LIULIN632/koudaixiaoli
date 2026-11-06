@@ -120,15 +120,13 @@ object SchoolServiceLauncher {
         if (!ok) Toast.makeText(context, "打开失败，请确认已安装支付宝", Toast.LENGTH_SHORT).show()
     }
 
-    /** 用外部浏览器打开（兜底） */
+    /** 用外部浏览器打开（兜底）：统一走 ExternalLinks，失败时会复制链接并提示 */
     fun openExternal(url: String, context: Context) {
-        val ok = runCatching {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }.isSuccess
-        if (!ok) Toast.makeText(context, "未找到可用浏览器", Toast.LENGTH_SHORT).show()
+        if (url.isBlank()) {
+            Toast.makeText(context, "该服务暂未配置入口", Toast.LENGTH_SHORT).show()
+            return
+        }
+        com.pocket.xiaoli.ui.util.ExternalLinks.open(context, url)
     }
 
     /**

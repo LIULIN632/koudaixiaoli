@@ -64,6 +64,7 @@ import com.pocket.xiaoli.ui.profile.components.FaqDialog
 import com.pocket.xiaoli.ui.share.AppShare
 import com.pocket.xiaoli.ui.share.RecommendSheet
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
+import com.pocket.xiaoli.ui.util.ExternalLinks
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.ServiceAccent
 import com.pocket.xiaoli.ui.components.MiuixSettingsScaffold
@@ -277,7 +278,7 @@ private fun AboutContent(
         SettingsDivider()
         SettingsMenuItem(
             icon = Icons.Filled.Info,
-            title = "关于口袋小鲤",
+            title = "关于",
             onClick = onAbout,
             accent = ServiceAccent.INFO,
         )
@@ -442,11 +443,12 @@ internal fun UpdatePageContent(
         SettingsMenuItem(
             icon = Icons.Filled.SystemUpdate,
             title = "检查更新",
+            // 这一轮的结论、有多新鲜、以及**这一轮的毛病**（哪个镜像、HTTP 几、什么异常）
+            // 全写在这一行小字里（`checkTrace`）：问号去掉之后，失败原因只能住在这儿 ——
+            // 光说"这次没查上"等于让用户再点一次碰运气。
             subtitle = feedState.checkTrace().takeIf { it.isNotBlank() },
             onClick = { if (!feedState.checking) onCheckUpdate() },
             accent = ServiceAccent.QUERY,
-            // 问号里的内容跟着状态走：平时是行为说明，这一轮有毛病时换成毛病原文
-            hint = feedState.checkHint,
         )
         SettingsDivider()
         SettingsMenuItem(
@@ -461,9 +463,10 @@ internal fun UpdatePageContent(
     SettingsCard {
         // 这一条是给"不想被打扰"的人的：关掉之后 App 不再自己弹更新抽屉、不发更新通知、
         // 消息入口那颗更新红点也不亮。
-        // ⚠️ 三件事它**不**管，也都写在问号里：检查照旧（feed 里还带着公告，停了检查公告一起瞎）、
+        // ⚠️ 三件事它**不**管：检查照旧（feed 里还带着公告，停了检查公告一起瞎）、
         // 上面的手动「检查更新」照旧（想更随时能更）、**强制更新照旧弹**
         //（那是"这个版本已不受支持"，能被开关关掉就不叫底线）。
+        // 这三条以前写在行尾的「?」里，2026-10-30 按用户要求连问号一起撤掉 —— 副标题只留结论。
         SettingsSwitchItem(
             icon = Icons.Filled.Notifications,
             title = "主动提醒更新",
@@ -471,9 +474,6 @@ internal fun UpdatePageContent(
             checked = pushEnabled,
             onToggle = onTogglePush,
             accent = ServiceAccent.INFO,
-            hint = "关掉之后：不再自动弹出更新窗口，通知栏也不发更新消息，消息入口的更新红点不亮。" +
-                "想更新随时点上面的「检查更新」，公告不受这个开关影响。" +
-                "版本不被支持时的强制提示仍然会出现 —— 那条不是新功能，是安全底线。",
         )
         SettingsDivider()
         SettingsSwitchItem(
@@ -482,13 +482,11 @@ internal fun UpdatePageContent(
             checked = backgroundCheck,
             onToggle = onToggleBackground,
             accent = ServiceAccent.INFO,
-            hint = "每 15 分钟查一次，有新版本发一条通知。关掉后只在打开 App 时查，" +
-                "停机公告也可能晚一步才看到。",
         )
         SettingsDivider()
         // 照岱宗盒子的做法：这一行不跳页，点了就地弹气泡菜单选。
         // 选项只写名字（0.1.95 那轮加的「：让它先跑」是复述 —— 行尾本来就显示当前选中的
-        // 那一个，弹层里选中的那条也高着，同一件事不必说三遍），行为差异收进「?」。
+        // 那一个，弹层里选中的那条也高着，同一件事不必说三遍）。
         SettingsMenuChoiceItem(
             icon = Icons.Filled.Cloud,
             title = "更新渠道",
@@ -496,14 +494,11 @@ internal fun UpdatePageContent(
             selected = channel,
             onSelect = onChannel,
             accent = ServiceAccent.QUERY,
-            hint = "两个仓放的是同一份包，这里只决定先问哪一个。选「自动」是两个同时问、" +
-                "谁快用谁；选 Gitee 或 GitHub 是让那个先跑，另一个仍然兜底。" +
-                "国内网络下 Gitee 通常更快。",
         )
         SettingsDivider()
         // 内测通道：读 feed.json 的 beta 块（比 stable 新的那一版）。
         // 名字刻意不叫「测试版」也不叫「抢先版」—— 前者像 bug 多的意思，后者像付费功能。
-        // 小字只留这一句风险提示：它是"开之前必须知道"的那一件事，其余解释进「?」。
+        // 小字只留这一句风险提示：它是"开之前必须知道"的那一件事。
         SettingsSwitchItem(
             icon = Icons.Filled.BugReport,
             title = "加入内测",
@@ -511,8 +506,6 @@ internal fun UpdatePageContent(
             checked = betaEnabled,
             onToggle = onToggleBeta,
             accent = ServiceAccent.PAYMENT,
-            hint = "先拿还没全量发布的版本试。装错了随时关掉，退回正式版重下一份就行；" +
-                "内测包坏了不会影响你的课表与账号数据。",
         )
     }
 }
@@ -741,18 +734,12 @@ private fun DangerContent(
 }
 
 /**
- * 用系统浏览器打开一个链接。
+ * 用系统浏览器打开一个链接（统一走 [ExternalLinks]）。
  *
- * 失败时静默 —— 这一页的每个动作都是"锦上添花"，打不开浏览器不值得弹一个 Toast
- * 打断用户（与首页通知抽屉里的 `openFeedUrl` 同一条取舍）。
+ * 2026-11 修：此前这里静默失败 —— 用户报「致谢里点一个链接、取消后再点另一个就没反应」。
+ * 现在失败会复制链接并提示，至少能分清"系统没有浏览器"和"点击没被处理"。
  */
 private fun openUrl(context: android.content.Context, url: String) {
-    if (url.isBlank()) return
-    runCatching {
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-    }
+    ExternalLinks.open(context, url)
 }
 

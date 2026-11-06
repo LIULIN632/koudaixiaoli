@@ -1,5 +1,6 @@
 package com.pocket.xiaoli.ui.home
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -38,6 +39,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.pocket.xiaoli.data.entity.ExamEntity
 
+/** 首页"下一节课"卡的那一节课。字段全 val，标 [Immutable] 让消费方能跳过重组。 */
+@Immutable
 data class HomeCourse(
     val course: CourseEntity,
     val startTime: String,
@@ -47,6 +50,14 @@ data class HomeCourse(
     val isFinished: Boolean = false
 )
 
+/**
+ * 首页一次状态发射的全部内容。
+ *
+ * 标 [Immutable]（字段全是 val，列表来自 Room 的只读投影）：Compose 只有**被调方参数类型
+ * 全稳定**才允许跳过重组，不标就是"每次发射整页重画"—— 首页还挂着每秒走一次的时钟。
+ * 守门人：`HomeStateStabilityTest`（重组计数，像素看不出来）。
+ */
+@Immutable
 data class HomeUiState(
     // 原 `nickname: String = "同学"` 已删除（2026-10）：「昵称」整个概念随身份卡改版一起删，
     // 而首页从来没有渲染过它（只在状态里躺着），所以这里没有替换项。
@@ -374,6 +385,7 @@ class HomeViewModel(
                         schemeId = settings.activeSchemeId.value,
                     )
                 )
+                settings.rescheduleHomeworkReminders()
             }
         }
     }
@@ -391,11 +403,15 @@ class HomeViewModel(
     fun toggleHomework(homework: HomeworkEntity) {
         viewModelScope.launch {
             repository.setHomeworkCompleted(homework.id, !homework.completed)
+            settings.rescheduleHomeworkReminders()
         }
     }
 
     fun deleteHomework(homework: HomeworkEntity) {
-        viewModelScope.launch { repository.deleteHomework(homework.id) }
+        viewModelScope.launch {
+            repository.deleteHomework(homework.id)
+            settings.rescheduleHomeworkReminders()
+        }
     }
 
     // ── 考试（首页待办区与「服务 → 考试安排」共用同一份数据） ──

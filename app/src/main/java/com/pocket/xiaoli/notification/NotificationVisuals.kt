@@ -44,6 +44,9 @@ internal object NotificationVisuals {
 
     /** 番茄钟进行中 / 结束。 */
     const val TIMER = R.drawable.ic_stat_timer
+
+    /** 反馈有了回复（对话气泡）。 */
+    const val REPLY = R.drawable.ic_stat_reply
     /** 通知大图标建议边长（dp）；系统会按需缩放，这里只保证不是 1:1 的原始小图。 */
     private const val LARGE_ICON_DP = 64
 

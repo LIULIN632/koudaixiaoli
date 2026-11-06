@@ -73,6 +73,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.Tram
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -102,6 +103,7 @@ import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DragHandle
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EventSeat
+import androidx.compose.material.icons.outlined.ViewInAr
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.FitnessCenter
@@ -122,6 +124,7 @@ import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Upgrade
 import androidx.compose.material.icons.outlined.Wifi
+import androidx.compose.material.icons.outlined.Tram
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material.icons.outlined.School
@@ -142,7 +145,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -170,6 +172,9 @@ import com.pocket.xiaoli.data.learning.LearningPlatform
 import com.pocket.xiaoli.data.CampusInfo
 import com.pocket.xiaoli.data.CampusServiceKeys
 import com.pocket.xiaoli.data.courseware.Courseware
+import com.pocket.xiaoli.data.courseware.CoursewareDownloader
+import com.pocket.xiaoli.data.courseware.CoursewareRepository
+import com.pocket.xiaoli.data.courseware.CoursewareRow
 import com.pocket.xiaoli.ui.courseware.CoursewareScreen
 import com.pocket.xiaoli.data.service.CampusServiceAdapterRegistry
 import com.pocket.xiaoli.data.service.CampusCardLauncher
@@ -188,6 +193,7 @@ import com.pocket.xiaoli.data.promo.PromoSlot
 import com.pocket.xiaoli.data.promo.PromoAction
 import com.pocket.xiaoli.telemetry.Telemetry
 import com.pocket.xiaoli.ui.service.PromoBanner
+import com.pocket.xiaoli.ui.bus.BusArrivalScreen
 import com.pocket.xiaoli.di.AppContainer
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pocket.xiaoli.ui.service.LibraryScreen
@@ -228,16 +234,18 @@ import com.pocket.xiaoli.ui.assistant.copyToClipboard
 import com.pocket.xiaoli.ui.secondclass.SecondClassEntryScreen
 import com.pocket.xiaoli.ui.secondclass.SecondClassEntryState
 import com.pocket.xiaoli.ui.theme.miuixPress
+import com.pocket.xiaoli.ui.util.ExternalLinks
 import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.automirrored.outlined.EventNote
 
+/**
+ * 外部链接统一走 [ExternalLinks]：优先用 Activity 打开，失败时把链接复制到剪贴板并提示。
+ * 原先这里自己 `startActivity` 且**没带** `FLAG_ACTIVITY_NEW_TASK`，
+ * 在包装过的 Context 上会抛 `AndroidRuntimeException` 被吞掉 —— 用户看到的就是"点了没反应"。
+ */
 private fun openUrl(context: android.content.Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    } catch (_: Exception) {
-        Toast.makeText(context, "未找到可用浏览器", Toast.LENGTH_SHORT).show()
-    }
+    ExternalLinks.open(context, url)
 }
 
 private fun openCampusJw(context: android.content.Context, campus: CampusInfo, fallback: () -> Unit) {
@@ -304,6 +312,7 @@ fun TreasureBoxScreen(
     val colors = LocalPocketXiaoliColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val courseware by CoursewareRepository.state.collectAsStateWithLifecycle()
     val selectedCampus by appContainer.selectedCampus.collectAsStateWithLifecycle()
     val dormInfo by appContainer.dormInfo.collectAsStateWithLifecycle()
     // ⚠️ 必须 collect 而不是读 `store.current`：后者不参与快照系统，拨了开关不会触发重组
@@ -351,6 +360,12 @@ fun TreasureBoxScreen(
     )
     val promos by promoViewModel.promos.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { promoViewModel.loadOnce() }
+
+    // 清单 6 小时 TTL，进页拉一次就够（课件不是每天必看的东西，不值得为它常驻一个后台任务）
+    LaunchedEffect(Unit) {
+        CoursewareRepository.init(context)
+        CoursewareRepository.refresh(force = false)
+    }
 
     fun showServiceInfo(title: String, provider: String? = null, campusName: String? = null) {
         serviceInfoTitle = title
@@ -601,6 +616,13 @@ fun TreasureBoxScreen(
     if (subPage == ServiceSubPage.Weather) {
         WeatherScreen(
             repository = appContainer.weatherRepository,
+            onBack = { subPage = null },
+        )
+        return
+    }
+    if (subPage == ServiceSubPage.BusArrival) {
+        BusArrivalScreen(
+            repository = appContainer.busRepository,
             onBack = { subPage = null },
         )
         return
@@ -864,6 +886,11 @@ fun TreasureBoxScreen(
                 ServiceEntry("天气", "实时 · 24 小时 · 7 天", Icons.Outlined.WbSunny, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.WbSunny, accent = ServiceAccent.QUERY) {
                     subPage = ServiceSubPage.Weather
                 },
+                // 公交到站紧跟天气：两格都是「出门前看一眼」，也都只打一个免 Key、无 SDK 的公开接口。
+                // 数据源与取舍写在 `data/bus/BusRepository.kt` 的 KDoc（含为什么不走车来了）。
+                ServiceEntry("公交到站", "本校站 · 下一班还有几站", Icons.Outlined.Tram, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.Tram, accent = ServiceAccent.QUERY) {
+                    subPage = ServiceSubPage.BusArrival
+                },
                 ServiceEntry("校园卡", "余额 · 充值 · 消费", Icons.Outlined.CreditCard, Color.Unspecified, Color.Unspecified, iconFilled = Icons.Filled.CreditCard, accent = ServiceAccent.PAYMENT) {
                     openCampusService(CampusServiceKeys.CAMPUS_CARD, "校园卡")
                 },
@@ -927,24 +954,36 @@ fun TreasureBoxScreen(
                 }
             )
         ),
-        // 「互动课件」整节由清单生成（`data/courseware/CoursewareCatalog.kt`）：
-        // 加一个课件，这里只会多一格，不会出现"清单里有、页面上没有"。
-        // 图标用**穷尽 when**而不是 `else -> 通用图标` —— 漏配图标要编译不过，
-        // 静默退回通用图标会让新课件长得跟别的格子一模一样。
+        // 「互动课件」整节由清单生成（`data/courseware/`）：内置的两个 + 远端清单里的其余。
+        // 加一个课件只需要往课件仓推一次，不用发版；这里只是多一格。
+        // 图标按内置项**穷尽 when**，远端新课件用通用图标（漏配图标不再编译报错，
+        // 因为远端清单是运行时的，但落回通用图标不会让格子长得一样）。
         ServiceSection(
             title = "互动课件",
-            entries = Courseware.entries.map { item ->
+            entries = courseware.rows.map { row ->
                 ServiceEntry(
-                    item.title,
-                    item.subtitle,
-                    when (item) {
+                    row.ref.title,
+                    coursewareSubtitle(row),
+                    when (row.ref.builtin) {
                         Courseware.BeamDeflection -> Icons.Outlined.ShowChart
                         Courseware.SoilThreePhase -> Icons.Outlined.Layers
+                        null -> Icons.Outlined.ViewInAr
                     },
                     Color.Unspecified,
                     Color.Unspecified,
                     accent = ServiceAccent.STUDY,
-                ) { subPage = ServiceSubPage.CoursewarePage(item) }
+                ) {
+                    if (row.installed) {
+                        subPage = ServiceSubPage.CoursewarePage(row.ref)
+                    } else {
+                        scope.launch {
+                            val result = CoursewareRepository.install(row.ref.id)
+                            if (result.isSuccess) {
+                                subPage = ServiceSubPage.CoursewarePage(row.ref)
+                            }
+                        }
+                    }
+                }
             },
         ),
         ServiceSection(
@@ -1611,6 +1650,8 @@ private fun serviceAliases(title: String): List<String> = when (title) {
     "评教" -> listOf("评价", "问卷", "教学评价")
     "校园卡" -> listOf("一卡通", "余额", "充值")
     "烟台乘车码" -> listOf("公交", "乘车", "扫码", "乘车码")
+    // 「实时公交」是用户嘴里最常见的说法；「到站」单独也搜得到这一格。
+    "公交到站" -> listOf("公交", "实时公交", "到站", "几站", "车站", "站点", "巴士", "班车")
     "洗衣机" -> listOf("洗衣", "浣熊", "洗衣机")
     "宿舍电费" -> listOf("电费", "余额", "缴费", "用电")
     "洗澡" -> listOf("澡堂", "淋浴", "热水")
@@ -2220,4 +2261,22 @@ private fun QuickServiceEditDialog(
             }
         },
     )
+}
+
+/**
+ * 课件那一格的副标题：四种状态各自说清，不合并成一句。
+ *
+ * 下载型课件的副标题就是它的「进度条」——服务页没有单独的下载页，
+ * 用户点一下之后如果什么都不变，他会以为没反应而反复点。
+ */
+private fun coursewareSubtitle(row: CoursewareRow): String {
+    val size = row.ref.remote?.size ?: 0L
+    return when {
+        row.ref.isBuiltin -> row.ref.subtitle
+        row.busy -> "正在下载 ${row.progress}%"
+        row.error != null -> "下载失败：${row.error}，点一下重试"
+        row.needsUpdate -> "有新版本，点一下更新（${CoursewareDownloader.sizeText(size)}）"
+        row.installed -> "已下载 · 点开看"
+        else -> "${CoursewareDownloader.sizeText(size)} · 点一下下载"
+    }
 }

@@ -86,9 +86,13 @@ fun LocalSchoolsEmptyState(query: String, onFeedback: () -> Unit) {
 }
 
 /**
- * 往 `LazyColumn` 里塞「我的收藏 → 烟台学校 → 其余学校 → 页脚」。
+ * 往 `LazyColumn` 里塞「我的收藏 → 其余学校 → 页脚」。
  *
- * 顺序与分组是产品口径（收藏优先、烟台本地的排在前），不要在某一个页面里另排一套。
+ * 顺序与分组是产品口径（收藏优先、置顶学校排在前面），不要在某一个页面里另排一套。
+ *
+ * ⚠️ 分组标题是「其他学校」而不是「烟台学校」：2026-10-31 起选择器里还有两所点名的外地学校
+ *（燕京理工学院 / 山东理工大学，见 `SchoolRegistry.EXTRA_PICKER_SCHOOL_IDS`），
+ * 再叫「烟台学校」就是错的了。
  *
  * @param selectedSchoolId 只有教务直连流程需要显示选中态；网页导入点一下就跳走，传 null
  * @param onEdit / [onDelete] 只对用户自建学校（`custom_`）生效，内置学校不给改
@@ -104,8 +108,9 @@ fun LazyListScope.localSchoolItems(
     onEdit: ((School) -> Unit)? = null,
     onDelete: ((School) -> Unit)? = null,
 ) {
-    val favorites = schools.filter { it.id in favoriteIds }
-    val others = schools.filter { it.id !in favoriteIds }
+    // 一趟分完，不要 `filter` 两次：这是 `LazyListScope`，滚动时内容体重跑，
+    // 200+ 所学校 × 两遍 = 每帧多扫 400 次（这里用不了 `remember`，只能少扫一遍）。
+    val (favorites, others) = schools.partition { it.id in favoriteIds }
 
     if (favorites.isNotEmpty()) {
         item { LocalSchoolSectionCaption("我的收藏") }
@@ -121,7 +126,7 @@ fun LazyListScope.localSchoolItems(
             )
         }
         item { LocalSchoolSectionDivider() }
-        item { LocalSchoolSectionCaption("烟台学校") }
+        item { LocalSchoolSectionCaption("其他学校") }
     }
     items(others, key = { it.id }) { school ->
         LocalSchoolItem(

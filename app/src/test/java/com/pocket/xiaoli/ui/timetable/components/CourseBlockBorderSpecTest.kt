@@ -16,6 +16,58 @@ class CourseBlockBorderSpecTest {
 
     private val border = Color(0xFF123456)
     private val accent = Color(0xFF4D6BFE)
+    private val warning = Color(0xFFFFB800)
+    private val gold = Color(0xFFC08A00)
+
+    /**
+     * 带作业的块 = **实线加粗的高亮边框**（2026-10-31 用户：别在课名旁挂感叹号）。
+     *
+     * 优先级钉在这里：作业压过日程虚线、也压过用户的虚线网格设置 ——
+     * "有作业要交"是这一格里最该被看见的一件事。
+     */
+    @Test
+    fun `带作业是实线加粗高亮 压过日程与虚线设置`() {
+        val hw = courseBlockBorderSpec(
+            isAgenda = true,
+            courseBorder = border,
+            accent = accent,
+            isGhost = false,
+            borderStyle = 2,
+            hasHomework = true,
+            homeworkColor = warning,
+        )
+        assertEquals(warning, hw.color)
+        assertFalse(hw.dashed)
+        assertEquals(2f, hw.widthDp, 0.001f)
+    }
+
+    /**
+     * 逾期/今天截止 = **同一金色加一圈内嵌双线**，不是换第二种颜色。
+     *
+     * 颜色回答"这是什么"（有作业），形状回答"有多急"。用橙/红两色等于把同一件事
+     * 做成两种观感，且红色会把作业报成错误；双线对色觉障碍与深色模式同样成立。
+     */
+    @Test
+    fun `紧急档不换色只加内圈双线`() {
+        fun spec(urgent: Boolean) = courseBlockBorderSpec(
+            isAgenda = false,
+            courseBorder = border,
+            accent = accent,
+            isGhost = false,
+            borderStyle = 0,
+            hasHomework = true,
+            homeworkUrgent = urgent,
+            homeworkColor = gold,
+        )
+        assertEquals(gold, spec(true).color)
+        assertEquals(gold, spec(false).color)
+        assertTrue(spec(true).doubleLine)
+        assertFalse(spec(false).doubleLine)
+        // 两档都是实线加粗，且都要向内让位（否则 2dp 被 clip 吃掉只剩 1dp）
+        assertTrue(spec(true).insetStroke)
+        assertFalse(spec(true).dashed)
+        assertEquals(2f, spec(true).widthDp, 0.001f)
+    }
 
     @Test
     fun `普通课程是实线且用课程边框色`() {

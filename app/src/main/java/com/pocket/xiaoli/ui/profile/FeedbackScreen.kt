@@ -179,7 +179,11 @@ internal fun ColumnScope.FeedbackContent(container: AppContainer) {
         if (tickets.isEmpty()) return
         if (!store.shouldFetchReplies(hasPending = store.pending().isNotEmpty(), force = force)) return
         val got = FeedbackRemote.replies(context, tickets)
-        if (got.isNotEmpty()) store.cacheReplies(got)
+        if (got.isNotEmpty()) {
+            store.cacheReplies(got)
+            // 用户已经在这个页面上看到了，就别再让后台那条「你的反馈有回复了」响一次。
+            got.forEach { (ticket, reply) -> store.markReplyNotified(ticket, reply.text) }
+        }
         // 失败也记一次：免费版配额按接口次数算，断网时不该每次重进都打一发。
         store.markRepliesFetched()
         replies = store.cachedReplies()

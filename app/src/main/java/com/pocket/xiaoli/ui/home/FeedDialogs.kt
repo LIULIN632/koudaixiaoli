@@ -198,15 +198,9 @@ internal fun FeedRow(
     }
 }
 
-/** 打开 feed 里给的链接；空串就什么都不做（绝不因为数据脏就崩） */
+/** 打开 feed 里给的链接；空串就什么都不做（绝不因为数据脏就崩）。统一走 [ExternalLinks]。 */
 internal fun openFeedUrl(context: android.content.Context, url: String) {
-    if (url.isBlank()) return
-    runCatching {
-        context.startActivity(
-            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-    }
+    com.pocket.xiaoli.ui.util.ExternalLinks.open(context, url)
 }
 
 /** 必须确认的公告：点外面也算确认过（等价于「知道了」），免得成了关不掉的弹窗 */

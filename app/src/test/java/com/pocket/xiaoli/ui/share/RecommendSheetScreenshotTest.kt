@@ -31,7 +31,8 @@ import org.robolectric.annotation.GraphicsMode
  *
  * ## 为什么截内容而不是截整个气泡
  *
- * 外壳是 MIUIX 的 `WindowBottomSheet` —— 独立窗口，JVM 截图抓不到。所以外壳与内容在
+ * 外壳原来是 MIUIX 的 `WindowBottomSheet`（独立窗口，JVM 截图抓不到），2026-10-30 换成
+ * 页内浮层 `AppOverlaySheet`；外壳本身由 `AppOverlaySheetTest` 拍。所以这里仍然只拍正文，因为外壳与内容在
  * `RecommendSheet.kt` 里拆成了两个函数：外壳只管窗口与回调，内容（`RecommendSheetBody`）
  * 可以单独渲染。**真正会改坏的是内容**：二维码尺寸、两行链接的高度、按钮顺序。
  *

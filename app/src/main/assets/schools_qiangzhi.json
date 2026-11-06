@@ -80,6 +80,14 @@
         "isV8":  true
     },
     {
+        "id":  "YJIT",
+        "name":  "燕京理工学院",
+        "city":  "廊坊",
+        "jwType":  "QIANGZHI",
+        "baseUrl":  "http://jw.yit.edu.cn/yjlgxy_jsxsd",
+        "isV8":  true
+    },
+    {
         "id":  "SDJU2",
         "name":  "山东交通学院",
         "city":  "济南",

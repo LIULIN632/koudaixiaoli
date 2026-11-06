@@ -11,8 +11,8 @@ import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.ExamEntity
 import com.pocket.xiaoli.data.entity.HomeworkEntity
 import com.pocket.xiaoli.data.entity.TaskEntity
-import com.pocket.xiaoli.data.weather.WeatherCurrent
-import com.pocket.xiaoli.data.weather.WeatherSnapshot
+import com.pocket.xiaoli.core.weather.WeatherCurrent
+import com.pocket.xiaoli.core.weather.WeatherSnapshot
 import com.pocket.xiaoli.ui.glass.LocalBottomBarInset
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
@@ -35,8 +35,9 @@ import java.time.LocalDateTime
  * ## 为什么这张图能稳定
  *
  * - **时钟停表**：`HomeClockHeader(fixedNow = …)`，否则每秒变一次，回放必红。
- * - **日期不可解析**：考试行 `date = ""`、作业 `dueDate = "6月15日"` ——
- *   不产生"还有 N 天"这种随当日变化的文案。
+ * - **日期不可解析**：考试行 `date = ""`、作业 `dueDate = "见课程群通知"` ——
+ *   不产生"还有 N 天"这种随当日变化的文案。⚠️ `6月15日` 这类中文写法**现在能解析**
+ *   （`data/HomeworkDue` 的中文兜底），会变成每天漂的倒计时文案，不能再用。
  * - **底栏高度显式给 88dp**：与线上 `LocalBottomBarInset` 的量测值一致，
  *   FAB 和列表底部的让位才对得上。
  */
@@ -92,7 +93,7 @@ class HomePageScreenshotTest {
         id = 2,
         courseName = "示例课程",
         content = "P45 习题 3-5",
-        dueDate = "6月15日",
+        dueDate = "见课程群通知",
     )
 
     private val task = TaskEntity(id = 3, name = "取快递")

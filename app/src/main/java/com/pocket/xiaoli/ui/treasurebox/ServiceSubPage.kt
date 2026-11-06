@@ -1,6 +1,6 @@
 package com.pocket.xiaoli.ui.treasurebox
 
-import com.pocket.xiaoli.data.courseware.Courseware
+import com.pocket.xiaoli.data.courseware.CoursewareRef
 
 /**
  * 服务页（`TreasureBoxScreen`）的子页目的地。
@@ -62,6 +62,8 @@ sealed interface ServiceSubPage {
 
     // ── 生活服务 ──
     data object Weather : ServiceSubPage
+    /** 公交到站：本校站的线路与下一班车（原生，数据来自掌上公交，见 `data/bus/BusRepository.kt`）。 */
+    data object BusArrival : ServiceSubPage
     data object Electricity : ServiceSubPage
     data object CampusCard : ServiceSubPage
     data object CardAccountDialog : ServiceSubPage
@@ -89,7 +91,7 @@ sealed interface ServiceSubPage {
      * 而漏掉任何一处的表现都是"格子点不动"或"进去是空白"。
      * 带参数之后，加课件只改清单那一处。
      */
-    data class CoursewarePage(val item: Courseware) : ServiceSubPage
+    data class CoursewarePage(val item: CoursewareRef) : ServiceSubPage
 
     // ── 编辑类 ──
     data object QuickServiceEdit : ServiceSubPage

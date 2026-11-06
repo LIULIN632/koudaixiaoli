@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,14 +44,15 @@ fun <T> CampusSegmentedTabs(
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
+    // 托盘宽度跟着用途走：可滚 = 通栏（灰底提示"还能往右滑"）；
+    // 不可滚 = 贴着内容收（两三个选项时通栏会剩一大条空灰底，基线 315 上就是这样）。
     Surface(
-        modifier = modifier,
+        modifier = modifier.then(if (scrollable) Modifier.fillMaxWidth() else Modifier.wrapContentWidth()),
         shape = RoundedCornerShape(skin.radiusChip),
         color = colors.surfaceAlt,
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
                 .padding(skin.spaceXs),
             horizontalArrangement = Arrangement.spacedBy(skin.spaceXs),
@@ -58,24 +60,31 @@ fun <T> CampusSegmentedTabs(
         ) {
             options.forEach { (label, value) ->
                 val active = value == selected
+                // ⚠️ 触摸热区与**可见**填充必须是两层：`invisibleTouchTarget()` 是
+                // `widthIn/heightIn(min = 44dp)`，直接挂在画底色的 Box 上会把选中块
+                // 撑成一枚 44dp 的大实心方（基线 315 上「本周」那一坨就是这么来的）。
+                // 外层只管点得到，内层只管长什么样。
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(skin.radiusChip))
-                        .background(if (active) colors.accentMain else Color.Transparent)
-                        .clickable { onSelect(value) }
-                        // 12sp 文字 + 7dp 上下内距 ≈ 31dp 高，够不着；
-                        // 抬高热区而不是可见高度（见 ui/theme/TouchTarget.kt）。
                         .invisibleTouchTarget()
-                        .padding(horizontal = skin.spaceCompact, vertical = 7.dp),
+                        .clickable { onSelect(value) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = label,
-                        fontSize = 12.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        // 选中态底是强调色填充 ⇒ 用 onAccentColor() 而不是写死白色
-                        color = if (active) onAccentColor() else colors.textSecondary,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(skin.radiusChip))
+                            .background(if (active) colors.accentMain else Color.Transparent)
+                            .padding(horizontal = skin.spaceCompact, vertical = 7.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            // 选中态底是强调色填充 ⇒ 用 onAccentColor() 而不是写死白色
+                            color = if (active) onAccentColor() else colors.textSecondary,
+                        )
+                    }
                 }
             }
         }

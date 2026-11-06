@@ -1,8 +1,7 @@
 package com.pocket.xiaoli.data.proactive
 
-import com.pocket.xiaoli.data.weather.WeatherAlert
-import com.pocket.xiaoli.util.EXAM_SOON_DAYS
-import com.pocket.xiaoli.util.examCountdownText
+import com.pocket.xiaoli.core.exam.ExamCountdown
+import com.pocket.xiaoli.core.weather.WeatherAlert
 import java.time.LocalDateTime
 
 /**
@@ -33,7 +32,7 @@ data class ProactiveMemory(
 /**
  * 考试信号。字段与参考实现一致：文案要用课程名，快照要用其余几项。
  *
- * [daysLeft] 由 `util/ExamCountdown.examDaysLeft` 算出来 —— 与首页卡片**同一个解析器**，
+ * [daysLeft] 由共享核心 `core/exam/ExamCountdown.daysLeft` 算出来 —— 与首页卡片**同一个解析器**，
  * 否则会出现"卡片说还有 2 天、气泡说还有 3 天"。
  */
 data class ExamSignal(
@@ -163,7 +162,7 @@ object ProactiveRules {
     /**
      * 考试的单条冷却。
      *
-     * 考试窗口本身有 [EXAM_SOON_DAYS] 天，用一小时的通用冷却会在这几天里反复念叨同一件事。
+     * 考试窗口本身有 `ExamCountdown.SOON_DAYS` 天，用一小时的通用冷却会在这几天里反复念叨同一件事。
      * 半天一次已经足够 —— 这是"别忘了"，不是"马上去做"。
      */
     const val EXAM_COOLDOWN_MS = 12 * 60 * 60 * 1000L
@@ -184,7 +183,7 @@ object ProactiveRules {
     /**
      * 校历节点的提前量（天）。
      *
-     * 取 3，与 `util/ExamCountdown.kt` 的 [EXAM_SOON_DAYS] 同一个数：两者都是
+     * 取 3，与 `core/exam/ExamCountdown.SOON_DAYS` 同一个数：两者都是
      * "还有几天"的提醒，用两个不同的窗口只会让人怀疑哪个准。
      */
     const val CALENDAR_AHEAD_DAYS = 3L
@@ -263,11 +262,11 @@ object ProactiveRules {
             // 考试：点气泡进对话，并把这场考试的已知字段当快照 —— 对准"点的是哪场"，
             // 缺的仍去调工具（气泡不为提醒拉一次教务）。
             val exam = s.exam
-            if (exam != null && exam.daysLeft <= EXAM_SOON_DAYS) {
+            if (exam != null && exam.daysLeft <= ExamCountdown.SOON_DAYS) {
                 add(
                     ProactiveMessage(
                         id = ID_EXAM,
-                        text = clipProactiveText(exam.courseName + examCountdownText(exam.daysLeft)),
+                        text = clipProactiveText(exam.courseName + ExamCountdown.countdownText(exam.daysLeft)),
                         prompt = "${exam.courseName}什么时候考、在哪考？帮我排一下复习",
                         eventSnapshot = eventFields(
                             "kind" to "exam",

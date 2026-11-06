@@ -32,7 +32,13 @@ class FeedbackStoreTest {
 
     @Test
     fun `冷却与每日上限落盘`() {
-        val now = System.currentTimeMillis()
+        // 锚到固定的正午，不用 System.currentTimeMillis()：本用例要连记 5 次、跨度 3 分钟，
+        // 若在 23:58 之后跑就会跨过零点，每日计数按日期分桶会重置，
+        // 断言 DailyLimit 于是变成 Ok（2026-10-31 23:58 实测到过）。
+        val now = java.time.LocalDateTime.of(2026, 5, 20, 12, 0)
+            .atZone(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
         assertEquals(SubmitGate.Ok, store.submitGate(now))
 
         store.markSubmitAttempt(now)

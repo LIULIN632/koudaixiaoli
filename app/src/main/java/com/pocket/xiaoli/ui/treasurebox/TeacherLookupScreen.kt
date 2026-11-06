@@ -311,20 +311,34 @@ private fun TeacherCard(
                     fontSize = 11.sp,
                     color = colors.textTertiary,
                 )
-                Row {
-                    IconButton(onClick = { onEdit(teacher) }, modifier = Modifier.size(36.dp).invisibleTouchTarget()) {
-                        Icon(Icons.Filled.Edit, "编辑", tint = colors.textSecondary, modifier = Modifier.size(18.dp))
+                // 编辑/删除原来是裸图标浮在右侧（无边界、无按压回应）。给一个圆角衬底，
+                // 与校园 3D、学术树的行内动作同一套语言。
+                Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceXs)) {
+                    IconButton(
+                        onClick = { onEdit(teacher) },
+                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(colors.surfaceAlt).invisibleTouchTarget(),
+                    ) {
+                        Icon(Icons.Filled.Edit, "编辑", tint = colors.textSecondary, modifier = Modifier.size(16.dp))
                     }
-                    IconButton(onClick = { onDelete(teacher) }, modifier = Modifier.size(36.dp).invisibleTouchTarget()) {
-                        Icon(Icons.Filled.Delete, "删除", tint = colors.danger, modifier = Modifier.size(18.dp))
+                    IconButton(
+                        onClick = { onDelete(teacher) },
+                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(colors.surfaceAlt).invisibleTouchTarget(),
+                    ) {
+                        Icon(Icons.Filled.Delete, "删除", tint = colors.danger, modifier = Modifier.size(16.dp))
                     }
                 }
             }
 
-            if (teacher.office.isNotEmpty()) {
-                Spacer(Modifier.height(skin.spaceSmall))
-                InfoRow(Icons.Outlined.WorkOutline, "办公室", teacher.office, colors)
-            }
+            // 办公室行原来是有才画，导致有/无办公室的卡高度不一。常驻这一行，
+            // 没填时给个三级提示，顺带提醒用户补。
+            Spacer(Modifier.height(skin.spaceSmall))
+            InfoRow(
+                Icons.Outlined.WorkOutline,
+                "办公室",
+                teacher.office.ifEmpty { "还没填，点编辑补上" },
+                colors,
+                dim = teacher.office.isEmpty(),
+            )
 
             if (expanded) {
                 Spacer(Modifier.height(skin.spaceXs))
@@ -356,14 +370,21 @@ private fun TeacherCard(
 }
 
 @Composable
-private fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, colors: PocketXiaoliColors) {
+private fun InfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    colors: PocketXiaoliColors,
+    /** 占位值（"还没填"）用三级色，别和真数据一个重量。 */
+    dim: Boolean = false,
+) {
     val skin = LocalSkin.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = colors.textTertiary, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(skin.spaceSmall))
         Text(label, fontSize = 12.sp, color = colors.textTertiary)
         Spacer(Modifier.width(skin.spaceSm))
-        Text(value, fontSize = 13.sp, color = colors.textPrimary)
+        Text(value, fontSize = 13.sp, color = if (dim) colors.textTertiary else colors.textPrimary)
     }
 }
 

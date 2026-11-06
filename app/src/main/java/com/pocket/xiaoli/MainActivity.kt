@@ -43,6 +43,7 @@ import com.pocket.xiaoli.focus.FocusController
 import com.pocket.xiaoli.notification.AppFeedNotifier
 import com.pocket.xiaoli.notification.AppFeedScheduler
 import com.pocket.xiaoli.notification.ClassReminderScheduler
+import com.pocket.xiaoli.notification.FeedbackReplyScheduler
 import com.pocket.xiaoli.ui.navigation.AppNavigation
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.CampusLayoutMode
@@ -172,6 +173,10 @@ class MainActivity : ComponentActivity() {
                 val container = app.appContainer
                 withContext(Dispatchers.IO) {
                     AppFeedScheduler.schedule(context)
+                    // 「反馈有回复」那条链：周期任务 + 冷启动补一次。
+                    // 没有提交过反馈的机器，worker 自己会直接返回，不发请求。
+                    FeedbackReplyScheduler.schedule(context)
+                    FeedbackReplyScheduler.pollNow(context)
                     val state = runCatching { container.appFeedRepository.refresh() }.getOrNull()
                     // 冷启动这一条路上如果已经能看到新版/新公告，**补一条本地通知**。
                     // 用户可能刚切到别的 App，通知栏才是"推"该出现的位置；去重在

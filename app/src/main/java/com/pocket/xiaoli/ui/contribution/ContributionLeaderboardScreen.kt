@@ -27,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -199,6 +200,8 @@ internal fun ContributionLeaderboardContent(
                         selected = state.category,
                         onSelect = onSelectCategory,
                     )
+                    // 只有两个选项时 scrollable=false 会把 chip 拉成等宽大块（基线 315 上
+                    // 「本周」是个大实心方、「全部」是条空灰底）。改成按内容宽度排。
                     CampusSegmentedTabs(
                         options = ContributionPeriod.entries.map { it.label to it },
                         selected = state.period,
@@ -265,8 +268,14 @@ internal fun ContributionLeaderboardContent(
                             )
                         }
                     }
-                    items(board.entries, key = { it.rank }) { entry ->
-                        NameRow(entry)
+                    // 一行一张白胶囊又高又空（撤掉分数/名次后右侧没信息），改成**一张卡里的分隔行**：
+                    // 与二课入口、设置列表同一套「卡内分行」语言，死空间也压掉了。
+                    item(key = "board") {
+                        AppCard(modifier = Modifier.fillMaxWidth()) {
+                            board.entries.forEachIndexed { index, entry ->
+                                NameRow(entry, last = index == board.entries.lastIndex)
+                            }
+                        }
                     }
                 }
             }
@@ -501,7 +510,7 @@ private fun MyRankCard(
 
 /** 榜单里的一行：头像首字 + 昵称 +（自己）「我」。不显示序号与分数。 */
 @Composable
-private fun NameRow(entry: ContributionEntry) {
+private fun NameRow(entry: ContributionEntry, last: Boolean = false) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
 
@@ -553,6 +562,9 @@ private fun NameRow(entry: ContributionEntry) {
                     Text("我", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.accentMain)
                 }
             }
+        }
+        if (!last) {
+            HorizontalDivider(color = colors.borderDivider)
         }
     }
 }

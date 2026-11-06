@@ -5,7 +5,9 @@ import com.pocket.xiaoli.core.course.expandIcsWeekEvents
 import com.pocket.xiaoli.core.weekSet
 import com.pocket.xiaoli.core.course.icsEscape
 import com.pocket.xiaoli.data.entity.CourseEntity
+import com.pocket.xiaoli.data.entity.HomeworkEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
+import com.pocket.xiaoli.data.parseHomeworkDue
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -28,6 +30,8 @@ object CourseIcsExporter {
         semesterStart: String,
         totalWeeks: Int,
         now: LocalDateTime = LocalDateTime.now(),
+        /** 未完成且截止可解析的作业：每条一个带提醒的事件（前 24h / 前 1h 各一次）。 */
+        homeworks: List<HomeworkEntity> = emptyList(),
     ): String {
         val startDate = parseSemesterStart(semesterStart) ?: return emptyCalendar()
         val slotMap = timeSlots.associateBy { it.slot }
@@ -73,6 +77,30 @@ object CourseIcsExporter {
                     append("LOCATION:").append(icsEscape(event.course.room)).append("\r\n")
                 }
                 append("DESCRIPTION:").append(icsEscape(courseDescription(course))).append("\r\n")
+                append("END:VEVENT\r\n")
+            }
+            // 作业截止也进日历：导入系统日历后，哪怕本 App 的闹钟被 ROM 杀掉，
+            // 系统日历自己还会再提醒一次 —— 用户要的那道"防忘保险"。
+            homeworks.filterNot { it.completed }.forEach { hw ->
+                val due = parseHomeworkDue(hw.dueDate, now) ?: return@forEach
+                val summary = "作业截止：${hw.courseName}"
+                append("BEGIN:VEVENT\r\n")
+                append("UID:hw-").append(hw.id).append("@pocketxiaoli.local\r\n")
+                append("DTSTAMP:").append(stamp).append("\r\n")
+                // 零时长事件：它是个"截止时刻"，不是一段时间
+                append("DTSTART:").append(stampFormatter.format(due)).append("\r\n")
+                append("DTEND:").append(stampFormatter.format(due)).append("\r\n")
+                append("SUMMARY:").append(icsEscape(summary)).append("\r\n")
+                if (hw.content.isNotBlank()) {
+                    append("DESCRIPTION:").append(icsEscape(hw.content)).append("\r\n")
+                }
+                repeat(2) { i ->
+                    append("BEGIN:VALARM\r\n")
+                    append("ACTION:DISPLAY\r\n")
+                    append("DESCRIPTION:").append(icsEscape(summary)).append("\r\n")
+                    append("TRIGGER:").append(if (i == 0) "-P1D" else "-PT1H").append("\r\n")
+                    append("END:VALARM\r\n")
+                }
                 append("END:VEVENT\r\n")
             }
             append("END:VCALENDAR\r\n")

@@ -137,8 +137,8 @@ class AssistantAgentLoopTest {
         val registry = AssistantToolRegistry(
             listOf(
                 AssistantToolSpec(
-                    tool = AssistantTool.SEARCH_KNOWLEDGE,
-                    name = "search_knowledge",
+                    tool = AssistantTool.SEARCH_LIBRARY,
+                    name = "search_library",
                     description = "知识库",
                     parameters = JsonObject().apply { addProperty("type", "object") },
                     handler = { ToolOutcome("命中一条", sources = listOf(source)) },
@@ -147,7 +147,7 @@ class AssistantAgentLoopTest {
         )
         val scripted = ScriptedSource(
             listOf(
-                { toolCallRound(ToolCall("c1", "search_knowledge", "{}")) },
+                { toolCallRound(ToolCall("c1", "search_library", "{}")) },
                 { reply("平时 07:00-22:00 开放[K1]。") },
             )
         )

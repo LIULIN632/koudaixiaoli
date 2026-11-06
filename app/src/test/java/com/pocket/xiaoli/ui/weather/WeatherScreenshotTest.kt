@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.pocket.xiaoli.data.weather.WeatherCurrent
-import com.pocket.xiaoli.data.weather.WeatherDay
-import com.pocket.xiaoli.data.weather.WeatherHour
-import com.pocket.xiaoli.data.weather.WeatherSnapshot
+import com.pocket.xiaoli.core.weather.WeatherCurrent
+import com.pocket.xiaoli.core.weather.WeatherDay
+import com.pocket.xiaoli.core.weather.WeatherHour
+import com.pocket.xiaoli.core.weather.WeatherSnapshot
 import com.pocket.xiaoli.ui.components.ServicePageTopBar
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors

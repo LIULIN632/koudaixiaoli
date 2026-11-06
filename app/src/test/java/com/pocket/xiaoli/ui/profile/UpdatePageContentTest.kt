@@ -23,8 +23,8 @@ import org.robolectric.annotation.GraphicsMode
  *
  * ## 为什么单测文案不够，还要测这一层
  *
- * `checkTrace()` / `checkHint` 的正确性由 `AppFeedViewTest` 钉；但"算对了却没接到行上"
- * 是另一类错：把 `subtitle` 写成固定串、把 `hint` 落回那句常态说明、或者 `onClick` 忘了
+ * `checkTrace()` 的正确性由 `AppFeedViewTest` 钉；但"算对了却没接到行上"
+ * 是另一类错：把 `subtitle` 写成固定串、把失败原因丢掉不说、或者 `onClick` 忘了
  * 挡「正在检查」—— 三种都不会让数据层测试变红，快照也看不出来（图是照当时的状态渲的）。
  * 所以这里只测**行与状态之间的那几根线**。
  */
@@ -120,7 +120,7 @@ class UpdatePageContentTest {
     }
 
     @Test
-    fun `失败时问号里是毛病原文而不是常态说明`() {
+    fun `失败时小字里是毛病原文而不是只说没查上`() {
         page(
             AppFeedRepository.State(
                 loaded = true,
@@ -130,12 +130,9 @@ class UpdatePageContentTest {
             )
         )
 
-        composeRule.onNodeWithText("这次没查上，可再点一次").assertIsDisplayed()
-        // 「?」挂在行尾，第一个就是「检查更新」那一行的
-        composeRule.onAllNodesWithContentDescription("说明")[0].performClick()
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithText("这一轮的毛病：检查失败：Gitee raw 返回 504（read timed out）")
+        // 2026-10-30：行尾那枚「?」按用户要求撤掉，毛病原文改住在这一行小字里 ——
+        // 接线断了的后果是"用户只知道没查上，不知道为什么"，而这正是当初加问号要解决的问题
+        composeRule.onNodeWithText("这次没查上 · 检查失败：Gitee raw 返回 504（read timed out）")
             .assertIsDisplayed()
     }
 

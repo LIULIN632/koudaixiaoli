@@ -121,6 +121,9 @@
         <receiver
             android:name=".notification.ExamReminderReceiver"
             android:exported="false" />
+        <receiver
+            android:name=".notification.HomeworkReminderReceiver"
+            android:exported="false" />
         <!-- 通知里的「更新」：只干一件事——把下载任务丢进 WorkManager -->
         <receiver
             android:name=".notification.AppUpdateReceiver"

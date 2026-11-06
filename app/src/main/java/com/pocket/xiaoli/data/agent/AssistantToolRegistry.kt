@@ -48,18 +48,16 @@ class AssistantToolRegistry(private val specs: List<AssistantToolSpec>) {
 
     /** 下发给模型的 tools 数组。惰性缓存，整个会话只拼一次。 */
     val toolDefinitionsJson: String by lazy {
-        val arr = JsonArray()
-        specs.forEach { spec ->
-            arr.add(JsonObject().apply {
-                addProperty("type", "function")
-                add("function", JsonObject().apply {
-                    addProperty("name", spec.name)
-                    addProperty("description", spec.description)
-                    add("parameters", spec.parameters)
-                })
-            })
-        }
-        arr.toString()
+        // 形状由 `:core` 的 AgentWire 决定，桌面端用同一份（以前两端各拼一次）
+        com.pocket.xiaoli.core.agent.AgentWire.toolsJson(
+            specs.map {
+                com.pocket.xiaoli.core.agent.AgentToolSpec(
+                    name = it.name,
+                    description = it.description,
+                    parameters = it.parameters,
+                )
+            },
+        )
     }
 
     val toolNames: List<String> get() = specs.map { it.name }
@@ -198,16 +196,22 @@ object AssistantToolBindings {
             ),
             legacySpec(
                 container = container,
-                tool = AssistantTool.SEARCH_KNOWLEDGE,
-                description = "查询校园知识库：学校规章制度（补考重修、学分绩点、请假规定）、" +
+                tool = AssistantTool.SEARCH_LIBRARY,
+                description = "查询资料库（四类内容在一个工具里，用一次就能拿到）：" +
+                    "① 校园知识库——学校规章制度（补考重修、学分绩点、请假规定）、" +
                     "场馆开放时间（图书馆、食堂、体育馆）、办事流程（奖学金申请、医保报销、转专业）、" +
-                    "以及近期通知（放假安排、临时闭馆）。" +
-                    "用户问「图书馆几点开门」「补考怎么报名」「放假怎么安排」「奖学金要什么条件」" +
-                    "这类**学校规定/校园事实**问题时调用。传入完整明确的检索词。" +
-                    "返回内容带 [K1] 这样的编号与更新时间，回答时请据此说明来源；" +
-                    "若返回「知识库暂无内容」或「没有查到」，如实告知并建议官方入口，**不要编造**。",
+                    "近期通知（放假安排、临时闭馆）；" +
+                    "② 快问快答——各门课每章老师爱问的问题与答案要点；" +
+                    "③ App 使用帮助——这个 App 怎么导入课表、怎么切主题、数据存在哪；" +
+                    "④ 资料站——课件、历年卷、习题答案这类**可下载的文件**，以及作者手工转录的正文。" +
+                    "凡是「学校怎么规定」「这门课这章问什么」「有没有 XX 的卷子/课件」「这个 App 怎么用」，" +
+                    "都先调这个工具，**不要凭记忆回答**。传入完整明确的检索词。" +
+                    "返回内容带 [K1]/[Q1]/[F1]/[L1] 编号（字母表示来源）与更新时间，" +
+                    "回答时据此说明来源；若返回「资料库暂无内容」或「没有查到」，" +
+                    "如实告知并建议官方入口或去「服务 → 资料站」看看，**不要编造**。",
                 paramName = "query",
-                paramDescription = "检索词，要完整明确，例如「图书馆开放时间」「补考报名流程」「国庆放假安排」。",
+                paramDescription = "检索词，要完整明确，例如「图书馆开放时间」「补考报名流程」" +
+                    "「数据结构第三章考什么」「高数期末卷」。",
             ),
         ))
 

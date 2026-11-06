@@ -2,17 +2,13 @@ package com.pocket.xiaoli.ui.proactive
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -25,7 +21,6 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
 import com.pocket.xiaoli.ui.theme.SkinStyle
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,14 +29,18 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 主动气泡与说明气泡的基线。
+ * 主动气泡的基线。
  *
  * ## 为什么渲的是 `*Content` 而不是完整的 View
  *
  * 完整的气泡带出现/消失动画与 8 秒计时，直接拍会拍到"某一帧"，**基准图会自己变红**
  *（本项目把"无限动画 / 相对时间"列为三类让基准图自己变红的不确定性）。
- * 所以这里渲纯状态驱动的 [ProactiveBubbleContent] 与 [TipBubble]：
- * 它们决定"长什么样"，而"什么时候出现"由 `ProactiveRulesTest` 钉常量、由人工验收看观感。
+ * 所以这里渲纯状态驱动的 [ProactiveBubbleContent]：
+ * 它决定"长什么样"，而"什么时候出现"由 `ProactiveRulesTest` 钉常量、由人工验收看观感。
+ *
+ * ⚠️ 这里曾经还有两张**说明气泡**（「?」点开的那一块）的基线与交互测试；
+ * 2026-10-31 用户把全 App 的问号撤掉，组件与本文件的那两条一起删了 —— 别再捡回来
+ * （守门人见 `NoBubbleTipTest`）。
  *
  * ## 三个状态各守一件事
  *
@@ -59,12 +58,6 @@ class ProactiveBubbleScreenshotTest {
 
     @get:Rule
     val composeRule = createComposeRule()
-
-    private companion object {
-        /** 说明气泡的正文（截图与断言共用一份，避免"图里是 A、断言查的是 B"）。 */
-        const val TIP_TEXT = "两条正事提醒之间至少隔 15 分钟；没有要紧事时偶尔搭句话，" +
-            "闲聊之间至少隔 25 分钟。"
-    }
 
     private fun content(message: ProactiveMessage) {
         composeRule.setContent {
@@ -147,33 +140,6 @@ class ProactiveBubbleScreenshotTest {
         }
     }
 
-    /** 说明气泡：贴着「?」展开的那一块（内含长文案，能换行）。 */
-    @Test
-    fun `说明气泡截图`() {
-        composeRule.setContent {
-            PocketXiaoliTheme(
-                appearanceMode = AppearanceMode.RAINBOW,
-                skinStyle = SkinStyle.VIVID,
-            ) {
-                val colors = LocalPocketXiaoliColors.current
-                val skin = LocalSkin.current
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(colors.surfaceBase)
-                        .padding(skin.spaceLg),
-                ) {
-                    TipBubble(
-                        text = TIP_TEXT,
-                        maxWidth = 240.dp,
-                        onDismiss = {},
-                    )
-                }
-            }
-        }
-        composeRule.onNodeWithText(TIP_TEXT).captureRoboImage("src/test/screenshots/98-bubble-tip.png")
-    }
-
     /**
      * 关闭键的**触摸区**必须够大。
      *
@@ -192,42 +158,4 @@ class ProactiveBubbleScreenshotTest {
         content(ProactiveMessage(id = ProactiveRules.ID_CLASS, text = "30分钟后上高等数学"))
         composeRule.onNodeWithContentDescription("鲤鱼提醒：30分钟后上高等数学").assertIsDisplayed()
     }
-
-    /**
-     * 说明气泡：点「?」展开、点气泡收起。
-     *
-     * ⚠️ 断言用 `onNodeWithText` 而不是截图：气泡渲染在 `Popup`（独立窗口）里，
-     * `captureRoboImage(onRoot())` 拍不到它 —— 它的样子由上面那张 `TipBubble` 基线负责。
-     */
-    @Test
-    fun `点问号能展开说明再点气泡收起`() {
-        composeRule.setContent {
-            PocketXiaoliTheme(
-                appearanceMode = AppearanceMode.RAINBOW,
-                skinStyle = SkinStyle.VIVID,
-            ) {
-                val colors = LocalPocketXiaoliColors.current
-                Column(Modifier.background(colors.surfaceBase)) {
-                    Text("主动提醒")
-                    BubbleTip(text = "两条正事提醒之间至少隔 1 小时。", contentDescription = "「少」这一档的说明")
-                }
-            }
-        }
-        val tipText = "两条正事提醒之间至少隔 1 小时。"
-        val trigger = composeRule.onNodeWithContentDescription("「少」这一档的说明")
-        // 「?」是 44dp 触摸区：低于本项目无障碍底线会被 AssistantAccessibilityTest 判死
-        trigger.assertHeightIsAtLeast(44.dp)
-        trigger.performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(tipText).assertIsDisplayed()
-        composeRule.onNodeWithText(tipText).performClick()
-        composeRule.waitForIdle()
-        assertTrue(
-            "点气泡自己就该收起（这里刻意不放关闭叉：那是主动气泡的语义）",
-            composeRule.onAllNodesWithTextCount(tipText) == 0,
-        )
-    }
-
-    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTextCount(text: String): Int =
-        onAllNodes(androidx.compose.ui.test.hasText(text)).fetchSemanticsNodes().size
 }

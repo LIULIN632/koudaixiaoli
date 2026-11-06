@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.util
 
 import com.pocket.xiaoli.data.entity.CourseEntity
+import com.pocket.xiaoli.data.entity.HomeworkEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -101,5 +102,33 @@ class CourseIcsExporterTest {
         )
         assertTrue(ics.contains("BEGIN:VCALENDAR"))
         assertFalse(ics.contains("BEGIN:VEVENT"))
+    }
+
+    @Test
+    fun `作业截止进日历 带两道提醒 已完成与解析不出的不写`() {
+        val ics = CourseIcsExporter.export(
+            courses = emptyList(),
+            timeSlots = slots,
+            semesterStart = "2026-08-31",
+            totalWeeks = 20,
+            now = now,
+            homeworks = listOf(
+                HomeworkEntity(
+                    id = 7,
+                    courseName = "高等数学",
+                    content = "第七章习题",
+                    dueDate = "2026-11-05 23:00",
+                ),
+                HomeworkEntity(id = 8, courseName = "已交的", dueDate = "2026-11-06", completed = true),
+                HomeworkEntity(id = 9, courseName = "解析不出的", dueDate = "下周三"),
+            ),
+        )
+        assertTrue(ics.contains("UID:hw-7@pocketxiaoli.local"))
+        assertTrue(ics.contains("DTSTART:20261105T230000"))
+        assertTrue(ics.contains("SUMMARY:作业截止：高等数学"))
+        assertTrue(ics.contains("TRIGGER:-P1D"))
+        assertTrue(ics.contains("TRIGGER:-PT1H"))
+        assertFalse(ics.contains("UID:hw-8@"))
+        assertFalse(ics.contains("UID:hw-9@"))
     }
 }

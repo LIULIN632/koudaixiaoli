@@ -32,7 +32,8 @@ fun isJwSystemAvailable(type: JwSystemType): Boolean =
  * 本 App 的主场城市。
  *
  * 这个软件已从「什么学校都能接」收窄成**烟台理工学院的校园助手**：
- * 选校列表只列烟台本地院校，用户不再面对 200+ 所全国学校的噪音。
+ * 选校列表只列烟台本地院校 + 两所**用户点名接入**的外地学校（见 [EXTRA_PICKER_SCHOOL_IDS]），
+ * 用户不再面对 200+ 所全国学校的噪音。
  * 内置数据仍保留全国名单（后续铺开烟台、或用户手动添加外地学校都用得上），
  * 这里只控制**默认展示范围**。
  */
@@ -41,11 +42,24 @@ const val HOME_CITY = "烟台"
 /** 置顶学校：先当前对接的烟台理工学院，再下一步优先覆盖的烟台大学。 */
 private val PINNED_SCHOOL_IDS = listOf("YIT", "YTU")
 
+/**
+ * 点名加入选校列表的**外地**学校（2026-10-31 用户要求）。
+ *
+ * - `YJIT` 燕京理工学院（河北廊坊 / 三河，强智）：用户点名要接；
+ * - `SDUT` 山东理工大学（淄博，正方）：同上。
+ *
+ * ⚠️ 这是**具名白名单，不是放开全国**：其余 200+ 所外地学校仍然不进选择器。
+ * 新加一所就加一个 id 到这儿，别把它改成 `city != …` 之类的大条件 —— 那等于把产品
+ * 又摊回全国，`SchoolPickerPriorityTest` 会红。
+ */
+private val EXTRA_PICKER_SCHOOL_IDS = listOf("YJIT", "SDUT")
+
 /** 用户自己添加的学校（`custom_` 前缀）：可编辑、可删除，也一定进选校列表。 */
 fun School.isCustomSchool(): Boolean = id.startsWith("custom_")
 
-/** 是否进入选校列表：本地院校，或用户自己添加的学校（`custom_` 前缀）。 */
-fun School.isPickerSchool(): Boolean = city == HOME_CITY || isCustomSchool()
+/** 是否进入选校列表：本地院校、点名的外地学校，或用户自己添加的学校。 */
+fun School.isPickerSchool(): Boolean =
+    city == HOME_CITY || id in EXTRA_PICKER_SCHOOL_IDS || isCustomSchool()
 
 /** 选校列表的置顶位次：越小越靠前，非置顶学校统一排在后面。 */
 fun School.pickerRank(): Int = PINNED_SCHOOL_IDS.indexOf(id).let { if (it >= 0) it else PINNED_SCHOOL_IDS.size }

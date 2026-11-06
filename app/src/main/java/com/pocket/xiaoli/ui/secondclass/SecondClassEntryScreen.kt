@@ -130,17 +130,21 @@ fun SecondClassEntryContent(
         }
 
         ServiceSectionLabel(title = "怎么进去", accent = ServiceAccent.STUDY)
+        // ⚠️ `AppCard` 自己**不带内边距**（padding 由调用方给）：这里漏了，正文就顶着卡边，
+        // 被圆角 clip 削掉每行第一个字 —— 基线 350 上看得清清楚楚。
         AppCard {
-            Text("网页版只能在电脑浏览器里登录", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
-            Spacer(Modifier.height(skin.spaceXs))
-            Text(
-                "到梦空间网页版没有账号密码登录，只有二维码：电脑浏览器打开登录页 → " +
-                    "用手机上的「到梦空间」App 扫那个码 → 手机 App 里就能看活动、报名、查学分。" +
-                    "手机浏览器自己打开时，二维码显示在同一块屏幕上，扫不了。",
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
-                color = colors.textSecondary,
-            )
+            Column(Modifier.padding(horizontal = skin.spaceLg, vertical = skin.spaceMd)) {
+                Text("网页版只能在电脑浏览器里登录", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                Spacer(Modifier.height(skin.spaceXs))
+                Text(
+                    "到梦空间网页版没有账号密码登录，只有二维码：电脑浏览器打开登录页 → " +
+                        "用手机上的「到梦空间」App 扫那个码 → 手机 App 里就能看活动、报名、查学分。" +
+                        "手机浏览器自己打开时，二维码显示在同一块屏幕上，扫不了。",
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                    color = colors.textSecondary,
+                )
+            }
         }
 
         ServiceSectionLabel(title = "这台手机上能做的", accent = ServiceAccent.STUDY)

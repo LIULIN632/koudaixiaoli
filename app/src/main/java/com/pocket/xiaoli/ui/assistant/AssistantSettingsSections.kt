@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.proactive.ProactiveLevel
-import com.pocket.xiaoli.ui.proactive.BubbleTip
+import com.pocket.xiaoli.data.proactive.ProactiveRules
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.MASCOT_MOTION_CATALOG
@@ -282,11 +282,12 @@ internal fun AppearanceSettingsSection(
  * 同样抽成独立函数、纯状态驱动，理由与 [MascotSettingsSection] 一样：
  * 快照测试可以直接渲它，不必搭 DI 容器。
  *
- * ## 三个档位与它们的说明气泡
+ * ## 三个档位各说清"多久一次"
  *
- * 档位名只有一两个字（"少"到底是什么？），所以每一档都挂一个「?」说明气泡 ——
- * 这是本项目第一批说明气泡的使用点。文案写的是**行为差异**（多久提一次、提哪些），
- * 不是营销话术；改了行为就要同步改它，否则说明气泡会变成谎话。
+ * 档位名只有一两个字（"少"到底是什么？），所以每一档的常驻小字里带着**行为差异**
+ * （提哪些、隔多久）。2026-10-31 之前这些数字挂在行尾的「?」说明气泡里 ——
+ * 现在全 App 不放说明气泡，它们只能住在这儿。数字从 [ProactiveRules] 的冷却常量派生，
+ * 别在这里手写数字，否则改了规则、这段话就变成谎话。
  */
 @Composable
 internal fun ProactiveSettingsSection(
@@ -327,7 +328,7 @@ internal fun ProactiveSettingsSection(
                         color = if (selected) colors.accentMain else colors.textPrimary,
                     )
                     Spacer(Modifier.height(skin.spaceMicro))
-                    Text(option.summary, fontSize = 12.sp, color = colors.textSecondary, lineHeight = 16.sp)
+                    Text(option.rowLine, fontSize = 12.sp, color = colors.textSecondary, lineHeight = 16.sp)
                 }
                 if (selected) {
                     Icon(
@@ -337,10 +338,6 @@ internal fun ProactiveSettingsSection(
                         modifier = Modifier.size(18.dp),
                     )
                 }
-                BubbleTip(
-                    text = option.tip,
-                    contentDescription = "「${option.title}」这一档的说明",
-                )
             }
         }
 
@@ -348,34 +345,48 @@ internal fun ProactiveSettingsSection(
     }
 }
 
-/** 一个档位的展示文案。**行为变了就要改这里**（说明气泡是用户判断"要不要开"的唯一依据）。 */
+/**
+ * 一个档位的展示文案。**行为变了就要改这里**。
+ *
+ * [summary] 是档位行与 AI 设置首页摘要共用的那一句（首页 `maxLines = 1`，所以它必须短）；
+ * [cadence] 只拼在本页档位行后面 —— 那一档"多久提一次"是全 App 唯一说清楚的地方，
+ * 原先挂在「?」说明气泡里，2026-10-31 问号撤掉后落到常驻小字。
+ */
 internal data class ProactiveLevelOption(
     val level: ProactiveLevel,
     val title: String,
     val summary: String,
-    val tip: String,
-)
+    val cadence: String = "",
+) {
+    val rowLine: String get() = if (cadence.isEmpty()) summary else "$summary · $cadence"
+}
 
 internal val PROACTIVE_LEVELS = listOf(
     ProactiveLevelOption(
         level = ProactiveLevel.OFF,
         title = "关",
         summary = "完全不冒泡，点它也不说话",
-        tip = "课表、成绩、教室这些页面照常用，只是鲤鱼不会主动冒泡。随时可以在这里打开。",
     ),
     ProactiveLevelOption(
         level = ProactiveLevel.LOW,
         title = "少",
         summary = "只提醒考试、快上课、余额这类正事",
-        tip = "两条正事提醒之间至少隔 1 小时，不闲聊。",
+        cadence = "两条之间至少隔${cooldownLabel(ProactiveRules.LOW_GLOBAL_COOLDOWN_MS)}，不闲聊",
     ),
     ProactiveLevelOption(
         level = ProactiveLevel.STANDARD,
         title = "标准",
         summary = "偶尔也会闲聊几句",
-        tip = "两条正事提醒之间至少隔 15 分钟；没有要紧事时偶尔搭句话，闲聊之间至少隔 25 分钟。",
+        cadence = "正事至少隔${cooldownLabel(ProactiveRules.GLOBAL_COOLDOWN_MS)}、" +
+            "闲聊至少隔${cooldownLabel(ProactiveRules.CHATTER_COOLDOWN_MS)}",
     ),
 )
+
+/** 冷却毫秒 → 给人看的那一句。整小时说「1小时」，否则说「15分钟」（数字与单位之间不空格，免得换行劈开单位）。 */
+private fun cooldownLabel(ms: Long): String {
+    val minutes = ms / 60_000
+    return if (minutes % 60L == 0L && minutes >= 60L) "${minutes / 60L}小时" else "${minutes}分钟"
+}
 
 /**
  * 首页摘要要用的档位名。

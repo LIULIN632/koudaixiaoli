@@ -19,8 +19,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.pocket.xiaoli.data.weather.WeatherSnapshot
-import com.pocket.xiaoli.data.weather.formatTemperature
+import com.pocket.xiaoli.core.weather.WeatherSnapshot
+import com.pocket.xiaoli.core.weather.formatTemperature
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.PocketTypography

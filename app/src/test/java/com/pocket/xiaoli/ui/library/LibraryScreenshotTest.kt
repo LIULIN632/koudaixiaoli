@@ -65,6 +65,7 @@ class LibraryScreenshotTest {
             kind = "历年卷",
             sizeBytes = 1_204_582L,
             urls = listOf("https://gitee.com/x/y/releases/download/lib/ds2023.pdf"),
+            provider = "22 级计算机 王同学",
         ),
         LibraryFile(
             id = "ds-ch2-slides",
@@ -83,6 +84,7 @@ class LibraryScreenshotTest {
             kind = "习题答案",
             sizeBytes = 812_000L,
             urls = listOf("https://gitee.com/x/y/releases/download/lib/math.docx"),
+            provider = "23 级数学 李同学",
         ),
     )
 

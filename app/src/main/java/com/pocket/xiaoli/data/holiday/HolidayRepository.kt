@@ -52,12 +52,16 @@ class HolidayRepository(context: Context) {
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
-    private val client = OkHttpClient.Builder()
-
-        .addInterceptor(NetworkLogInterceptor)
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
+    // ⚠️ `by lazy`：这个类在冷启动路径上会被构造（`AppContainer` 的节假日初值要同步读缓存，
+    // 好让首帧就有数据），而 `OkHttpClient.Builder().build()` 会连连接池、Dispatcher 线程池
+    // 和 SSL 上下文一起建出来 —— 只读本地缓存的话，那些东西一个都用不上。
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(NetworkLogInterceptor)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     /** 同步读取本地全部缓存（启动首帧先出数据，不等网络）。 */
     fun cachedAll(): List<HolidayDay> = readCache().values.flatten().sortedBy { it.date }

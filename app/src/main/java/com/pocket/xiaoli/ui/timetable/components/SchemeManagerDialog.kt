@@ -49,12 +49,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.entity.SchemeEntity
-import com.pocket.xiaoli.ui.components.SheetBackToDismiss
+import com.pocket.xiaoli.ui.overlay.AppOverlaySheet
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.rememberSinkIndication
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * 「课表管理」：多方案切换 + 新建 / 重命名 / 删除。
@@ -67,7 +66,8 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
  * 3. 对话框内容区宽度由 Material3 默认值决定，长方案名与「使用中」状态没有位置，
  *    选中与否只能靠一行浅色底 —— 一眼看不出当前用的是哪张。
  *
- * 换成 [WindowBottomSheet]（与「发现新版本」「推荐给同学」同一套外壳）后：
+ * 换成底部抽屉（与「发现新版本」「推荐给同学」同一套外壳，现下是页内浮层
+ * [AppOverlaySheet]）后：
  * 宽度随屏幕、可滚动、标题有位置；新建做成底部主按钮，方案行有选中态与徽标。
  *
  * ## 状态语义
@@ -89,12 +89,10 @@ fun SchemeManagerDialog(
     var showRenameDialog by remember { mutableStateOf<SchemeEntity?>(null) }
     var showDeleteConfirm by remember { mutableStateOf<SchemeEntity?>(null) }
 
-    WindowBottomSheet(
-        show = true,
+    AppOverlaySheet(
         title = "课表管理",
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        SheetBackToDismiss(onDismiss = onDismiss)
         SchemeManagerBody(
             schemes = schemes,
             activeSchemeId = activeSchemeId,
@@ -155,7 +153,7 @@ fun SchemeManagerDialog(
 /**
  * 抽屉正文（与窗口外壳分开，只为了能单独截图）。
  *
- * `WindowBottomSheet` 是独立窗口，JVM 快照抓不到它 —— 与
+ * 单独拆出来是为了拍**只含正文**的基线（外壳现在也截得到，见 `AppOverlaySheetTest`）—— 与
  * `RecommendSheetBody` / `AppUpdateSheetBody` 同一条限制。
  */
 @Composable

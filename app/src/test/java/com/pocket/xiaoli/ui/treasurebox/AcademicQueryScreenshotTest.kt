@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
@@ -166,9 +164,16 @@ class AcademicQueryScreenshotTest {
             )
         }
 
-    /** 渲真实树的一段（`from`/`to` 是节点下标切片）；父节点展开、叶子收起 = 生产默认。 */
+    /**
+     * 渲真实树的一段（`from`/`to` 是节点下标切片）。
+     *
+     * 走的是 [academicTreeState] —— 也就是页面那一条路：**默认展开到平台层**，
+     * 收起的模块连子树一起不渲染。以前这里手写 `isExpanded = 有子节点`，
+     * 于是基线拍的是"生产里根本不会出现的一棵树"。
+     */
     private fun renderRealTree(from: Int, to: Int, file: String, dark: Boolean = false) {
         val slice = realTypes.subList(from, to)
+        val tree = academicTreeState(slice, realCourses)
         composeRule.setContent {
             PocketXiaoliTheme(
                 appearanceMode = AppearanceMode.RAINBOW,
@@ -183,10 +188,10 @@ class AcademicQueryScreenshotTest {
                 ) {
                     LazyColumn {
                         academicTreeSections(
-                            types = slice,
+                            types = tree.types,
                             courses = realCourses,
-                            // 生产默认：有子节点的展开（一眼看到整棵树），叶子收起（课程按需再展开）
-                            isExpanded = { id -> slice.any { it.parentId == id } },
+                            parents = tree.parents,
+                            isExpanded = tree.expandedIds::contains,
                             onToggle = {},
                             // ⚠️ 段色按**全量** realTypes 算：按切片重算的话，
                             // 下半段里的「学科专业教育平台」会拿到上半段第一个平台的颜色
@@ -213,7 +218,8 @@ class AcademicQueryScreenshotTest {
                         .background(LocalPocketXiaoliColors.current.surfaceBase)
                         .padding(horizontal = 16.dp)
                 ) {
-                    val expanded = remember { mutableStateListOf("t1") }
+                    // 页面默认态（主修 + 平台展开）+ 用户把「思想政治类课程」点开
+                    val tree = remember { academicTreeState(types, courses, openIds = setOf("t1")) }
                     LazyColumn(
                         contentPadding = PaddingValues(vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -235,8 +241,9 @@ class AcademicQueryScreenshotTest {
                             )
                         }
                         item {
-                            // `CourseStatsCard` 是 private —— 这一页的计划内/计划外统计格
-                            // 由 `SummaryCard` 那条路径一同覆盖，这里不为了截一张图去改生产代码的可见性。
+                            // `CourseStatsCard`（计划内/计划外统计格）这里不单独渲：
+                            // 那些数字由 `SummaryCard` 那条路径一同覆盖，两张卡同屏只会让基线更难看。
+                            // （拆文件之后它是 internal 了，真要拍它这张图，直接渲就行。）
                         }
                         item {
                             // 2026-10-28 新增：学分构成条（段宽=要求学分，实心=已获）
@@ -265,17 +272,16 @@ class AcademicQueryScreenshotTest {
                             AcademicTreeHeader(
                                 typeCount = types.size,
                                 courseGroupCount = 1,
-                                expandedCount = if (expanded.contains("t1")) 1 else 0,
+                                expandedCount = if (tree.expandedIds.contains("t1")) 1 else 0,
                                 onToggleAll = {},
                             )
                         }
                         academicTreeSections(
-                            types = types,
+                            types = tree.types,
                             courses = courses,
-                            isExpanded = { expanded.contains(it) },
-                            onToggle = { id ->
-                                if (expanded.contains(id)) expanded.remove(id) else expanded.add(id)
-                            },
+                            parents = tree.parents,
+                            isExpanded = tree.expandedIds::contains,
+                            onToggle = {},
                             platformAccents = platformAccents(creditSegments(types)),
                         )
                     }
@@ -321,6 +327,7 @@ class AcademicQueryScreenshotTest {
                         academicTreeSections(
                             types = types,
                             courses = courses,
+                            parents = academicParentIds(types),
                             isExpanded = { true },
                             onToggle = {},
                         )
@@ -383,6 +390,7 @@ class AcademicQueryScreenshotTest {
                         academicTreeSections(
                             types = listOf(toneType),
                             courses = toneCourses,
+                            parents = academicParentIds(listOf(toneType)),
                             isExpanded = { true },
                             onToggle = {},
                         )

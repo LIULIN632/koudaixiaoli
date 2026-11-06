@@ -1,18 +1,18 @@
 package com.pocket.xiaoli.data.proactive
 
 import android.util.Log
+import com.pocket.xiaoli.core.exam.ExamCountdown
 import com.pocket.xiaoli.data.card.YxyCardRepository
 import com.pocket.xiaoli.data.electricity.DormElectricityRepository
 import com.pocket.xiaoli.data.entity.ExamEntity
 import com.pocket.xiaoli.data.entity.SavedGradeEntity
-import com.pocket.xiaoli.data.weather.WeatherAlert
-import com.pocket.xiaoli.data.weather.buildWeatherAlert
+import com.pocket.xiaoli.core.weather.WeatherAlert
+import com.pocket.xiaoli.core.weather.buildWeatherAlert
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.util.CalendarUtils
 import com.pocket.xiaoli.util.HolidayCalendar
 import com.pocket.xiaoli.util.coursesOn
 import com.pocket.xiaoli.util.currentWeekFrom
-import com.pocket.xiaoli.util.examDaysLeft
 import com.pocket.xiaoli.util.findUpcomingCourse
 import com.pocket.xiaoli.util.parseSemesterStart
 import kotlinx.coroutines.flow.first
@@ -168,7 +168,7 @@ object ProactiveEvaluator {
     }
 
     /**
-     * 天气提醒：**只读** [com.pocket.xiaoli.data.weather.WeatherRepository] 的快照。
+     * 天气提醒：**只读** [com.pocket.xiaoli.core.weather.WeatherRepository] 的快照。
      *
      * 快照由首页 / 天气页 / 天气工具拉取后发布，这里绝不为了提醒再发一次请求
      * （`buildWeatherAlert` 是纯函数，见它的注释）。没快照、快照过期或跨天都返回 null。
@@ -229,7 +229,7 @@ object ProactiveEvaluator {
         exams.asSequence()
             .filter { !it.completed }
             .mapNotNull { exam ->
-                examDaysLeft(exam.date, today)
+                ExamCountdown.daysLeft(exam.date, today)
                     ?.takeIf { it >= 0 }
                     ?.let { days -> ExamSignal(
                         courseName = exam.courseName,

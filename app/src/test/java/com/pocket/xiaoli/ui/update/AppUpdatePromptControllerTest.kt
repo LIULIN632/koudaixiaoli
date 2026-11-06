@@ -76,15 +76,29 @@ class AppUpdatePromptControllerTest {
     }
 
     @Test
-    fun `退到后台再回来会重新弹`() {
+    fun `点过稍后，切后台回来也不弹`() {
         val prompt = controller()
         prompt.autoShow(state())
         prompt.dismiss()
         prompt.autoShow(state())
         assertNull(prompt.info)
 
+        // 「稍后提醒」的语义是推迟到下次冷启动：切后台再回来不算重新打开
         prompt.onBackground()
         prompt.autoShow(state())
+        assertNull(prompt.info)
+    }
+
+    @Test
+    fun `强更不受稍后提醒影响`() {
+        val prompt = controller()
+        prompt.autoShow(state(force = true))
+        assertNotNull(prompt.info)
+        prompt.dismiss()
+        assertNull(prompt.info)
+
+        prompt.onBackground()
+        prompt.autoShow(state(force = true))
         assertNotNull(prompt.info)
     }
 

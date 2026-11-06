@@ -1,5 +1,6 @@
 package com.pocket.xiaoli.data.exam
 
+import com.pocket.xiaoli.core.exam.ExamSchedule
 import com.pocket.xiaoli.data.agent.AssistantLlmClient
 import com.pocket.xiaoli.data.agent.AssistantLlmConfig
 import com.pocket.xiaoli.data.agent.ChatMessage
@@ -15,7 +16,7 @@ import org.json.JSONObject
  *
  * ## 什么时候才用它
  *
- * **只在规则解析（[ExamNoticeParser]）认不出条目时**才调用。理由是成本与确定性：
+ * **只在规则解析（`core/exam/ExamNoticeParser`）认不出条目时**才调用。理由是成本与确定性：
  *
  * - 规则解析免费、离线、每次结果一致，常规教务模板它都能处理
  * - LLM 调用要联网、要花钱、结果有随机性（同一份通知可能两次结果不同）

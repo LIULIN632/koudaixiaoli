@@ -907,6 +907,112 @@ private fun AssistantCardBlock(card: AssistantCard) {
                 }
             }
         }
+
+        is AssistantCard.MaterialList -> {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(skin.radiusChip),
+                color = colors.surfaceAlt,
+            ) {
+                Column(modifier = Modifier.padding(skin.spaceCompact)) {
+                    if (card.header.isNotBlank()) {
+                        Text(
+                            text = card.header,
+                            style = PocketTypography.caption,
+                            color = colors.textTertiary,
+                        )
+                    }
+                    card.rows.forEach { row ->
+                        Spacer(Modifier.height(skin.spaceSm))
+                        MaterialRow(row)
+                    }
+                    if (card.hint.isNotBlank()) {
+                        Spacer(Modifier.height(skin.spaceSm))
+                        Text(
+                            text = card.hint,
+                            style = PocketTypography.caption,
+                            color = colors.textTertiary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 资料卡里的一行：**编号 + 标题 + 元信息 + 摘要**。
+ *
+ * ⚠️ 不用 `InfoRow`：它的左列很窄，而资料标题是文件名（「数据结构期末卷 2023.pdf」），
+ * 折行后右侧再挂一个"暂不可下载"就会把标题挤成一列竖排 —— 与培养方案卡同一个坑
+ * （见 [AcademicProgressRow] 的注释）。这里编号靠左固定宽度、标题单行截断、
+ * 元信息与摘要各占一行。
+ *
+ * 编号（`L1`）与回答正文里的 `[L1]` 同源，因此它必须**总是**显示：
+ * 少一个编号，用户就看不出"这句话是靠哪份资料答的"。
+ */
+@Composable
+private fun MaterialRow(row: AssistantCard.MaterialList.Row) {
+    val skin = LocalSkin.current
+    val colors = LocalPocketXiaoliColors.current
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = row.marker,
+            style = PocketTypography.caption,
+            color = colors.accentMain,
+        )
+        Spacer(Modifier.width(skin.spaceSm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = row.title,
+                // 文件名可以很长，但两行足够分辨；再折就把卡片撑成半屏
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = PocketTypography.body,
+                color = colors.textPrimary,
+            )
+            if (row.meta.isNotBlank()) {
+                Text(
+                    text = row.meta,
+                    // 两行而不是一行：「更新于 …」被截掉比折行更糟 —— 资料有没有时效
+                    // 直接决定用户要不要信它（基线 61-turn-material-card 第一版就截成了「更…」）
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = PocketTypography.caption,
+                    color = colors.textTertiary,
+                )
+            }
+            if (row.summary.isNotBlank()) {
+                Text(
+                    text = row.summary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = PocketTypography.caption,
+                    color = colors.textSecondary,
+                )
+            }
+            // 索引里登记了但还没传上去时明说，不给假按钮（设计 §2.4）
+            if (row.fileId.isNotBlank() && !row.downloadable) {
+                Text(
+                    text = "暂不可下载",
+                    style = PocketTypography.caption,
+                    color = colors.warning,
+                )
+            }
+            // 署名挂右下角：混进上面那堆元信息里会被当成"又一个字段"划过去，
+            // 而它其实是这一行最想让用户看见的东西（谁给的 → 愿意投稿）
+            if (row.provider.isNotBlank()) {
+                Text(
+                    text = "由 ${row.provider} 提供",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = PocketTypography.caption,
+                    color = colors.textTertiary,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 

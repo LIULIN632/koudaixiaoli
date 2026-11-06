@@ -315,3 +315,24 @@ fun courseBorderColor(colorIndex: Int, isDark: Boolean): Color {
         blue = (bg.blue * 0.85f).coerceIn(0f, 1f)
     )
 }
+
+/**
+ * 「这门课有作业」的高亮色 —— 金色。
+ *
+ * ## 为什么不是蓝色，也不是危险红
+ *
+ * - **蓝色**与主题主色 `accentMain`（#4D6BFE）同族，而主色在本 App 里已经承担
+ *   "选中 / 可点 / 主操作"；课表格子里再放一圈蓝，用户会读成"这门课被选中了"。
+ *   何况 15 档课程底色里就有淡蓝与淡紫，蓝框压在淡蓝底上几乎没有分离度。
+ * - **红色**会把作业报成错误。上一轮用 `warning`(#B45309) 观感偏棕橙，
+ *   因为要压住近白底色够 3:1，橙黄系只能压得很深；把色相从 30° 提到 43°
+ *   才是"金"，同时 `#C08A00` 对白底仍有约 3.0:1。
+ * - 深色模式反过来：格子底色深，需要更亮的金才跳得出来。
+ *
+ * ⚠️ 紧急与否**不用第二种颜色**，用双线表示（见 `CourseBlockBorderSpec.doubleLine`）——
+ * 同一件事只该有一个颜色，颜色负责"是什么"，形状负责"有多急"。
+ */
+private val HomeworkGoldOnLight = Color(0xFFC08A00)
+private val HomeworkGoldOnDark = Color(0xFFF5C542)
+
+fun homeworkGoldColor(isDark: Boolean): Color = if (isDark) HomeworkGoldOnDark else HomeworkGoldOnLight

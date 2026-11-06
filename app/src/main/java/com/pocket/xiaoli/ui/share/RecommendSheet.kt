@@ -31,18 +31,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
-import com.pocket.xiaoli.ui.components.SheetBackToDismiss
+import com.pocket.xiaoli.ui.overlay.AppOverlaySheet
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * 「推荐给同学」气泡：**轻点入口**看到的两样东西 —— 一个能扫的码、两条能复制的链接。
  *
  * 长按入口那一路不发这个气泡（直接起系统分享面板），所以本组件只管"看"与"复制"。
  *
- * 外壳用 MIUIX `WindowBottomSheet`，与「发现新版本」气泡同一套（2026-10-17 用户反馈
- * Material3 的 ModalBottomSheet 会撑到半屏，哪怕内容只有三行）。
+ * 外壳是页内浮层 [AppOverlaySheet]（2026-10-30 换的）：之前用 MIUIX 的 `WindowBottomSheet`，
+ * 那是独立窗口，ROM 会把窗口后面糊成一块空白（见 `memory/03` §九）。
+ * 2026-10-17 那条老反馈仍然成立 —— 内容只有三行，所以抽屉高度跟着内容走、不许撑到半屏，
+ * 这正是当初不用 Material3 `ModalBottomSheet` 的理由。
  */
 @Composable
 fun RecommendSheet(
@@ -54,12 +55,10 @@ fun RecommendSheet(
     val context = LocalContext.current
     val qr = rememberQrCode(AppShare.GITEE_URL, sizePx = 512)
 
-    WindowBottomSheet(
-        show = show,
+    AppOverlaySheet(
         title = "推荐给同学",
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        SheetBackToDismiss(onDismiss = onDismiss)
         RecommendSheetBody(
             qr = qr,
             onCopyLink = { url ->
@@ -76,7 +75,7 @@ fun RecommendSheet(
  * 气泡的**内容**（与窗口外壳分开，只为了能单独截图）。
  *
  * 这里没有 `show`、没有窗口、也不读 Context —— 复制/打开/分享都由调用方给。
- * 拆出来的唯一理由是基准图：`WindowBottomSheet` 是独立窗口，JVM 截图抓不到它；
+ * 拆出来的唯一理由是基准图：拍**只含正文**的那一块，不用连遮罩和背后的页面一起造；
  * 而这一块的排版（二维码大小、两行链接的高度、按钮顺序）恰恰是最容易改坏的部分。
  */
 @Composable

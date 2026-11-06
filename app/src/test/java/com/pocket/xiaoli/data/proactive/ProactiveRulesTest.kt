@@ -1,6 +1,6 @@
 package com.pocket.xiaoli.data.proactive
 
-import com.pocket.xiaoli.data.weather.WeatherAlert
+import com.pocket.xiaoli.core.weather.WeatherAlert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

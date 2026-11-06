@@ -37,8 +37,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import android.widget.FrameLayout
 import androidx.compose.ui.viewinterop.AndroidView
-import com.pocket.xiaoli.data.courseware.Courseware
+import com.pocket.xiaoli.data.courseware.CoursewareRef
+import com.pocket.xiaoli.data.courseware.CoursewareRepository
 import com.pocket.xiaoli.data.courseware.CoursewareServer
+import com.pocket.xiaoli.data.courseware.coursewareRoot
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.PocketTypography
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +67,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-internal fun CoursewareScreen(item: Courseware, onBack: () -> Unit) {
+internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
     val context = LocalContext.current
     val colors = LocalPocketXiaoliColors.current
 
@@ -80,8 +82,15 @@ internal fun CoursewareScreen(item: Courseware, onBack: () -> Unit) {
         loading = true
         failure = null
         server?.close()
+        CoursewareRepository.init(context)
+        // 下载型课件要确认文件真的在，不能只看清单（用户可能清过数据）
+        if (item.requiresDownload && !CoursewareRepository.isInstalled(item.id)) {
+            loading = false
+            failure = "这个课件还没下载完，回服务页点一下重新下载"
+            return@LaunchedEffect
+        }
         val started = withContext(Dispatchers.IO) {
-            runCatching { CoursewareServer(context.assets) }
+            runCatching { CoursewareServer(context.assets, coursewareRoot(context)) }
                 .onFailure { failure = "本机课件服务没起来：${it.javaClass.simpleName} ${it.message}" }
                 .getOrNull()
         }

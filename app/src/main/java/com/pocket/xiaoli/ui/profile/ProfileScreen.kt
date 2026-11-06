@@ -698,8 +698,19 @@ fun ProfileScreen(
             // 点平台行 = 直接进那一家的网页登录页（请求交给持有开关的 [ProfileDialogHost]），
             // 并带上"关掉后回绑定信息页"的意图 —— 这样返回时用户还在他刚操作的那一页。
             onOpenLearningPlatform = { platform ->
-                pendingLearningRequest = ProfileLearningRequest(platform, returnToBinding = true)
-                showAccountBinding = false
+                // 这一跳会换整页（绑定信息 → 网页登录）。2026-11 有过「点学习通直接闪退」，
+                // 当时没有任何日志能定位，所以这里兜一层：真出事时至少是一条可读提示，
+                // 而不是一个什么都没有的黑屏退出。
+                runCatching {
+                    pendingLearningRequest = ProfileLearningRequest(platform, returnToBinding = true)
+                    showAccountBinding = false
+                }.onFailure { t ->
+                    android.widget.Toast.makeText(
+                        context,
+                        "打开${platform.label}登录页失败：${t.javaClass.simpleName}${t.message?.let { " · $it" } ?: ""}",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
             },
             onSyncLearning = {
                 pendingLearningRequest = ProfileLearningRequest(LearningPlatform.CHAOXING, sync = true)

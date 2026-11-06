@@ -30,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.data.library.LibraryFile
 import com.pocket.xiaoli.data.library.LibraryRepository
 import com.pocket.xiaoli.ui.components.AppCard
@@ -83,7 +83,7 @@ internal fun LibraryScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val state by repository.state.collectAsState()
+    val state by repository.state.collectAsStateWithLifecycle()
 
     var query by remember { mutableStateOf("") }
     var subject by remember { mutableStateOf("") }
@@ -312,6 +312,9 @@ private fun LibraryRow(
             val meta = listOfNotNull(
                 file.kind.takeIf { it.isNotBlank() },
                 file.sizeText.takeIf { it.isNotBlank() },
+                // 署名跟元信息同一行：这一屏每行右侧已经挂了下载图标/进度，
+                // 再往右下角塞名字会把文件名挤窄，而文件名才是用户先看的东西。
+                file.provider.takeIf { it.isNotBlank() }?.let { "由 $it 提供" },
             ).joinToString(" · ")
             if (meta.isNotEmpty()) {
                 Spacer(Modifier.height(2.dp))

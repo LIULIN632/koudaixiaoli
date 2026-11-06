@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -428,15 +429,24 @@ private fun GoodItemCard(
                     )
                 }
                 Spacer(Modifier.width(skin.spaceSm))
-                Checkbox(
-                    checked = item.purchased,
-                    onCheckedChange = { onToggle() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = colors.accentMain,
-                        uncheckedColor = colors.textTertiary,
-                        checkmarkColor = onAccentColor()
-                    )
-                )
+                // 原生 Checkbox 是个 Material 方块，和左边的分类图标衬底并排像两个控件。
+                // 换成同一家族的圆角勾选块：未勾=描边、已勾=主题色填充+白勾。
+                IconButton(onClick = { onToggle() }, modifier = Modifier.size(32.dp).invisibleTouchTarget()) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .then(
+                                if (item.purchased) Modifier.background(colors.accentMain)
+                                else Modifier.border(1.5.dp, colors.textTertiary, RoundedCornerShape(6.dp))
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (item.purchased) {
+                            Icon(Icons.Outlined.Check, null, tint = onAccentColor(), modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
                 Spacer(Modifier.width(skin.spaceXs))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -486,7 +496,14 @@ private fun GoodItemCard(
                     fontSize = 11.sp,
                     color = colors.textTertiary,
                 )
-                IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(28.dp).invisibleTouchTarget()) {
+                IconButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.surfaceAlt)
+                        .invisibleTouchTarget(),
+                ) {
                     Icon(
                         Icons.Outlined.Close, "删除",
                         tint = colors.textTertiary,

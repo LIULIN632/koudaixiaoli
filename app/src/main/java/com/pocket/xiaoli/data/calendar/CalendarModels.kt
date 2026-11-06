@@ -1,5 +1,6 @@
 package com.pocket.xiaoli.data.calendar
 
+import com.pocket.xiaoli.core.calendar.eventCoversDay
 import java.time.LocalDate
 
 /**
@@ -82,7 +83,11 @@ data class CalendarEvent(
     val nodeKey: String get() = "$title@$start"
 
     /** 这一天是否落在事件区间内。 */
-    fun covers(date: LocalDate): Boolean = !date.isBefore(start) && !date.isAfter(end)
+    fun covers(date: LocalDate): Boolean = eventCoversDay(
+        startEpochDay = start.toEpochDay(),
+        endEpochDay = end.toEpochDay(),
+        dayEpochDay = date.toEpochDay(),
+    )
 
     companion object {
         /**

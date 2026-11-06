@@ -11,6 +11,7 @@ import com.pocket.xiaoli.data.School
 import com.pocket.xiaoli.data.CampusConfig
 import com.pocket.xiaoli.data.CampusInfo
 import com.pocket.xiaoli.data.SchoolRegistry
+import com.pocket.xiaoli.data.learning.ChaoxingWorkLinks
 import com.pocket.xiaoli.data.learning.LearningPlatform
 import com.pocket.xiaoli.data.qzxy.QzxyDeviceStore
 import com.pocket.xiaoli.data.qzxy.QzxyRepository
@@ -42,6 +43,7 @@ import com.pocket.xiaoli.data.map.BuiltinRoomCells
 import com.pocket.xiaoli.data.map.RoomCell
 import com.pocket.xiaoli.data.map.RoomDirectorySearch
 import com.pocket.xiaoli.data.map.RoomDirectorySearch.RoomMergeDirection
+import com.pocket.xiaoli.data.bus.BusRepository
 import com.pocket.xiaoli.data.calendar.CalendarRepository
 import com.pocket.xiaoli.data.holiday.HolidayDay
 import com.pocket.xiaoli.data.holiday.HolidayRepository
@@ -92,9 +94,10 @@ import kotlinx.coroutines.flow.map
 import com.pocket.xiaoli.data.entity.SpecialWorkDayEntity
 import com.pocket.xiaoli.data.announcement.AppFeedRepository
 import com.pocket.xiaoli.data.announcement.AppFeedStore
-import com.pocket.xiaoli.data.weather.WeatherRepository
+import com.pocket.xiaoli.core.weather.WeatherRepository
 import com.pocket.xiaoli.data.weather.WeatherStore
 import com.pocket.xiaoli.notification.ExamReminderScheduler
+import com.pocket.xiaoli.notification.HomeworkReminderScheduler
 
 class AppContainer(context: Context) {
     private val app = context.applicationContext as PocketXiaoliApplication
@@ -132,6 +135,15 @@ class AppContainer(context: Context) {
      */
     val weatherStore by lazy { WeatherStore(app) }
     val weatherRepository by lazy { WeatherRepository(weatherStore) }
+
+    /**
+     * 公交到站：只打掌上公交那**一个明文接口**（无 key、无签名、无 SDK），
+     * 30 秒 TTL + 本机缓存，不申请定位权限（距离按学校中心点算）。
+     *
+     * 单例的理由与天气一样：OkHttp 连接池与缓存只有一份，页面进出不会各建一个。
+     * 数据源与取舍见 [BusRepository] 的 KDoc。
+     */
+    val busRepository by lazy { BusRepository(context) }
 
 
     /**
@@ -790,6 +802,9 @@ class AppContainer(context: Context) {
 
     fun deleteLearningCookie(platform: LearningPlatform) {
        credPrefs.edit().remove("learning_cookie_${platform.key}").apply()
+       // 学习通的作业列表链接缓存里带着「这个人、这门课」的签名参数：
+       // 登出就该一起清掉，否则换账号后会拿着上一个人的链接去请求。
+       if (platform == LearningPlatform.CHAOXING) ChaoxingWorkLinks.clear()
     }
 
     /**
@@ -1158,6 +1173,8 @@ class AppContainer(context: Context) {
      * 都要自己想办法拿 context。
      */
     fun rescheduleExamReminders() = ExamReminderScheduler.rescheduleAsync(appContext)
+
+    fun rescheduleHomeworkReminders() = HomeworkReminderScheduler.rescheduleAsync(appContext)
 
     fun autoCurrentWeek(): Int {
        val start = parseSemesterStart(_semesterStart.value) ?: return 1

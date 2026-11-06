@@ -350,11 +350,15 @@ fun ProfileDialogHost(
                             .getCoursesByScheme(container.activeSchemeId.value)
                             .first()
                         val slots = app.repository.allTimeSlots.first()
+                        val homeworks = app.repository
+                            .getHomeworkByScheme(container.activeSchemeId.value)
+                            .first()
                         val ics = com.pocket.xiaoli.util.CourseIcsExporter.export(
                             courses = courses,
                             timeSlots = slots,
                             semesterStart = container.semesterStart.value,
                             totalWeeks = container.semesterWeeks.value,
+                            homeworks = homeworks,
                         )
                         context.contentResolver.openOutputStream(uri)?.use { out ->
                             out.write(ics.toByteArray(Charsets.UTF_8))
@@ -528,6 +532,7 @@ fun ProfileDialogHost(
                     )
                     added++
                 }
+                if (added > 0) container.rescheduleHomeworkReminders()
                 added
             },
             onNeedLogin = {
@@ -578,6 +583,7 @@ fun ProfileDialogHost(
                             }
                         }
                     }
+                    container.rescheduleHomeworkReminders()
                     withContext(Dispatchers.Main) {
                         showLearningManualImport = false
                         Toast.makeText(context, "已加入待办", Toast.LENGTH_SHORT).show()

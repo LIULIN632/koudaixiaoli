@@ -68,7 +68,7 @@ import com.pocket.xiaoli.data.announcement.AppFeedRepository
 import com.pocket.xiaoli.data.entity.ExamEntity
 import com.pocket.xiaoli.data.entity.HomeworkEntity
 import com.pocket.xiaoli.data.entity.TaskEntity
-import com.pocket.xiaoli.data.weather.WeatherSnapshot
+import com.pocket.xiaoli.core.weather.WeatherSnapshot
 import com.pocket.xiaoli.network.Announcement
 import com.pocket.xiaoli.network.AnnouncementLevel
 import com.pocket.xiaoli.util.AppVersion
@@ -76,8 +76,6 @@ import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.onAccentColor
 import com.pocket.xiaoli.ui.theme.invisibleTouchTarget
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -475,8 +473,8 @@ internal fun HomeClockHeader(
             delay(1000L)
         }
     }
-    val timeText = now.format(DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA))
-    val dateText = now.format(DateTimeFormatter.ofPattern("M月d日 EEEE", Locale.CHINA))
+    val timeText = now.format(clockTimeFormat)
+    val dateText = now.format(clockDateFormat)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -693,7 +691,7 @@ internal fun SectionHeader(
     // 2026-10 用户的要求是"首页那些问号的都去掉" —— 首页**一律不放**说明气泡，
     // 所以参数与调用点一并删掉，不是"默认不传"。要再加回来先问：
     // 首页是"一眼看完就出门"的屏，多一枚「?」就是多一个要判读的符号。
-    // 守门人：`HomeNoBubbleTipTest`（源码扫描，首页相关文件里不许出现 BubbleTip）。
+    // 守门人：`NoBubbleTipTest`（源码扫描，首页相关文件里不许出现 BubbleTip）。
     //
     // ⚠️ 2026-10 又删掉了 `action` / `onActionClick`：那是标题右侧的「新增 / N 项 · 管理」，
     // 与列表里的行内输入框并列为**第二个**新增入口。用户要求"改成一个、按钮放右下角"，

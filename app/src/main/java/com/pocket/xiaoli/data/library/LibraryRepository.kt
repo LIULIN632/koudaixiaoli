@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import org.json.JSONArray
+import org.json.JSONObject
 import okhttp3.Request
 
 /**
@@ -46,14 +48,15 @@ class LibraryRepository(
     data class State(
         val loading: Boolean = false,
         val files: List<LibraryFile> = emptyList(),
+        val docs: List<LibraryDoc> = emptyList(),
         val generatedAt: String = "",
         val checkedAtMillis: Long = 0L,
         val error: String? = null,
         /** 这份索引是从网上拉的（true）还是缓存/内置（false）。 */
         val fromNetwork: Boolean = false,
     ) {
-        val isEmpty: Boolean get() = files.isEmpty()
-        val index: LibraryIndex get() = LibraryIndex(generatedAt, files)
+        val isEmpty: Boolean get() = files.isEmpty() && docs.isEmpty()
+        val index: LibraryIndex get() = LibraryIndex(generatedAt, files, docs)
     }
 
     private val _state = MutableStateFlow(readInitial())
@@ -67,7 +70,7 @@ class LibraryRepository(
 
     suspend fun refresh(force: Boolean = false): State {
         val current = _state.value
-        if (!force && current.files.isNotEmpty() && !isStale(current.checkedAtMillis)) return current
+        if (!force && !current.isEmpty && !isStale(current.checkedAtMillis)) return current
         _state.value = current.copy(loading = true, error = null)
         val fetched = withContext(Dispatchers.IO) { fetchIndex() }
         val next: State = if (fetched == null) {
@@ -87,6 +90,7 @@ class LibraryRepository(
                 State(
                     loading = false,
                     files = index.files,
+                    docs = index.docs,
                     generatedAt = index.generatedAt,
                     checkedAtMillis = System.currentTimeMillis(),
                     error = null,
@@ -108,12 +112,12 @@ class LibraryRepository(
         }.getOrNull()
         val fromCache = cached?.let { LibraryIndex.fromJson(it) }
         if (fromCache != null) {
-            return State(files = fromCache.files, generatedAt = fromCache.generatedAt, fromNetwork = false)
+            return State(files = fromCache.files, docs = fromCache.docs, generatedAt = fromCache.generatedAt, fromNetwork = false)
         }
         val bundled = runCatching {
             context.assets.open("library/index.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
         }.getOrNull()?.let { LibraryIndex.fromJson(it) } ?: LibraryIndex.EMPTY
-        return State(files = bundled.files, generatedAt = bundled.generatedAt)
+        return State(files = bundled.files, docs = bundled.docs, generatedAt = bundled.generatedAt)
     }
 
     /** 拉索引：返回 (索引, 是否来自网络)；全挂返回 null。 */
@@ -134,25 +138,55 @@ class LibraryRepository(
     }
 
 
-    /** 缓存写的就是解析后的规范形态，省得再存一份原文。 */
-    private fun rawOf(index: LibraryIndex): String = buildString {
-        append("{\"generatedAt\":\"").append(index.generatedAt.replace("\"", "")).append("\",\"files\":[")
-        index.files.forEachIndexed { i, file ->
-            if (i > 0) append(',')
-            append("{\"id\":\"").append(file.id.escape())
-            append("\",\"name\":\"").append(file.name.escape())
-            append("\",\"course\":\"").append(file.course.escape())
-            append("\",\"kind\":\"").append(file.kind.escape())
-            append("\",\"sizeBytes\":").append(file.sizeBytes)
-            append(",\"sha256\":\"").append(file.sha256.orEmpty().escape())
-            append("\",\"updatedAt\":\"").append(file.updatedAt.escape())
-            append("\",\"urls\":[").append(file.urls.joinToString(",") { "\"" + it.escape() + "\"" }).append("]")
-            append(",\"tags\":[").append(file.tags.joinToString(",") { "\"" + it.escape() + "\"" }).append("]}")
+    /**
+     * 缓存写的就是解析后的规范形态，省得再存一份原文。
+     *
+     * ⚠️ 手写字符串拼接在这里是错的：`docs[].body` 一定有换行，手写的 `escape()`
+     * 只处理引号与反斜杠，写出来的 JSON 会坏掉 —— 下次启动读缓存就解析失败，
+     * 于是"索引看起来每天都在退回到内置空索引"。所以用 [JSONObject] 序列化。
+     */
+    private fun rawOf(index: LibraryIndex): String {
+        val filesJson = JSONArray()
+        index.files.forEach { file ->
+            filesJson.put(
+                JSONObject()
+                    .put("id", file.id)
+                    .put("name", file.name)
+                    .put("subject", file.subject)
+                    .put("course", file.course)
+                    .put("kind", file.kind)
+                    .put("sizeBytes", file.sizeBytes)
+                    .put("sha256", file.sha256.orEmpty())
+                    .put("updatedAt", file.updatedAt)
+                    .put("urls", JSONArray(file.urls))
+                    .put("tags", JSONArray(file.tags))
+                    .put("summary", file.summary)
+                    .put("textRef", file.textRef)
+                    .put("provider", file.provider),
+            )
         }
-        append("]}")
+        val docsJson = JSONArray()
+        index.docs.forEach { doc ->
+            docsJson.put(
+                JSONObject()
+                    .put("id", doc.id)
+                    .put("title", doc.title)
+                    .put("summary", doc.summary)
+                    .put("body", doc.body)
+                    .put("subject", doc.subject)
+                    .put("course", doc.course)
+                    .put("kind", doc.kind)
+                    .put("tags", JSONArray(doc.tags))
+                    .put("updatedAt", doc.updatedAt)
+                    .put("provider", doc.provider),
+            )
+        }
+        return JSONObject()
+            .put("generatedAt", index.generatedAt)
+            .put("files", filesJson)
+            .put("docs", docsJson)
+            .toString()
     }
-
-    private fun String.escape(): String = replace("\\", "\\\\").replace("\"", "\\\"")
 
     private fun indexUrls(): List<String> = SelfHost.libraryIndexUrls(MIRRORS)
 

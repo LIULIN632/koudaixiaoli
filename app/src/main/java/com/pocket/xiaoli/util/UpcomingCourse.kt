@@ -1,5 +1,7 @@
 package com.pocket.xiaoli.util
 
+import com.pocket.xiaoli.core.course.UpcomingCandidate
+import com.pocket.xiaoli.core.course.pickUpcomingCourse
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
 import java.time.LocalDate
@@ -49,26 +51,32 @@ fun findUpcomingCourse(
     now: LocalTime = LocalTime.now(),
     isOffDay: (LocalDate) -> Boolean = { false },
 ): UpcomingCourse? {
-    fun pick(date: LocalDate, dayOffset: Int): UpcomingCourse? = coursesOn(courses, week, date, isOffDay)
-        .map { it.toUpcoming(slots, date, dayOffset) }
-        .firstOrNull()
-
-    val notFinished = coursesOn(courses, week, today, isOffDay)
-        .map { it.toUpcoming(slots, today, dayOffset = 0) }
-        .firstOrNull { candidate ->
-            val end = parseTimeOrNull(candidate.endTime)
-            // 与 `HomeCourse.isFinished` 同口径：end 缺失 = 不算已下课
-            end == null || now.isBefore(end)
-        }
-    if (notFinished != null) return notFinished
-
-    for (offset in 1..7) {
-        val date = today.plusDays(offset.toLong())
-        if (isOffDay(date)) continue
-        pick(date, offset)?.let { return it }
+    if (week <= 0) return null
+    // 挑选规则在共享层（core/course/UpcomingCourseCore.kt）：这里只负责把实体翻译成
+    // 判定需要的最小数、再把命中下标翻回实体 + 补时间。
+    val candidates = courses.map { course ->
+        UpcomingCandidate(
+            dayOfWeek = course.dayOfWeek,
+            startSlot = course.startSlot,
+            startMinute = minuteOf(slots[course.startSlot]?.startTime),
+            endMinute = minuteOf(slots[course.endSlot]?.endTime),
+            occursThisWeek = isCourseInWeek(course, week),
+        )
     }
-    return null
+    val pick = pickUpcomingCourse(
+        candidates = candidates,
+        todayDayOfWeek = today.dayOfWeek.value,
+        nowMinute = now.hour * 60 + now.minute,
+        isOffDay = { offset -> isOffDay(today.plusDays(offset.toLong())) },
+    ) ?: return null
+
+    val date = today.plusDays(pick.dayOffset.toLong())
+    return courses[pick.index].toUpcoming(slots, date, pick.dayOffset)
 }
+
+/** `"08:00"` → 从 0 点起的分钟数；空串/坏格式 → -1（共享层把 -1 当「时间未知」）。 */
+private fun minuteOf(value: String?): Int =
+    parseTimeOrNull(value.orEmpty())?.let { it.hour * 60 + it.minute } ?: -1
 
 /**
  * 某一天要上的课：本周出现的 + 那一天的 + 不是法定放假日的，按节次排序。

@@ -1,0 +1,33 @@
+# Gradle / Kotlin 构建产物
+build/
+.gradle/
+.kotlin/
+
+# 打包产物（绿色版目录 + zip，体积大，按需重新生成）
+dist/
+
+# .NET 安装器构建产物（bin + obj 实测 260 MB，绝不入库）
+installer/**/bin/
+installer/**/obj/
+installer/**/payload.zip
+installer/**/*.zip
+.vs/
+
+# 验收截图（按需重截；docs/screenshots 里的小图保留入库）
+shots/
+
+# 运行日志与崩溃转储
+*.log
+hs_err_pid*.log
+replay_pid*.log
+
+# IDE
+.idea/
+*.iml
+
+# 开发期 scratch（一次性补丁脚本 / 抓图数据 / 日志），不是产品的一部分
+# 判据同根目录的 `_backup_*` 与 `build-logs/`：跑一次就多一份，不入库。
+tmp/
+
+# 截图门禁的固定数据目录：只提交种子数据与 onboarded.flag，运行产生的 logs/ 不入库
+tools/fixtures/**/logs/

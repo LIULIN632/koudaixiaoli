@@ -4,8 +4,8 @@ import com.pocket.xiaoli.data.academic.AcademicSnapshotCodec
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
 import com.pocket.xiaoli.data.service.CampusServiceRegistry
-import com.pocket.xiaoli.data.weather.WeatherRepository
-import com.pocket.xiaoli.data.weather.weatherReport
+import com.pocket.xiaoli.core.weather.WeatherRepository
+import com.pocket.xiaoli.core.weather.weatherReport
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.util.isCourseInWeek
 import java.time.LocalDate
@@ -31,17 +31,24 @@ object AssistantTools {
         AssistantTool.CAMPUS_LOCATION -> text(AssistantFormatters.rooms(container.roomCells.value, query))
         AssistantTool.CAMPUS_SERVICE -> text(AssistantFormatters.services(CampusServiceRegistry.catalogFor(container.selectedCampus.value), query))
 
-        // 校园知识库：⚠️ 过滤必须在**每次检索时**现算"今天"。
+        // 资料库：四源合一（知识库 / 快问快答 / 内置帮助 / 资料站）。
+        // ⚠️ 过滤必须在**每次检索时**现算"今天"。
         // 若改成加载时过滤一次，Android 进程跨天后仍会把过期通知当现行安排答出来。
-        AssistantTool.SEARCH_KNOWLEDGE -> {
-            val raw = container.knowledgeStore.ensureLoaded()
+        AssistantTool.SEARCH_LIBRARY -> {
+            val raw = UnifiedContent.collect(container)
             val usable = ExpiryPolicy.apply(raw, LocalDate.now())
+            val index = container.libraryRepository.state.value.index
             // 直接返回 ToolOutcome：来源条要的 sources 与回灌给模型的文本在这里已经配好对，
             // 再包一层 text() 会把 sources 丢掉。
-            AssistantFormatters.knowledge(
+            AssistantFormatters.library(
                 hits = KeywordRetriever.search(query, usable, topK = KNOWLEDGE_TOP_K),
                 totalDocuments = usable.size,
                 query = query,
+                // 资料卡要的 类型/大小/可下载 只在索引里，正文里没有 —— 与检索同一次取数，
+                // 不额外联网（索引本来就是内存里的那份）。
+                files = index.files,
+                // 正文条目的署名只在 docs[] 里（正文行没有文件可反查）。
+                docs = index.docs,
             )
         }
 

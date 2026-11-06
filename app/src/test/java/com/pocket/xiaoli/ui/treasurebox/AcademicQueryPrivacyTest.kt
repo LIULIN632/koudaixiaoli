@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
-import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasText
@@ -28,6 +28,7 @@ import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
 import com.pocket.xiaoli.ui.theme.SkinStyle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,6 +102,7 @@ class AcademicQueryPrivacyTest {
                     courses = List(courseCount) {
                         AcademicCourseItem(typeId = type.id, typeName = type.name, courseName = "课$it")
                     },
+                    parents = academicParentIds(listOf(type)),
                     isExpanded = { true },
                     onToggle = {},
                 )
@@ -205,7 +207,7 @@ class AcademicQueryPrivacyTest {
         )
 
         // 「已获」与「/ 要求」是两个节点，所以只能验后半句
-        composeRule.onNodeWithText(" / 不限", substring = true).assertExists()
+        composeRule.onNodeWithText("不限").assertExists()
         composeRule.onNodeWithText("4.0", substring = true).assertExists()
         // 没有分母就没有进度：不画条、也不给一个假的百分比
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0f, 0f..1f))).assertCountEquals(0)
@@ -229,6 +231,7 @@ class AcademicQueryPrivacyTest {
                 academicTreeSections(
                     types = types,
                     courses = courses,
+                    parents = academicParentIds(types),
                     isExpanded = { expandedIds.contains(it) },
                     onToggle = { id ->
                         if (expandedIds.contains(id)) expandedIds.remove(id) else expandedIds.add(id)
@@ -262,6 +265,7 @@ class AcademicQueryPrivacyTest {
                 academicTreeSections(
                     types = listOf(AcademicTypeInfo(name = "创新创业实践教育模块", id = "p1", depth = 1)),
                     courses = emptyList(),
+                    parents = emptySet(),
                     isExpanded = { false },
                     onToggle = {},
                 )
@@ -274,21 +278,29 @@ class AcademicQueryPrivacyTest {
         composeRule.onNodeWithText("（学校暂无该类型的课程明细）").assertExists()
     }
 
+    /** 四层树：主修 → 平台 → 模块 → 类型，类型下挂一门课。 */
+    private val fourLevelTypes = listOf(
+        AcademicTypeInfo(name = "主修", id = "root", requiredCredit = "170", earnedCredit = "95.0"),
+        AcademicTypeInfo(name = "通识教育平台", id = "p1", parentId = "root", depth = 1),
+        AcademicTypeInfo(name = "通识必修课程模块", id = "m1", parentId = "p1", depth = 2),
+        AcademicTypeInfo(name = "思想政治类课程", id = "t1", parentId = "m1", depth = 3),
+    )
+
+    private val fourLevelCourses = listOf(
+        AcademicCourseItem(typeId = "t1", typeName = "思想政治类课程", courseName = "思想道德修养与法律基础"),
+    )
+
     @Test
     fun `收起一个平台 它的子模块与课程类型都不再渲染`() {
-        val types = listOf(
-            AcademicTypeInfo(name = "主修", id = "root", requiredCredit = "170", earnedCredit = "95.0"),
-            AcademicTypeInfo(name = "通识教育平台", id = "p1", parentId = "root", depth = 1),
-            AcademicTypeInfo(name = "通识必修课程模块", id = "m1", parentId = "p1", depth = 2),
-            AcademicTypeInfo(name = "思想政治类课程", id = "t1", parentId = "m1", depth = 3),
-        )
-        // 收起由调用方（页面）算好后传进来 —— 这里模拟"p1 被收起"
+        // 走页面同一条路：shutIds 里写"p1 被收起"，剩下的裁剪由 academicTreeState 负责
+        val tree = academicTreeState(fourLevelTypes, fourLevelCourses, shutIds = setOf("p1"))
         render {
             LazyColumn {
                 academicTreeSections(
-                    types = visibleAcademicTypes(types, setOf("p1")),
-                    courses = emptyList(),
-                    isExpanded = { true },
+                    types = tree.types,
+                    courses = fourLevelCourses,
+                    parents = tree.parents,
+                    isExpanded = tree.expandedIds::contains,
                     onToggle = {},
                 )
             }
@@ -297,6 +309,49 @@ class AcademicQueryPrivacyTest {
         composeRule.onNodeWithText("通识教育平台").assertExists() // 被收起的自己还在（还要能点开）
         composeRule.onNodeWithText("通识必修课程模块").assertDoesNotExist()
         composeRule.onNodeWithText("思想政治类课程").assertDoesNotExist()
+        // 收起后**箭头必须还在**：parents 来自裁剪前的全列表，否则这里点不开、页面就死了
+        composeRule.onNode(hasClickAction() and hasText("通识教育平台", substring = true)).assertIsDisplayed()
+    }
+
+    /**
+     * 默认展开到哪一层（用户 2026-10-31 的口径："默认展开平台"）。
+     *
+     * 判据落在**纯函数**上而不是快照：默认值错一行，图上只是"少了几行"，
+     * 谁都不会觉得是 bug；而这里能直接说出"平台在、模块在、类型不在"。
+     */
+    @Test
+    fun `默认展开到平台层 模块与类型默认收起`() {
+        val tree = academicTreeState(fourLevelTypes, fourLevelCourses)
+
+        // 展开的是主修与平台（它们有子树要露出来），模块与类型默认收起
+        assertEquals(setOf("root", "p1"), tree.expandedIds)
+        // 类型行（t1）藏在收起的模块下面 —— 整棵子树不渲染，这才是"收起来了"
+        assertEquals(listOf("root", "p1", "m1"), tree.types.map { it.id })
+        // 一门课都没露出来：默认态不该把课程表铺满整屏
+        assertTrue(tree.types.none { it.id == "t1" })
+    }
+
+    @Test
+    fun `显式覆盖压过默认 筛选时全展开`() {
+        // 用户把模块点开：它的子树才该出现
+        val opened = academicTreeState(fourLevelTypes, fourLevelCourses, openIds = setOf("m1"))
+        assertEquals(listOf("root", "p1", "m1", "t1"), opened.types.map { it.id })
+        assertTrue(opened.expandedIds.contains("m1"))
+
+        // 同一层既被展开过又被收起过 → 收起赢（用户最后一次动作是"收起来"）
+        val both = academicTreeState(
+            fourLevelTypes,
+            fourLevelCourses,
+            openIds = setOf("m1"),
+            shutIds = setOf("m1"),
+        )
+        assertTrue(!both.expandedIds.contains("m1"))
+        assertTrue(both.types.none { it.id == "t1" })
+
+        // 筛选时默认全展开：命中项藏在收起的分支里没有意义
+        val filtered = academicTreeState(fourLevelTypes, fourLevelCourses, filtering = true)
+        assertEquals(setOf("root", "p1", "m1", "t1"), filtered.expandableIds)
+        assertEquals(setOf("root", "p1", "m1", "t1"), filtered.expandedIds)
     }
 
     @Test
@@ -350,7 +405,13 @@ class AcademicQueryPrivacyTest {
         )
         render {
             LazyColumn {
-                academicTreeSections(types = types, courses = emptyList(), isExpanded = { true }, onToggle = {})
+                academicTreeSections(
+                    types = types,
+                    courses = emptyList(),
+                    parents = academicParentIds(types),
+                    isExpanded = { true },
+                    onToggle = {},
+                )
             }
         }
 
@@ -366,31 +427,41 @@ class AcademicQueryPrivacyTest {
     }
 
     /**
-     * **整张卡都是展开键**，不只是卡里的标题行（2026-10-29 用户点名"点空白展不开"）。
+     * **整块都是展开键**，不只是标题行（2026-10-29 用户点名"点空白展不开"）。
      *
-     * 卡有边界，用户就按边界理解可点区。这一条钉的是"点击挂在卡上"这件事：
-     * 挂在标题行上量到 44dp，挂在卡上量到 ~69dp（标题行 + 进度条那一行 + 卡内边距），
-     * 所以断言取 60dp —— 两边都有余量，不是刀口。
-     * 顺带钉"卡里只有一个可点节点"：嵌套两个按钮会让点空白和点标题行走出不同的东西。
+     * 平台那一档现在是一条有色脊的段色带（模块只有色脊、不铺底），不管有没有底，
+     * 用户都是按"这一块"来理解可点区的。这一条钉的是点击挂在**最外面那层**：
+     * 挂在标题行上量到 44dp，挂在整块上量到 ~78dp（标题行 + 进度条 + 药丸行 + 带的内边距），
+     * 所以断言取 60dp —— 上下各有十几 dp 余量，不是刀口。
+     * 顺带钉"一块只有一个可点节点"：嵌套两个按钮会让点空白和点标题行走出不同的东西。
      */
     @Test
-    fun `整张平台卡都是展开键`() {
+    fun `整块都是展开键 不只是标题行`() {
         val types = listOf(
             AcademicTypeInfo(name = "主修", id = "root", requiredCredit = "170.0", earnedCredit = "95.0"),
             AcademicTypeInfo(
                 name = "通识教育平台", id = "p1", parentId = "root", depth = 1,
                 requiredCredit = "53.5", earnedCredit = "49.5",
+                // 门次缺口也要给：药丸那一行是"整块"的一部分。少了它这块只有两行高，
+                // 44dp 与 60dp 之间的余量就瘦成刀口了
+                requiredCount = "35", reachedCount = "29", missedCount = "6",
             ),
             AcademicTypeInfo(name = "通识必修课程模块", id = "m1", parentId = "p1", depth = 2),
         )
         render {
             LazyColumn {
-                academicTreeSections(types = types, courses = emptyList(), isExpanded = { true }, onToggle = {})
+                academicTreeSections(
+                    types = types,
+                    courses = emptyList(),
+                    parents = academicParentIds(types),
+                    isExpanded = { true },
+                    onToggle = {},
+                )
             }
         }
 
-        val card = composeRule.onNode(hasClickAction() and hasText("通识教育平台", substring = true))
-        card.assertHeightIsAtLeast(60.dp)
+        val block = composeRule.onNode(hasClickAction() and hasText("通识教育平台", substring = true))
+        block.assertHeightIsAtLeast(60.dp)
         composeRule.onAllNodes(hasClickAction() and hasText("通识教育平台", substring = true))
             .assertCountEquals(1)
     }

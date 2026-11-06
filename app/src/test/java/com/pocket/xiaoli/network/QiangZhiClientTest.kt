@@ -20,6 +20,40 @@ class QiangZhiClientTest {
         assertEquals("", client.normalizeBaseUrl("  "))
     }
 
+    /**
+     * 强智部署在**带上下文路径**的位置时，路径必须留下来。
+     *
+     * 燕京理工的教务在 `http://jw.yit.edu.cn/yjlgxy_jsxsd/`（用户 2026-10-31 给的地址）：
+     * API 是 `<ctx>/app.do`、网页登录是 `<ctx>/jsxsd/xk/LoginToXk`。
+     * 老实现把路径整个砍掉，于是打的是 `http://jw.yit.edu.cn/app.do` —— 一个不存在的东西。
+     * 判据：路径里**有** `jsxsd` 才保留；`/yjlgxy` 这种门户页地址维持老行为（只认 host），
+     * 已对接的六所强智学校不受影响。
+     */
+    @Test
+    fun normalizeBaseUrlKeepsQiangzhiContextPath() {
+        assertEquals(
+            "http://jw.yit.edu.cn/yjlgxy_jsxsd/app.do",
+            client.normalizeBaseUrl("http://jw.yit.edu.cn/yjlgxy_jsxsd/"),
+        )
+        assertEquals(
+            "http://jw.yit.edu.cn/yjlgxy_jsxsd/app.do",
+            client.normalizeBaseUrl("http://jw.yit.edu.cn/yjlgxy_jsxsd"),
+        )
+        // 网页端根 = 归一化结果去掉 /app.do，上下文路径留着
+        assertEquals(
+            "http://jw.yit.edu.cn/yjlgxy_jsxsd",
+            client.webBaseUrl(client.normalizeBaseUrl("http://jw.yit.edu.cn/yjlgxy_jsxsd/")),
+        )
+        // 门户页地址（没有 jsxsd）维持老行为：只认 host
+        assertEquals("http://jw.yit.edu.cn/app.do", client.normalizeBaseUrl("http://jw.yit.edu.cn/yjlgxy"))
+        // 已对接的学校一个字都不能变
+        assertEquals("https://xsjw.ldu.edu.cn/app.do", client.normalizeBaseUrl("https://xsjw.ldu.edu.cn"))
+        assertEquals(
+            "https://jw.educationgroup.cn/app.do",
+            client.normalizeBaseUrl("https://jw.educationgroup.cn/ytkjxy"),
+        )
+    }
+
     @Test
     fun parseApiCourseFullFields() {
         val item = JSONObject("""

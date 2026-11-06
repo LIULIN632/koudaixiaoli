@@ -100,7 +100,7 @@ class CourseRepository(
     suspend fun updateHomework(homework: HomeworkEntity) = dao.updateHomework(homework)
     suspend fun setHomeworkCompleted(id: Long, completed: Boolean) = dao.setHomeworkCompleted(id, completed)
     suspend fun deleteHomework(id: Long) = dao.deleteHomework(id)
-    fun getActiveHomeworkCourseNames(schemeId: Long) = dao.getActiveHomeworkCourseNames(schemeId)
+    fun getActiveHomework(schemeId: Long) = dao.getActiveHomework(schemeId)
 
     // ── Exam operations（考试安排：来自通知解析 + 用户确认） ──
     fun getExamsByScheme(schemeId: Long) = examDao.getByScheme(schemeId)

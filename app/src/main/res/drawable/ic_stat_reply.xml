@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!--
+      反馈有回复：一个对话气泡（用户在等的是「有人回我了」，不是「新消息」）。
+      与 ic_stat_announce（铃铛）区分：那条是公告广播，这条是一对一答复。
+      纯 alpha 剪影、白色描边，原生 ROM 会涂成单色，MIUI 等原样画。
+    -->
+    <path
+        android:pathData="M4.2,4.2h15.6v11.2h-8.4l-4.6,3.6v-3.6h-2.6z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M8.4,8.2h7.2M8.4,11.4h4.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round" />
+</vector>

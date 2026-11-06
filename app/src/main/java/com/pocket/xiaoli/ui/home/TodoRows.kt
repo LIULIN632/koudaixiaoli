@@ -65,6 +65,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pocket.xiaoli.core.exam.ExamCountdown
+import com.pocket.xiaoli.data.DueStage
+import com.pocket.xiaoli.data.dueLabelText
+import com.pocket.xiaoli.data.dueStageOf
 import com.pocket.xiaoli.data.entity.ExamEntity
 import com.pocket.xiaoli.focus.pomodoroCountText
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
@@ -73,10 +77,7 @@ import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.Motion
 import com.pocket.xiaoli.ui.theme.PocketTypography
 import com.pocket.xiaoli.ui.theme.onAccentColor
-import com.pocket.xiaoli.util.EXAM_SOON_DAYS
-import com.pocket.xiaoli.util.examCountdownText
-import com.pocket.xiaoli.util.examDaysLeft
-import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlin.math.abs
 
 /**
@@ -104,6 +105,11 @@ internal fun TodoRow(
     modifier: Modifier = Modifier,
     onStartFocus: (() -> Unit)? = null,
     focusCount: Int = 0,
+    /**
+     * 倒计时文案的"现在"。默认真时钟；快照测试喂固定值 ——
+     * 截止文案带天数（「已过期 5 天」），拿真时钟录的基线会**每天漂一次**。
+     */
+    now: LocalDateTime = LocalDateTime.now(),
 ) {
     val colors = LocalPocketXiaoliColors.current
     val skin = LocalSkin.current
@@ -176,19 +182,27 @@ internal fun TodoRow(
                 // 而绝大多数自定义待办本来就没有截止日期 —— 那是每行都在喊的噪音。
                 if (dueDate.isNotBlank()) {
                     Spacer(Modifier.height(2.dp))
-                    val overdue = isOverdue(dueDate)
+                    // 倒计时档位与文案走共享解析（`data/HomeworkDue`）：带时刻的截止
+                    // （学习通抓来的 `2026-11-05 23:59`）以前在这里解析失败，
+                    // 当天早上既不标红也不算过期。解析不出才退回原文。
+                    val stage = dueStageOf(dueDate, now)
+                    val tone = when (stage) {
+                        DueStage.OVERDUE, DueStage.TODAY -> colors.danger
+                        DueStage.SOON -> colors.warning
+                        else -> colors.textTertiary
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Outlined.Schedule,
                             contentDescription = null,
-                            tint = if (overdue) colors.danger else colors.textTertiary,
+                            tint = tone,
                             modifier = Modifier.size(12.dp),
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "截止 $dueDate",
+                            text = dueLabelText(dueDate, now) ?: "截止 $dueDate",
                             style = PocketTypography.caption,
-                            color = if (overdue) colors.danger else colors.textTertiary
+                            color = tone,
                         )
                     }
                 }
@@ -382,12 +396,11 @@ internal fun ExamRow(
                             text = cd,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            // 3 天内用警示色 —— 临近考试值得被看见。
-                            // ⚠️ 这个 3 现在来自 `util/ExamCountdown.EXAM_SOON_DAYS`：
-                            // 主动气泡说「X 还有 N 天」用的是**同一个常量**，
-                            // 两处必须同一天变（否则用户会觉得对不上）。
-                            color = if (cd.startsWith("还有") &&
-                                cd.filter { it.isDigit() }.toIntOrNull()?.let { it <= EXAM_SOON_DAYS } == true
+                            // 3 天内用警示色 —— 临近考试值得被看见，**今天与明天也算**。
+                            // 判据在共享核心 `ExamCountdown.isSoon`：主动气泡与考试安排页
+                            // 用的是同一个函数，三处只能一起变（否则用户会觉得对不上）。
+                            color = if (ExamCountdown.daysLeft(exam.date)
+                                    ?.let { ExamCountdown.isSoon(it) } == true
                             ) colors.warning else colors.textTertiary,
                         )
                     }
@@ -561,26 +574,19 @@ internal fun EmptyTodoCard() {
 /**
  * 考试倒计时文案。解析不出日期时返回 null（界面就不显示倒计时）。
  *
- * 实现已搬到 `util/ExamCountdown`（那里还有主动气泡用的"还剩几天"）。
- * 这里保留这个名字与签名，只为不动既有调用点与它的单测（`ExamCountdownTest`）——
- * 与 `BoundLogin.maskStudentId` 保留为委托是同一个理由。
+ * 实现已搬到共享核心 `core/exam/ExamCountdown`（手机端首页、主动气泡与桌面端
+ * 考试页/托盘提醒都读那一份）。这里保留这个名字与签名，只为不动既有调用点
+ * 与它的单测（`ExamCountdownTest`）—— 与 `BoundLogin.maskStudentId` 保留为委托是同一个理由。
  *
- * ## 为什么不复用 [isOverdue]
+ * ## 与作业截止 [isOverdue] 的分工
  *
- * [isOverdue] 只认 ISO 的 `2026-01-15`。而考试通知里常见 **`1月15日`** 这种写法
- * （解析器刻意保留原文，因为通知里往往省略年份）—— `LocalDate.parse` 会直接抛异常。
- *
- * 所以 `util/ExamCountdown.parseExamDate` 额外支持「M月D日」，补**今年**的年份；
- * 若该日期已过去半年以上，则按**明年**算 —— 学期末的通知常跨年（12 月发的 1 月考试）。
+ * [isOverdue] 已改委托 `data/HomeworkDue` 的共享解析（ISO / 斜杠 / 中文 / 带时刻都认）。
+ * 考试日期仍走 `ExamCountdown.parseDate`：通知原文常**省略年份**，要按"半年规则"补年
+ * （12 月发的 1 月考试会跨年）；作业截止的无年份中文写法也借了这一条补年规则，
+ * 两边的"今天"必须是同一天。
  */
 internal fun examCountdown(date: String): String? =
-    examDaysLeft(date)?.let(::examCountdownText)
+    ExamCountdown.daysLeft(date)?.let { ExamCountdown.countdownText(it) }
 
-internal fun isOverdue(dueDate: String): Boolean {
-    if (dueDate.isBlank()) return false
-    return try {
-        LocalDate.parse(dueDate).isBefore(LocalDate.now())
-    } catch (_: Exception) {
-        false
-    }
-}
+internal fun isOverdue(dueDate: String): Boolean =
+    dueStageOf(dueDate) == DueStage.OVERDUE

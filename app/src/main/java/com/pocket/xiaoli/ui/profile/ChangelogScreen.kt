@@ -106,7 +106,7 @@ fun ChangelogScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            itemsIndexed(changelog) { index, log ->
+            itemsIndexed(changelog, key = { _, log -> log.version }) { index, log ->
                 VersionCard(log, isFirst = index == 0)
             }
         }

@@ -115,9 +115,8 @@ object AppShare {
         manager.setPrimaryClip(ClipData.newPlainText(label, text))
     }
 
-    /** 用系统浏览器打开（不内置 WebView：这里只有两个固定的发行页） */
+    /** 用系统浏览器打开（不内置 WebView：这里只有两个固定的发行页），统一走 [ExternalLinks] */
     fun openUrl(context: Context, url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(intent) }
+        com.pocket.xiaoli.ui.util.ExternalLinks.open(context, url)
     }
 }

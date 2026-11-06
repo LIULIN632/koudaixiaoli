@@ -100,6 +100,72 @@ class Campus3DMapAssetTest {
         assertTrue(text.contains("441875196"))
     }
 
+    @Test
+    fun ytuSouthSceneParsesAndValidates() {
+        val result = Campus3DTestAssets.loadResult("ytu_south")
+        val scene = result.scene
+
+        assertEquals(1, scene.schemaVersion)
+        assertEquals("ytu_south", scene.campusId)
+        assertEquals("烟台大学南校区", scene.name)
+        assertTrue(scene.attribution.contains("OpenStreetMap"))
+        assertTrue("至少应有 20 栋真实楼栋", scene.buildings.size >= 20)
+        assertTrue(scene.boundary.size >= 3)
+        assertTrue(scene.hasGeometry)
+        assertTrue("数据不应有校验错误：${result.issues.map { it.message }}", result.issues.isEmpty())
+        assertTrue(Campus3DMapValidator.validate(scene).isEmpty())
+    }
+
+    /** 南校楼栋名全部来自 OSM；bbox 里混进来的校区外建筑必须被边界裁掉。 */
+    @Test
+    fun ytuSouthKeepsRealBuildingsAndDropsOffCampusOnes() {
+        val scene = Campus3DTestAssets.loadScene("ytu_south")
+        val names = scene.buildings.map { it.name }
+
+        listOf(
+            "7号学生公寓", "8号学生公寓", "9号学生公寓", "10号学生公寓",
+            "教学楼", "十餐厅", "工程实训车间", "南校医务室",
+        ).forEach { assertTrue("缺少 $it", it in names) }
+
+        assertTrue("校区外酒店没被裁掉", names.none { it.contains("酒店") })
+        assertTrue("校区外住宅没被裁掉", names.none { it.contains("世纪大厦") })
+        assertTrue(
+            "带校区前缀的 OSM 原名应保留在 sourceName",
+            scene.buildings.any { it.sourceName == "烟台大学南校区7号学生公寓" },
+        )
+    }
+
+    /** 层数要么来自 OSM，要么明确标成推算值；不许出现「看起来像实测」的来历不明高度。 */
+    @Test
+    fun ytuSouthLevelsAreEitherFromOsmOrFlaggedEstimated() {
+        val scene = Campus3DTestAssets.loadScene("ytu_south")
+
+        scene.buildings.forEach { building ->
+            if (building.levelsEstimated) {
+                assertEquals(
+                    "推算层数应等于 levels×3.2+0.6：${building.id}",
+                    building.levels * 3.2 + 0.6,
+                    building.heightMeters,
+                    1e-9,
+                )
+            }
+        }
+        assertTrue(
+            "学生公寓的 6 层来自 OSM building:levels，不该标推算",
+            scene.buildings.filter { it.name.contains("学生公寓") && it.name.endsWith("区") }
+                .all { it.levels == 6 && !it.levelsEstimated },
+        )
+    }
+
+    /** 南校没有影像描点补充：几何全部出自 OSM，缺的水系/绿地就留空。 */
+    @Test
+    fun ytuSouthHasNoTracedGeometry() {
+        val scene = Campus3DTestAssets.loadScene("ytu_south")
+
+        assertTrue(scene.buildings.none { it.id.startsWith("traced/") })
+        assertTrue(scene.pois.isEmpty())
+    }
+
     private fun loadScene(): Campus3DScene = Campus3DTestAssets.loadScene()
 
     private fun asset(name: String): File? {

@@ -28,6 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.LocalDateTime
 
 /**
  * 首页**待办区**的基线（2026-10 补，随"一个入口 + 右下角 FAB"那次改造）。
@@ -49,9 +50,8 @@ import org.robolectric.annotation.GraphicsMode
  *
  * ## ⚠️ 两条确定性纪律（`memory/04-ui-verification.md` §3）
  *
- * 1. **不用相对时间**：`isOverdue` 是拿 `LocalDate.now()` 比的，所以这里刻意**不喂**
- *    "已过期的截止日期" —— 那种图会随日子变红。截止日期用 `6月15日` 这种
- *    `isOverdue` 解析不了的写法（教务导入的作业正是这种），恒为"未过期"，图才稳。
+ * 1. **截止日期与"现在"都钉死**：截止文案带天数（「已过期 5 天」），任何一边拿真时钟
+ *    基线都会每天漂一次。截止日期固定 `6月15日`、行内喂 [FIXED_NOW] —— 两边都是死值，图才稳。
  * 2. **弹窗正文单独渲**：`AlertDialog` 渲染在独立窗口，`captureRoboImage` 抓的是
  *    Compose 根节点、**抓不到那个窗口**。所以渲的是抽出来的 [AddTodoForm]，
  *    并按弹窗正文的实际可用宽度（288dp）约束它 —— 宽度不对，截断就看不出来。
@@ -72,6 +72,9 @@ class HomeTodoScreenshotTest {
         val appearance: AppearanceMode,
         val kind: Kind,
     )
+
+    /** 截止文案的"现在"钉死在这天：基线不随真日历漂（见类 KDoc 纪律 1）。 */
+    private val FIXED_NOW = LocalDateTime.of(2026, 6, 20, 10, 0)
 
     private val cases = listOf(
         Case("113-home-todo-list-vivid", SkinStyle.VIVID, AppearanceMode.RAINBOW, Kind.LIST),
@@ -118,7 +121,9 @@ class HomeTodoScreenshotTest {
                         ) {
                             SectionHeader(title = "待办")
                             ExamRow(exam = exam, onToggle = {}, onDelete = {})
-                            // 带截止日期的待办（= 教务/学习平台导入的作业走的那条）
+                            // 带截止日期的待办（= 教务/学习平台导入的作业走的那条）。
+                            // ⚠️ `now` 喂固定值：截止文案带天数（「已过期 5 天」），
+                            // 拿真时钟录的基线会每天漂一次（2026-11-04 踩过）。
                             TodoRow(
                                 title = "P45 习题 3-5",
                                 detail = "示例课程",
@@ -126,6 +131,7 @@ class HomeTodoScreenshotTest {
                                 completed = false,
                                 onToggle = {},
                                 onDelete = {},
+                                now = FIXED_NOW,
                             )
                             // 纯自定义待办：没有课程、没有截止日期 —— 副标题与第三行都不该出现
                             TodoRow(

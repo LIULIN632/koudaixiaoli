@@ -30,6 +30,7 @@ fun Campus3DSandbox(
     selected: Campus3DHit?,
     onCameraChange: (Campus3DCamera) -> Unit,
     onSelect: (Campus3DHit?) -> Unit,
+    campusName: String,
     modifier: Modifier = Modifier,
     todayBuildingIds: Set<String> = emptySet(),
 ) {
@@ -48,7 +49,7 @@ fun Campus3DSandbox(
             .fillMaxSize()
             .onSizeChanged { viewport = Size(it.width.toFloat(), it.height.toFloat()) }
             .semantics {
-                contentDescription = "烟台理工学院 3D 校园沙盘，可拖动旋转、双指缩放、点选楼栋"
+                contentDescription = "$campusName 3D 校园沙盘，可拖动旋转、双指缩放、点选楼栋"
             }
             .pointerInput(layout) {
                 detectTransformGestures { _, pan, zoom, _ ->

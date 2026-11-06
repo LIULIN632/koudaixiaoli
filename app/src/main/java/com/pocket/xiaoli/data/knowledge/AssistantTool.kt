@@ -55,12 +55,16 @@ enum class AssistantTool(
     WEATHER("get_weather"),
 
     /**
-     * 校园知识库检索（Obsidian 维护的校园事实：制度 / 场馆 / 办事流程 / 通知）。
+     * 资料库检索（四源合一：校园知识库 / 快问快答 / 内置使用帮助 / 资料站）。
      *
-     * 与内置的「App 帮助 FAQ」是两回事：那是"这个 App 怎么用"，硬编码在
-     * `LocalFaqKnowledgeSource`；这里查的是"学校怎么规定"。
+     * 2026-10-30 由 `search_knowledge` 改名而来：内容面从"只有 Obsidian 知识库"扩到
+     * 资料站与题库之后，继续叫 `search_knowledge` 会让模型以为查不到资料，
+     * 也会让它在"有没有历年卷"这类问题上直接答"不知道"。
+     *
+     * ⚠️ 只有**一个**工具。`search_library` 与 `search_knowledge` 并存会让模型在两份
+     * 描述里挑，实测那是最常见的选错工具形态（见 `docs/superpowers/specs/2026-10-30-资料库-design.md` §6）。
      */
-    SEARCH_KNOWLEDGE("search_knowledge"),
+    SEARCH_LIBRARY("search_library"),
     ;
 
     companion object {

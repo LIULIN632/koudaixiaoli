@@ -144,8 +144,15 @@ interface CourseDao {
     @Query("DELETE FROM homework WHERE id = :id")
     suspend fun deleteHomework(id: Long)
 
-    @Query("SELECT DISTINCT courseName FROM homework WHERE schemeId = :schemeId AND completed = 0")
-    fun getActiveHomeworkCourseNames(schemeId: Long): Flow<List<String>>
+    /**
+     * 未完成的作业（课表格子的高亮边框要用）。
+     *
+     * 原本这里返回 `DISTINCT courseName`，只够回答"这门课有没有作业"；
+     * 而边框要按**截止档位**分色，就得把 `dueDate` 一起带出来 ——
+     * 一门课几条作业时取最紧那一档（见 `data/HomeworkDue.worstDueStage`）。
+     */
+    @Query("SELECT * FROM homework WHERE schemeId = :schemeId AND completed = 0")
+    fun getActiveHomework(schemeId: Long): Flow<List<HomeworkEntity>>
 
     // ── Tasks ──
     @Query("SELECT * FROM tasks WHERE schemeId = :schemeId ORDER BY sortOrder")

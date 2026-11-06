@@ -47,12 +47,13 @@ import org.robolectric.annotation.GraphicsMode
  * | 链路 | 外壳 | 基线 |
  * |---|---|---|
  * | 导入课表 | 整页（Scaffold） | `280..283` |
- * | 课表管理 | `WindowBottomSheet` | `284..286` |
- * | 备份与分享 | `WindowBottomSheet` | `287..288` |
+ * | 课表管理 | `AppOverlaySheet`（原 `WindowBottomSheet`） | `284..286` |
+ * | 备份与分享 | `AppOverlaySheet`（原 `WindowBottomSheet`） | `287..288` |
  *
  * ## 为什么抽屉只渲正文
  *
- * `WindowBottomSheet` 渲染在**独立窗口**里，JVM 快照抓的是 Compose 根节点，
+ * `WindowBottomSheet`（2026-10-30 之前这四个抽屉的外壳）渲染在**独立窗口**里，
+ * JVM 快照抓的是 Compose 根节点，
  * 抓不到那个窗口 —— 与 `AppUpdateSheetScreenshotTest` 同一条限制。
  * 正文抽成 `internal` 正是为了这里能单独上镜；外面套的 [SheetFrame]
  * 只是还原"底部卡片 + 页面底色"，不参与业务。

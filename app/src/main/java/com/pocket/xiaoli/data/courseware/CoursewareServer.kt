@@ -2,6 +2,7 @@ package com.pocket.xiaoli.data.courseware
 
 import android.content.res.AssetManager
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -13,7 +14,11 @@ private const val LOOPBACK = "127.0.0.1"
 private const val ASSET_ROOT = "courseware"
 
 /** 只认这几种后缀：不在表里的（哪怕路径合法）一律 404，避免变成"任意文件读取口"。 */
-private val SERVED_EXTENSIONS = setOf("html", "css", "js", "mjs", "json", "svg", "png")
+private val SERVED_EXTENSIONS = setOf(
+    "html", "css", "js", "mjs", "json", "svg", "png",
+    // 3D 课件要用到的二进制资源：glb/gltf 模型、bin 缓冲、ktx2 纹理、hdr 环境、wasm 解码器
+    "glb", "gltf", "bin", "ktx2", "hdr", "wasm", "mp4", "woff2", "jpg", "jpeg", "webp",
+)
 
 /**
  * 课件的**本机回环 HTTP 服务**：把 `assets/courseware/` 那一棵子树用 `http://127.0.0.1:<随机端口>`
@@ -47,7 +52,19 @@ private val SERVED_EXTENSIONS = setOf("html", "css", "js", "mjs", "json", "svg",
  * 所以这里没有再加一层 token 校验 —— 加了也只是防一个"本来就不是秘密"的东西，
  * 而子资源请求不带 query，token 实际上罩不住整棵目录树。
  */
-internal class CoursewareServer(private val assets: AssetManager) : AutoCloseable {
+internal class CoursewareServer(
+    private val assets: AssetManager,
+    /**
+     * 下载型课件的根目录（`filesDir/courseware/`）。为 null 时只服务 APK 内置的那两个。
+     *
+     * 存在的理由：课件从 v0.2.x 起不再全部打进 APK —— 3 个 3D 课件就能让安装包从 9.4 MB
+     * 涨到 30 MB，而改一个错别字也要发版。磁盘上的包与内置包**走同一套 URL**，
+     * WebView 侧完全不知道差别（`courseware/<id>/index.html`）。
+     */
+    private val packagesRoot: File? = null,
+) : AutoCloseable {
+
+    private class Resource(val bytes: ByteArray, val cacheable: Boolean)
 
     private val server = ServerSocket(0, 8, InetAddress.getByName(LOOPBACK))
 
@@ -56,8 +73,33 @@ internal class CoursewareServer(private val assets: AssetManager) : AutoCloseabl
     val port: Int get() = server.localPort
 
     /** 课件入口地址。子资源（css / js / vendor）都是相对路径，由同一个服务给出。 */
-    fun urlFor(courseware: Courseware): String =
-        "http://$LOOPBACK:$port/$ASSET_ROOT/${courseware.dir}/index.html"
+    fun urlFor(courseware: Courseware): String = urlFor(CoursewareRef.of(courseware))
+
+    fun urlFor(ref: CoursewareRef): String =
+        "http://$LOOPBACK:$port/$ASSET_ROOT/${ref.id}/index.html"
+
+    /**
+     * 解析一个请求目标到实际字节：**先磁盘（下载的包）、后 assets（内置包）**。
+     *
+     * 顺序不能反：同名课件升级后，用户期望看到的是新下载的那份，而不是包里的旧版。
+     * 两条路径都受 [assetPathFor] 的白名单与 `..` 检查保护；磁盘这条额外做
+     * `canonicalPath` 越界校验（软链接也要挡住）。
+     */
+    private fun readResource(relative: String): Resource? {
+        val root = packagesRoot
+        if (root != null) {
+            val candidate = File(root, relative.removePrefix("$ASSET_ROOT/"))
+            val inside = runCatching {
+                candidate.isFile && candidate.canonicalPath.startsWith(root.canonicalPath + File.separator)
+            }.getOrDefault(false)
+            if (inside) {
+                val bytes = runCatching { candidate.readBytes() }.getOrNull()
+                if (bytes != null) return Resource(bytes, cacheable = true)
+            }
+        }
+        val bytes = runCatching { assets.open(relative).use { it.readBytes() } }.getOrNull() ?: return null
+        return Resource(bytes, cacheable = false)
+    }
 
     private fun acceptLoop() {
         while (!server.isClosed) {
@@ -87,25 +129,24 @@ internal class CoursewareServer(private val assets: AssetManager) : AutoCloseabl
             return
         }
         val assetPath = assetPathFor(parts[1])
-        val bytes = assetPath?.let { path ->
-            runCatching { assets.open(path).use { it.readBytes() } }.getOrNull()
-        }
-        if (assetPath == null || bytes == null) {
+        val resource = assetPath?.let { readResource(it) }
+        if (assetPath == null || resource == null) {
             write(socket, status(404, "Not Found"))
             return
         }
         val header = buildString {
             append("HTTP/1.1 200 OK\r\n")
             append("Content-Type: ").append(contentTypeFor(assetPath)).append("\r\n")
-            append("Content-Length: ").append(bytes.size).append("\r\n")
-            // 课件是 APK 里的静态资源，改一次要发版 —— 缓存只会让"改了看不到"变成常态
-            append("Cache-Control: no-store\r\n")
+            append("Content-Length: ").append(resource.bytes.size).append("\r\n")
+            // 内置包改一次要发版，缓存只会让"改了看不到"变成常态；下载的包则按版本号换目录，
+            // 允许浏览器复用（不缓存的话，每次打开 3D 课件都要重新解析 700 KB 的 three.js）。
+            append(if (resource.cacheable) "Cache-Control: max-age=0, must-revalidate\r\n" else "Cache-Control: no-store\r\n")
             append("Connection: close\r\n")
             append("\r\n")
         }
         socket.getOutputStream().use { out ->
             out.write(header.toByteArray(Charsets.ISO_8859_1))
-            out.write(bytes)
+            out.write(resource.bytes)
             out.flush()
         }
     }

@@ -56,6 +56,8 @@ class LocalSchoolListScreenshotTest {
         School("YIT", "烟台理工学院", "烟台", JwSystemType.ZHENGFANG, "jw.example.edu.cn"),
         School("YTU", "烟台大学", "烟台", JwSystemType.ZHENGFANG, "jw2.example.edu.cn"),
         School("SDBI", "山东工商学院", "烟台", JwSystemType.QIANGZHI, "jw3.example.edu.cn"),
+        // 选择器里现在有两所点名的外地学校（燕京理工 / 山东理工）：这张图要能看见它们在「其他学校」里
+        School("YJIT", "燕京理工学院", "廊坊", JwSystemType.QIANGZHI, "jw5.example.edu.cn"),
         School("custom_1", "我的学校", "外地", JwSystemType.ZHENGFANG, "jw4.example.edu.cn"),
     )
 
@@ -130,7 +132,7 @@ class LocalSchoolListScreenshotTest {
                         onToggleFavorite = {},
                         onEdit = {},
                         onDelete = {},
-                        footer = "列表只收烟台院校，外地学校可点上方「添加自定义学校」手动添加",
+                        footer = "列表收烟台院校与燕京理工、山东理工，其他外地学校可点上方「添加自定义学校」手动添加",
                     )
                 }
             }

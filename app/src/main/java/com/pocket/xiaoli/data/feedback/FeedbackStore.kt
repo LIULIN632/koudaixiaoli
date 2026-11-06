@@ -272,6 +272,33 @@ class FeedbackStore(context: Context) {
         prefs.edit().putLong(KEY_REPLIES_AT, nowMillis).apply()
     }
 
+    // ── 回复通知的去重账 ──────────────────────────────────────────────
+
+    /** 已经为哪条回复弹过通知（工单号 → 当时那版回复正文）。 */
+    fun notifiedReplies(): Map<String, String> {
+        val raw = prefs.getString(KEY_NOTIFIED_REPLIES, null) ?: return emptyMap()
+        val obj = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyMap()
+        return buildMap {
+            obj.keys().forEach { ticket ->
+                val text = obj.optString(ticket)
+                if (text.isNotBlank()) put(ticket, text)
+            }
+        }
+    }
+
+    /**
+     * 记一笔「这条回复已经通知过」。
+     *
+     * 顺便裁掉账本里已经不在的工单，否则清过数据、换过学号之后这本账只长不短。
+     */
+    fun markReplyNotified(ticketId: String, text: String) {
+        val keep = sentIds()
+        val merged = notifiedReplies().filterKeys { it in keep } + (ticketId to text)
+        val obj = JSONObject()
+        merged.forEach { (ticket, body) -> obj.put(ticket, body) }
+        prefs.edit().putString(KEY_NOTIFIED_REPLIES, obj.toString()).apply()
+    }
+
     private fun dayStamp(nowMillis: Long): String =
         SimpleDateFormat("yyyyMMdd", Locale.US).format(Date(nowMillis))
 
@@ -286,6 +313,7 @@ class FeedbackStore(context: Context) {
         const val KEY_SENT = "sent"
         const val KEY_REPLIES = "replies"
         const val KEY_REPLIES_AT = "replies_at"
+        const val KEY_NOTIFIED_REPLIES = "notified_replies"
         const val KEY_LAST_SUBMIT_AT = "last_submit_at"
         const val KEY_SUBMIT_DAY = "submit_day"
         const val KEY_SUBMIT_COUNT = "submit_count"

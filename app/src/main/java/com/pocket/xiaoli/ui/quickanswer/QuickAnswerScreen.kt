@@ -26,7 +26,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +38,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.data.quickanswer.QuickAnswerCourse
 import com.pocket.xiaoli.data.quickanswer.QuickAnswerHit
 import com.pocket.xiaoli.data.quickanswer.QuickAnswerQuestion
@@ -79,7 +79,7 @@ internal fun QuickAnswerScreen(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val state by repository.state.collectAsState()
+    val state by repository.state.collectAsStateWithLifecycle()
 
     var subject by remember { mutableStateOf("") }
     var courseId by remember { mutableStateOf<String?>(null) }

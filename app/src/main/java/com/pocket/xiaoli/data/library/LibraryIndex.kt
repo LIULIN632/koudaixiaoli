@@ -6,16 +6,26 @@ import org.json.JSONObject
 /**
  * 资料站的一个文件。
  *
- * ## 为什么没有「上传者」「下载次数」
+ * ## 为什么没有「下载次数」「上传者账号」
  *
  * 资料站是**作者单向分发**的：`announce/feed.json` 那套链路已经证明「静态 JSON + Release 附件」
  * 够用且零成本（Gitee 单仓附件 1GB、单文件 100MB、不需要备案）。
- * 一旦加上上传者/统计，就得有后端、有审核、有备案 —— 那是另一个产品。
+ * 一旦加上统计/账号，就得有后端、有采集、有备案 —— 那是另一个产品。
+ *
+ * **2026-10-30 有意反转了一半**：加了 [provider]（谁提供的）但**不加**下载量与账号。
+ * 原因是署名本身就是投稿的激励（"让人看到是我给的"），而下载量要采集、账号要登录，
+ * 两者都不需要。展示名走昵称/年级专业，**由提供者本人确认过才写**，不写学号、不写手机号。
  *
  * @param subject 学科，第一层分组（如「数学」「计算机」「外语」）。留空归到「未分学科」。
  * @param urls 下载地址，**按优先级排列**。多填几个是容灾：Gitee 挂了还有 GitHub。
  *   空列表 = 索引里有、文件还没传上来，UI 要明确说「暂不可下载」而不是点了没反应。
  * @param tags 别名，让「高数」也能搜到「高等数学」。
+ * @param summary 一句话摘要（**必填，作者写**）。AI 只读这一句 —— 它不解析 PDF/PPT 正文，
+ *   详见 `docs/superpowers/specs/2026-10-30-资料库-design.md` §5。
+ * @param textRef 指向 `docs[]` 里某条的 id：作者把这份文件**手工转成文字**后，正文放在那里，
+ *   AI 就能答"这份卷子考了什么"。留空表示只有摘要。
+ * @param provider 提供者展示名（昵称 / 「22 级计算机 王同学」）。留空 = 不显示署名。
+ *   **不是账号、不是学号**，纯展示，用来让人愿意投稿。
  */
 data class LibraryFile(
     val id: String,
@@ -28,6 +38,9 @@ data class LibraryFile(
     val urls: List<String> = emptyList(),
     val updatedAt: String = "",
     val tags: List<String> = emptyList(),
+    val summary: String = "",
+    val textRef: String = "",
+    val provider: String = "",
 ) {
     /** 扩展名（小写，不含点）；没有扩展名时为空串。 */
     val extension: String get() = name.substringAfterLast('.', "").lowercase()
@@ -65,12 +78,41 @@ data class LibraryFile(
     }
 }
 
+/**
+ * 资料站的一条**正文条目**（`index.json` 的 `docs[]`）。
+ *
+ * 与 [LibraryFile] 的分工：`files[]` 是"能下载的文件"，`docs[]` 是"能直接读的文字"。
+ * AI 检索吃的是后者 + 前者的 [LibraryFile.summary]；
+ * **两类条目绝不互相塞**（把 doc 塞进 files 会让下载器拿到一个没有 urls 的假文件）。
+ *
+ * 正文 [body] 是可选的：条目可以只有摘要（够 AI 答"有没有 XX 的资料"），
+ * 也可以在作者手工转录后补上全文（AI 就能答卷子考了什么）。
+ */
+data class LibraryDoc(
+    val id: String,
+    val title: String,
+    val summary: String = "",
+    val body: String = "",
+    val subject: String = "",
+    val course: String = "",
+    val kind: String = "",
+    val tags: List<String> = emptyList(),
+    val updatedAt: String = "",
+    /** 提供者展示名，同 [LibraryFile.provider]。 */
+    val provider: String = "",
+) {
+    /** AI 侧真正要检索的文本：有全文用全文，否则退回摘要。 */
+    val content: String get() = body.ifBlank { summary }
+}
+
 /** `library/index.json` 的完整内容。 */
 data class LibraryIndex(
     val generatedAt: String = "",
     val files: List<LibraryFile> = emptyList(),
+    val docs: List<LibraryDoc> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = files.isEmpty()
+    /** 空索引的判据必须同时看两类条目：只推文字条目的索引不该被当成"空的"拒掉。 */
+    val isEmpty: Boolean get() = files.isEmpty() && docs.isEmpty()
 
     /** 出现过的课程，按文件顺序去重（作者写索引时的顺序就是他想排的顺序）。 */
     fun courses(): List<String> = files.map { it.group }.distinct()
@@ -135,6 +177,13 @@ data class LibraryIndex(
             LibraryIndex(
                 generatedAt = root.optString("generatedAt", ""),
                 files = files,
+                docs = buildList {
+                    val docArray: JSONArray = root.optJSONArray("docs") ?: JSONArray()
+                    for (i in 0 until docArray.length()) {
+                        val obj = docArray.optJSONObject(i) ?: continue
+                        parseDoc(obj)?.let(::add)
+                    }
+                },
             )
         }.getOrNull()
 
@@ -163,6 +212,30 @@ data class LibraryIndex(
                 urls = urls,
                 updatedAt = obj.optString("updatedAt", "").trim(),
                 tags = obj.optJSONArray("tags").toStringList(),
+                summary = obj.optString("summary", "").trim(),
+                textRef = obj.optString("textRef", "").trim(),
+                provider = obj.optString("provider", "").trim(),
+            )
+        }
+
+        /** 缺 id 或没有一句可检索文本的条目丢掉 —— 空条目进检索只会占着 topK 的位置。 */
+        private fun parseDoc(obj: JSONObject): LibraryDoc? {
+            val title = obj.optString("title", "").trim()
+            if (title.isEmpty()) return null
+            val summary = obj.optString("summary", "").trim()
+            val body = obj.optString("body", "").trim()
+            if (summary.isEmpty() && body.isEmpty()) return null
+            return LibraryDoc(
+                id = obj.optString("id", "").trim().ifEmpty { title },
+                title = title,
+                summary = summary,
+                body = body,
+                subject = obj.optString("subject", "").trim(),
+                course = obj.optString("course", "").trim(),
+                kind = obj.optString("kind", "").trim(),
+                tags = obj.optJSONArray("tags").toStringList(),
+                updatedAt = obj.optString("updatedAt", "").trim(),
+                provider = obj.optString("provider", "").trim(),
             )
         }
 

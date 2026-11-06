@@ -490,7 +490,7 @@ class AppFeedViewTest {
     fun `这一轮没查上时不谎称已是最新`() {
         val state = build(feed = null, loaded = false, error = "检查失败：网络不通")
 
-        assertEquals("这次没查上，可再点一次", state.checkTrace(1_000_000L))
+        assertEquals("这次没查上 · 检查失败：网络不通", state.checkTrace(1_000_000L))
     }
 
     @Test
@@ -498,7 +498,7 @@ class AppFeedViewTest {
         // error 里装的是"镜像还在返回旧数据"，但缓存那份新版是真读回来的
         val state = build(newerFeed, currentVersionCode = 40, error = "镜像还在返回旧数据（vc 40 < 41）")
 
-        assertEquals("发现新版 v0.1.41", state.checkTrace(1_000_000L))
+        assertEquals("发现新版 v0.1.41 · 镜像还在返回旧数据（vc 40 < 41）", state.checkTrace(1_000_000L))
     }
 
     @Test
@@ -529,23 +529,29 @@ class AppFeedViewTest {
     }
 
     @Test
-    fun `问号里带的是这一轮的毛病原文`() {
-        // 小字只放得下一句结论，"为什么失败"必须有个地方能查到 —— 否则只能导日志
+    fun `失败原因写进行的小字而不是只说没查上`() {
+        // 2026-10-30 行尾那枚「?」按用户要求撤掉了，"为什么失败"只剩这一处可住 ——
+        // 光说"这次没查上"等于让用户再点一次碰运气，哪个镜像、HTTP 几才是要看的
         val failed = build(feed = null, loaded = false, error = "检查失败：Gitee raw 返回 504（read timed out）")
 
-        assertTrue(failed.checkHint.contains("504"))
-        assertTrue(failed.checkHint.startsWith("这一轮的毛病：检查失败"))
+        val trace = failed.checkTrace(1_000_000L)
+        assertTrue("小字里要带毛病原文，实际是：$trace", trace.contains("504"))
+        assertTrue("实际是：$trace", trace.startsWith("这次没查上 · 检查失败"))
     }
 
     @Test
-    fun `没毛病时问号还是那句行为说明`() {
-        val ok = build(newerFeed, currentVersionCode = 40)
+    fun `镜像回退那种半毛病也要跟着结论说出来`() {
+        // 手里那份新版是真读回来的，所以结论仍然是"发现新版"；但用户看到的版本号
+        // 来自缓存而不是这一轮 —— 不说清就是骗（问号撤掉之后只能挂在这句后面）
+        val trace = build(newerFeed, currentVersionCode = 40, error = "镜像还在返回旧数据")
+            .checkTrace(1_000_000L)
 
-        assertEquals("查到新版会先问你，再下载。", ok.checkHint)
-        // 镜像回退那种"半毛病"也要说出来：用户看到的版本号是缓存里的，不是这一轮读到的
-        assertTrue(
-            build(newerFeed, currentVersionCode = 40, error = "镜像还在返回旧数据").checkHint
-                .startsWith("这一轮的毛病：镜像"),
+        assertTrue("实际是：$trace", trace.startsWith("发现新版"))
+        assertTrue("实际是：$trace", trace.contains("镜像还在返回旧数据"))
+        // 没毛病时不多出括号
+        assertEquals(
+            "发现新版 v0.1.41",
+            build(newerFeed, currentVersionCode = 40).checkTrace(1_000_000L),
         )
     }
 

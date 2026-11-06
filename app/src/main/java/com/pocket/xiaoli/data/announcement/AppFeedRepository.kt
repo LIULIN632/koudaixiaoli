@@ -125,18 +125,8 @@ class AppFeedRepository(
          */
         val updateBadge: String get() = if (updateIsBeta) " · 内测版" else ""
 
-        /**
-         * 「检查更新」那行行尾「?」里的正文：**平时是行为说明，这一轮有毛病时换成毛病原文**。
-         *
-         * 小字只放得下一句结论（"这次没查上"），而真正有用的是**为什么**——哪个镜像、HTTP 几、
-         * 什么异常。这句以前只进一条两秒的 Toast，用户想回头看就得去导日志；挂在问号上之后，
-         * 反馈给作者时他自己就能念出来。
-         *
-         * [error] 非空有两种：真的没查上，和"镜像还在返回旧数据"（手里那份缓存更新）。
-         * 两种都不该被"查到新版会先问你"这种常态说明盖掉，所以这里不分类，统一说"这一轮的毛病"。
-         */
-        val checkHint: String
-            get() = error?.let { "这一轮的毛病：$it" } ?: "查到新版会先问你，再下载。"
+        /** 有毛病时接在结论后面的半句；没毛病时是空串。用中点不用括号 —— 毛病自己就带括号。 */
+        private val errorTail: String get() = error?.let { " · $it" } ?: ""
 
         /**
          * 「设置 → 更新 → 检查更新」那一行的小字：**这一轮的结论 + 它有多新鲜**。
@@ -159,13 +149,19 @@ class AppFeedRepository(
          * 「已是最新」只在**这一轮真的核对过版本**时才说：`latestVersionCode <= 0` 表示这份 feed
          * 压根不带版本信息（只推公告），那时宁可不写字 —— 凭没有的数据下"已是最新"的结论，
          * 和抽屉里那句假「已是最新版本」是同一种谎。时间口径与修课快照共用 [relativeSinceLabel]。
+         *
+         * 2026-10-30：行尾那枚「?」（原来的 `checkHint`）按用户要求撤掉了，**失败原因改住在这一行
+         * 小字里**（结论后面接 [errorTail]）。"小字只放结论、问号放毛病"那个分工已经不存在了。
          */
         fun checkTrace(now: Long = System.currentTimeMillis()): String = when {
             checking -> "正在检查…"
-            !newerVersionExists && error != null -> "这次没查上，可再点一次"
+            // 毛病原文直接进小字：2026-10-30 行尾的「?」按用户要求撤掉之后，这里是它唯一的住处。
+            // 光说"这次没查上"等于让用户再点一次碰运气 —— 哪个镜像、HTTP 几、什么异常才是要看的。
+            !newerVersionExists && error != null -> "这次没查上$errorTail"
             !updatesEnabled -> "版本由应用商店更新"
-            newerVersionExists && !updateAvailable -> "新版 v$latestVersionName$updateBadge（你选了稍后提醒）"
-            newerVersionExists -> "发现新版 v$latestVersionName$updateBadge"
+            newerVersionExists && !updateAvailable ->
+                "新版 v$latestVersionName$updateBadge（你选了稍后提醒）$errorTail"
+            newerVersionExists -> "发现新版 v$latestVersionName$updateBadge$errorTail"
             lastCheckedAt <= 0L || latestVersionCode <= 0 -> ""
             else -> "已是最新 · ${relativeSinceLabel(lastCheckedAt, "查过", now)}"
         }

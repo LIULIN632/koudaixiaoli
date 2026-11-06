@@ -184,7 +184,7 @@ internal fun ProactiveBubbleContent(
     val isDark = LocalDarkMode.current
     val accent = colors.accentMain
     val onAccent = accentForeground(accent, isDark)
-    val shape = remember(arrowFromStart) { BubbleShape(BubbleArrow.Bottom, arrowFromStart) }
+    val shape = remember(arrowFromStart) { BubbleShape(arrowFromStart) }
 
     Row(
         modifier = modifier

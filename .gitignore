@@ -158,3 +158,6 @@ config.local.*
 
 # 服务端部署包（server/gradlew installDist 的产物，18MB，不进仓）
 pocket-server*.tar.gz
+
+# 竞品调研时抓的参考截图（临时看过就算，不是项目素材）
+.research-tmp/

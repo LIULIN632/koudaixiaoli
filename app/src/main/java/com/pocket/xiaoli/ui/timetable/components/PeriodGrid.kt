@@ -33,10 +33,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.pocket.xiaoli.data.DueStage
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
 import com.pocket.xiaoli.ui.theme.*
@@ -79,7 +83,13 @@ fun PeriodGrid(
     gridBgColor: Int = -1,
     otherWeekAlpha: Float = 0.50f,
     verticalLayout: Boolean = true,
-    homeworkCourseNames: Set<String> = emptySet(),
+    /**
+     * 课程名 → 这门课**最紧**那条作业的截止档位（值可为 null = 有作业但没写能解析的日期）。
+     *
+     * **键的存在**就是"有作业"，所以这里不能用 `Map<String, DueStage>` 把 null 滤掉 ——
+     * 手动录入的作业经常只写「下周交」这种解析不出的话，它们仍然该有高亮边框。
+     */
+    homeworkStageByCourse: Map<String, DueStage?> = emptyMap(),
     onCourseClick: (CourseEntity) -> Unit,
     onEmptyCellClick: (Int, Int) -> Unit,
     onCourseMoved: (List<Long>, Int, Int) -> Unit,
@@ -403,20 +413,23 @@ fun PeriodGrid(
                                     .background(bgColor.copy(alpha = blockAlpha))
                                     .then(
                                         if (!isDragging) Modifier.drawBehind {
+                                            val homeworkName = mainCourse.name
+                                            val homeworkPresent = homeworkStageByCourse.containsKey(homeworkName)
+                                            val homeworkUrgent = isUrgentStage(homeworkStageByCourse[homeworkName])
                                             val spec = courseBlockBorderSpec(
                                                 isAgenda = mainCourse.isAgenda,
                                                 courseBorder = courseBorderColor(mainColorIndex, isDark),
                                                 accent = colors.accentMain,
                                                 isGhost = isGhost,
                                                 borderStyle = borderStyle,
+                                                hasHomework = homeworkPresent,
+                                                homeworkUrgent = homeworkUrgent,
+                                                homeworkColor = homeworkGoldColor(isDark),
                                             )
-                                            drawRoundRect(
-                                                color = spec.color,
-                                                cornerRadius = CornerRadius(cornerRadius.dp.toPx()),
-                                                style = Stroke(
-                                                    width = if (isGhost) 1.5.dp.toPx() else 1.dp.toPx(),
-                                                    pathEffect = if (spec.dashed) PathEffect.dashPathEffect(floatArrayOf(6f, 3f), 0f) else null
-                                                )
+                                            drawCourseBlockBorder(
+                                                spec = spec,
+                                                strokeWidthPx = if (isGhost) 1.5.dp.toPx() else spec.widthDp.dp.toPx(),
+                                                cornerRadiusPx = cornerRadius.dp.toPx(),
                                             )
                                         } else Modifier
                                     )
@@ -519,7 +532,7 @@ fun PeriodGrid(
                                     .padding(horizontal = skin.spaceXs, vertical = 8.dp),
                                 contentAlignment = if (textCentered) Alignment.Center else Alignment.TopStart
                             ) {
-                                CourseCardContent(mainCourse, textColor, isGhost, showTeacher, showRoom, showCampus, showOddEven, textCentered, gridTextSize, mainCourse.name in homeworkCourseNames, if (isGhost) otherWeekAlpha else if (isDragging) 0.5f else 1f, verticalLayout, slots = block.slots)
+                                CourseCardContent(mainCourse, textColor, isGhost, showTeacher, showRoom, showCampus, showOddEven, textCentered, gridTextSize, hasHomework = homeworkStageByCourse.containsKey(mainCourse.name), homeworkUrgent = isUrgentStage(homeworkStageByCourse[mainCourse.name]), otherWeekAlpha = if (isGhost) otherWeekAlpha else if (isDragging) 0.5f else 1f, verticalLayout = verticalLayout, slots = block.slots)
                                 // 非本周 leftover 局部斜纹遮罩（混合块：活跃课 + 非活跃课剩余区域）
                                 if (!isGhost && block.maskRanges.isNotEmpty()) {
                                     NonActiveMaskOverlay(block)
@@ -568,7 +581,7 @@ fun PeriodGrid(
                         .padding(horizontal = skin.spaceXs, vertical = 8.dp),
                     contentAlignment = if (textCentered) Alignment.Center else Alignment.TopStart
                 ) {
-                    CourseCardContent(course, floatText, false, showTeacher, showRoom, showCampus, showOddEven, textCentered, gridTextSize, course.name in homeworkCourseNames, otherWeekAlpha = 1f, verticalLayout = verticalLayout, slots = spanSlots)
+                    CourseCardContent(course, floatText, false, showTeacher, showRoom, showCampus, showOddEven, textCentered, gridTextSize, hasHomework = homeworkStageByCourse.containsKey(course.name), homeworkUrgent = isUrgentStage(homeworkStageByCourse[course.name]), otherWeekAlpha = 1f, verticalLayout = verticalLayout, slots = spanSlots)
                 }
             }
         }
@@ -653,6 +666,8 @@ internal fun CourseCardContent(
     textCentered: Boolean,
     gridTextSize: Int,
     hasHomework: Boolean = false,
+    /** 逾期/今天截止 —— 只改读屏文案，颜色与线宽由 `courseBlockBorderSpec` 决定。 */
+    homeworkUrgent: Boolean = false,
     otherWeekAlpha: Float = 0.50f,
     verticalLayout: Boolean = true,
     /**
@@ -668,6 +683,8 @@ internal fun CourseCardContent(
     val skin = LocalSkin.current
     val nameAlpha = if (isNonCurrent) (otherWeekAlpha * 2.78f).coerceIn(0.3f, 1f) else 1f
     val infoAlpha = if (isNonCurrent) (otherWeekAlpha * 1.67f).coerceIn(0.2f, 0.8f) else 0.6f
+    // 读屏文案只有一份：竖排/横排两个分支各写一遍迟早会漂成两种说法
+    val homeworkLabel = if (homeworkUrgent) "有作业已逾期" else "有作业"
 
     val displayRoom = remember(course.room, showCampus) {
         val room = course.room
@@ -711,12 +728,9 @@ internal fun CourseCardContent(
                     modifier = Modifier.weight(1f)
                 )
                 if (hasHomework) {
-                    Icon(
-                        Icons.Filled.Warning,
-                        contentDescription = "有作业",
-                        tint = Color(0xFFFFB800),
-                        modifier = Modifier.size(14.dp)
-                    )
+                    // 视觉信号是整块的高亮边框（见 courseBlockBorderSpec），这里只留读屏语义。
+                    // 逾期单独说：读屏用户拿不到颜色，只说"有作业"分不出该不该今天做。
+                    Spacer(Modifier.size(1.dp).semantics { contentDescription = homeworkLabel })
                 }
             }
             // 信息行：日程的前缀「日程」是格子里的第二重区分（第一重是边框虚线）。
@@ -794,12 +808,7 @@ internal fun CourseCardContent(
                 modifier = Modifier.weight(1f)
             )
             if (hasHomework) {
-                Icon(
-                    Icons.Filled.Warning,
-                    contentDescription = "有作业",
-                    tint = Color(0xFFFFB800),
-                    modifier = Modifier.size(16.dp)
-                )
+                Spacer(Modifier.size(1.dp).semantics { contentDescription = homeworkLabel })
             }
         }
         if (isNonCurrent) {
@@ -878,8 +887,27 @@ internal fun CourseCardContent(
  *
  * 抽成纯函数是因为**边框在 `drawBehind` 里画，截图测不到**（`CourseCardContent` 不含边框），
  * 而"日程 = 强调色虚线"是用户可见的语义，需要一条单测守住（见 `CourseBlockBorderSpecTest`）。
+ *
+ * @param insetStroke 描边要不要向内让位半个线宽。`drawRoundRect` 的矩形路径就压在边界上，
+ *  而画笔是**居中**描的，外面那一半会被上层的 `.clip()` 切掉 —— 所以"2dp 高亮"实际只剩 1dp。
+ *  高亮边框必须让位才看得出加粗；细边框维持原有的贴边画法（改了会动全部课表基线）。
  */
-internal data class CourseBlockBorderSpec(val color: Color, val dashed: Boolean)
+internal data class CourseBlockBorderSpec(
+    val color: Color,
+    val dashed: Boolean,
+    val widthDp: Float = 1f,
+    val insetStroke: Boolean = false,
+    /** 再画一圈内嵌细线 —— 作业的"有多急"靠形状区分，不靠第二种颜色。 */
+    val doubleLine: Boolean = false,
+)
+
+/**
+ * 这门课的作业是否紧到该画双线。
+ *
+ * 判据与首页待办行**共用同一份档位语义**（`data/HomeworkDue.dueStageOf`）：
+ * 逾期与今天截止算紧急，还剩几天的算"该留意"，更晚或没写日期的只是"有件事要做"。
+ */
+internal fun isUrgentStage(stage: DueStage?): Boolean = stage == DueStage.OVERDUE || stage == DueStage.TODAY
 
 /**
  * @param isAgenda 课程 `kind == "agenda"`
@@ -887,6 +915,9 @@ internal data class CourseBlockBorderSpec(val color: Color, val dashed: Boolean)
  * @param accent 当前强调色（`LocalPocketXiaoliColors.current.accentMain`）
  * @param isGhost 非本周的淡化块（本来就是虚线）
  * @param borderStyle 用户的「课表网格边框」设置（2 = 虚线）
+ * @param hasHomework 这门课有未完成的作业（只问有没有，紧不紧另说）
+ * @param homeworkUrgent 逾期或今天截止 —— 由 [isUrgentStage] 从档位换算，别在调用点各写一遍
+ * @param homeworkColor 作业高亮金（调用方传 `homeworkGoldColor(isDark)`，别在这里写死色值）
  */
 internal fun courseBlockBorderSpec(
     isAgenda: Boolean,
@@ -894,10 +925,67 @@ internal fun courseBlockBorderSpec(
     accent: Color,
     isGhost: Boolean,
     borderStyle: Int,
-): CourseBlockBorderSpec = CourseBlockBorderSpec(
-    color = if (isAgenda) accent.copy(alpha = 0.55f) else courseBorder,
-    dashed = isAgenda || isGhost || borderStyle == 2,
-)
+    hasHomework: Boolean = false,
+    homeworkUrgent: Boolean = false,
+    homeworkColor: Color = Color.Transparent,
+): CourseBlockBorderSpec = when {
+    // 作业 > 日程 > 普通：一门课同时是日程又带作业时，"有作业要交"比"这是日程"更要紧。
+    // 高亮用**实线加粗边框**而不是角标/图标 —— 格子里再塞一枚感叹号图标，
+    // 课名就会被顶成两行（2026-10 课名截断是 P0，不能再往课名行里加东西）。
+    hasHomework -> CourseBlockBorderSpec(
+        // 颜色只有一个金：颜色回答"这是什么"，形状回答"有多急"。
+        // 再分橙/红等于把同一件事做成两种观感，而且红色会把作业报成错误。
+        color = homeworkColor,
+        dashed = false,
+        widthDp = 2f,
+        insetStroke = true,
+        doubleLine = homeworkUrgent,
+    )
+    else -> CourseBlockBorderSpec(
+        color = if (isAgenda) accent.copy(alpha = 0.55f) else courseBorder,
+        dashed = isAgenda || isGhost || borderStyle == 2,
+    )
+}
+
+/**
+ * 按 [spec] 描出课程块边框 —— 课表真页与外观预览两处共用，别再各写一遍画法。
+ *
+ * 两件事都在这里，因为它们正是各写一遍时最容易写漏的：
+ * 1. **向内让位半个线宽**：描边路径压在边界上、画笔居中，外半会被上层的 `.clip()` 切掉，
+ *    于是"2dp 高亮"实际只剩 1dp；
+ * 2. **紧急档的第二圈**：与外圈之间留一个线宽的缝 —— 再挤就糊成一块金，
+ *    而双线在 52dp 宽的格子里仍然看得出来是两笔。
+ */
+internal fun DrawScope.drawCourseBlockBorder(
+    spec: CourseBlockBorderSpec,
+    strokeWidthPx: Float,
+    cornerRadiusPx: Float,
+) {
+    val inset = if (spec.insetStroke) strokeWidthPx / 2f else 0f
+    drawRoundRect(
+        color = spec.color,
+        topLeft = Offset(inset, inset),
+        size = Size(size.width - inset * 2f, size.height - inset * 2f),
+        cornerRadius = CornerRadius((cornerRadiusPx - inset).coerceAtLeast(0f)),
+        style = Stroke(
+            width = strokeWidthPx,
+            pathEffect = if (spec.dashed) PathEffect.dashPathEffect(floatArrayOf(6f, 3f), 0f) else null,
+        ),
+    )
+    if (spec.doubleLine) {
+        // 内圈**贴着外圈**画：格子的左右内边距只有 `spaceXs`(4dp)，
+        // 内圈若按"外圈再让一个线宽"往里放就会压到课名上。这里线心落在 3.5dp、
+        // 线宽 1dp，占 3–4dp，正好卡在外圈与文字之间。
+        val inner = inset + strokeWidthPx * 1.25f
+        drawRoundRect(
+            color = spec.color,
+            topLeft = Offset(inner, inner),
+            size = Size(size.width - inner * 2f, size.height - inner * 2f),
+            cornerRadius = CornerRadius((cornerRadiusPx - inner).coerceAtLeast(0f)),
+            style = Stroke(width = strokeWidthPx / 2f),
+        )
+    }
+}
 
 // ── P0 冲突块：块 key + 角标 + 底部选择弹窗 ──
 

@@ -7,6 +7,7 @@ import com.pocket.xiaoli.data.calendar.CalendarTerm
 import com.pocket.xiaoli.data.calendar.EventKind
 import com.pocket.xiaoli.data.holiday.HolidayDay
 import java.time.DayOfWeek
+import com.pocket.xiaoli.core.calendar.monthGrid as sharedMonthGrid
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -100,34 +101,40 @@ object CalendarUtils {
      * 一条跨界的考试事件就能把整个 2 月说成「考试周」。
      */
     fun calendarPhase(asset: CalendarAsset, date: LocalDate): CalendarPhase {
-        asset.events
-            .firstOrNull { it.kind == EventKind.VACATION && it.covers(date) }
-            ?.let { vacation ->
-                return if (isWinterVacation(vacation, date)) {
-                    CalendarPhase.WINTER_VACATION
-                } else {
-                    CalendarPhase.SUMMER_VACATION
-                }
-            }
-        if (asset.events.any { it.kind == EventKind.EXAM && it.covers(date) }) {
-            return CalendarPhase.EXAM_WEEKS
+        // 判定顺序（假期 > 考试周 > 学期中 > 未开学）在共享层，桌面端用同一份规则；
+        // 这里只负责把 LocalDate 模型翻成 epochDay 窗口，再把结果映射回日历枚举。
+        val terms = asset.terms.map {
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Window(
+                kind = com.pocket.xiaoli.core.calendar.TermPhaseCore.Kind.OTHER,
+                startEpochDay = it.start.toEpochDay(),
+                endEpochDay = teachingEndOf(it).toEpochDay(),
+            )
         }
-        val inTerm = asset.terms.any { !date.isBefore(it.start) && !date.isAfter(teachingEndOf(it)) }
-        return if (inTerm) CalendarPhase.IN_TERM else CalendarPhase.BEFORE_TERM
-    }
-
-    /**
-     * 寒假还是暑假。
-     *
-     * 先读名字（资产里就叫「寒假」「暑假」），名字里认不出来才退回按月份猜。
-     * 顺序不能反：靠月份是猜的，靠名字是读的 —— 南半球式的小概率数据不该让名字失效。
-     */
-    private fun isWinterVacation(vacation: CalendarEvent, date: LocalDate): Boolean {
-        val name = vacation.short.ifBlank { vacation.title }
-        return when {
-            name.contains("寒") -> true
-            name.contains("暑") -> false
-            else -> date.monthValue >= 12 || date.monthValue <= 2
+        val events = asset.events.map {
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Window(
+                kind = when (it.kind) {
+                    EventKind.VACATION -> com.pocket.xiaoli.core.calendar.TermPhaseCore.Kind.VACATION
+                    EventKind.EXAM -> com.pocket.xiaoli.core.calendar.TermPhaseCore.Kind.EXAM
+                    else -> com.pocket.xiaoli.core.calendar.TermPhaseCore.Kind.OTHER
+                },
+                startEpochDay = it.start.toEpochDay(),
+                endEpochDay = it.end.toEpochDay(),
+                name = it.short.ifBlank { it.title },
+            )
+        }
+        return when (
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.phaseOf(
+                todayEpochDay = date.toEpochDay(),
+                terms = terms,
+                events = events,
+                monthOf = { day -> LocalDate.ofEpochDay(day).monthValue },
+            )
+        ) {
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Phase.BEFORE_TERM -> CalendarPhase.BEFORE_TERM
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Phase.IN_TERM -> CalendarPhase.IN_TERM
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Phase.EXAM_WEEKS -> CalendarPhase.EXAM_WEEKS
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Phase.WINTER_VACATION -> CalendarPhase.WINTER_VACATION
+            com.pocket.xiaoli.core.calendar.TermPhaseCore.Phase.SUMMER_VACATION -> CalendarPhase.SUMMER_VACATION
         }
     }
 
@@ -139,13 +146,13 @@ object CalendarUtils {
      */
     fun monthGrid(month: YearMonth, firstDayOfWeek: DayOfWeek = DayOfWeek.MONDAY): List<MonthCell> {
         val first = month.atDay(1)
-        val leading = Math.floorMod(first.dayOfWeek.value - firstDayOfWeek.value, 7)
-        val rows = (leading + month.lengthOfMonth() + 6) / 7
-        val start = first.minusDays(leading.toLong())
-        return (0 until rows * 7).map { offset ->
-            val date = start.plusDays(offset.toLong())
-            MonthCell(date = date, inMonth = YearMonth.from(date) == month)
-        }
+        // 格子几何在共享层（desktop 侧将来画月历时用同一份），这里只做 java.time ↔ epochDay 的转换
+        return sharedMonthGrid(
+            firstEpochDayOfMonth = first.toEpochDay(),
+            daysInMonth = month.lengthOfMonth(),
+            weekdayOfFirst = first.dayOfWeek.value - 1,
+            firstDayOfWeek = firstDayOfWeek.value - 1,
+        ).map { MonthCell(date = LocalDate.ofEpochDay(it.epochDay), inMonth = it.inMonth) }
     }
 
     /** 落在这一天的事件，按 [EventKind.weight] 升序（越靠前越优先上格子）。 */

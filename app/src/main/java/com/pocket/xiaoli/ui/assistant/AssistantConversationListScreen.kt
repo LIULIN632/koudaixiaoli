@@ -323,14 +323,11 @@ internal fun ConversationRow(
  *（看起来只是"某个日期变了"）。所以基准时刻必须能从外面注入。
  */
 internal fun formatTime(millis: Long, now: Long = System.currentTimeMillis()): String {
-    if (millis <= 0L) return "刚刚"
-    val dayMs = 24L * 60 * 60 * 1000
-    val offset = 8L * 60 * 60 * 1000
-    val startOfToday = now - (now + offset) % dayMs
-    return when {
-        millis >= startOfToday -> "今天"
-        millis >= startOfToday - dayMs -> "昨天"
-        millis >= startOfToday - 2 * dayMs -> "前天"
-        else -> SimpleDateFormat("M月d日", Locale.CHINA).format(Date(millis))
-    }
+    // 划天规则在共享层（core/text/ConversationDayLabelCore.kt）：东八区、今天/昨天/前天/月日，
+    // 与 Windows 端同一套；这里只提供 "M月d日" 的本地化。
+    return com.pocket.xiaoli.core.text.conversationDayLabel(
+        millis = millis,
+        nowMillis = now,
+        formatMonthDay = { m -> SimpleDateFormat("M月d日", Locale.CHINA).format(Date(m)) },
+    )
 }

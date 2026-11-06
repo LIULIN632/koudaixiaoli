@@ -18,7 +18,7 @@ import org.junit.Test
  *   且 `TextStyles` 内部是 `MutableState`，纯 JVM 断言不便构造）。
  *
  * 剩下的可靠判据只有**源码层面**的不变量 —— 与 `TabRouteInputFocusTest` /
- * `InlinePasswordTransformationTest` / `HomeNoBubbleTipTest` 同一思路：
+ * `InlinePasswordTransformationTest` / `NoBubbleTipTest` 同一思路：
  * **看不见的东西，判据落在源码上；剩下的一半靠人。**
  *
  * ## 守的四条
@@ -63,7 +63,7 @@ class MiuixTypographyMappingTest {
      * 本文件（映射文件）的 KDoc 里写着"会拦下任何 `fontSize =` 字面量"这句话，
      * 而扫描器把**注释里的这句话**当成了真的字面量。
      *
-     * 这是源码扫描型守卫的通病，本项目已有先例：`HomeNoBubbleTipTest` 专门带一条
+     * 这是源码扫描型守卫的通病，本项目已有先例：`NoBubbleTipTest` 专门带一条
      * "守卫本身有效"的用例（证明抓得到调用、**不误伤注释**）。
      * **凡是扫源码的守卫，都必须先剥注释。**
      */

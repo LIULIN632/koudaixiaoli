@@ -22,9 +22,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
@@ -40,6 +43,8 @@ import androidx.compose.ui.unit.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.di.AppContainer
+import com.pocket.xiaoli.ui.timetable.components.courseBlockBorderSpec
+import com.pocket.xiaoli.ui.timetable.components.drawCourseBlockBorder
 import com.pocket.xiaoli.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -597,10 +602,17 @@ fun AppearanceScreen(
 }
 
 // ═══ Preview week-grid course card ═══
+/**
+ * 外观预览里的课程块。`internal` 只为了一件事：作业高亮边框画在 `drawBehind` 里，
+ * 课表整页与 [CourseCardContent] 的基线都截不到它，只能借这块预览录一张
+ * （`CourseCellHomeworkBorderScreenshotTest` / 基线 388）。别改回 private。
+ */
 @Composable
-private fun PreviewGridCourseCard(
+internal fun PreviewGridCourseCard(
     course: CourseEntity,
     hasHomework: Boolean,
+    /** 逾期/今天截止 —— 高亮边框换成危险色，与首页待办看板同一档。 */
+    homeworkUrgent: Boolean = false,
     isNonCurrent: Boolean,
     x: Dp,
     y: Dp,
@@ -624,6 +636,8 @@ private fun PreviewGridCourseCard(
     val bgColor = courseBgColor(colorIndex, isDark)
     val cardAlpha = if (isNonCurrent) otherWeekAlpha else opacity
 
+    // drawBehind 里不是组合上下文：令牌要在外面先取好
+    val previewAccent = accentColor()
     Box(
         modifier = Modifier
             .offset(x = x + 1.dp, y = y + 1.dp)
@@ -634,6 +648,24 @@ private fun PreviewGridCourseCard(
             .background(bgColor)
             .then(
                 when {
+                    // 与课表真页面同一套判据（courseBlockBorderSpec）：作业 = 实线加粗高亮边框
+                    hasHomework -> Modifier.drawBehind {
+                        val spec = courseBlockBorderSpec(
+                            isAgenda = false,
+                            courseBorder = courseBorderColor(colorIndex, isDark),
+                            accent = previewAccent,
+                            isGhost = isNonCurrent,
+                            borderStyle = borderStyle,
+                            hasHomework = true,
+                            homeworkUrgent = homeworkUrgent,
+                            homeworkColor = homeworkGoldColor(isDark),
+                        )
+                        drawCourseBlockBorder(
+                            spec = spec,
+                            strokeWidthPx = spec.widthDp.dp.toPx(),
+                            cornerRadiusPx = radius.dp.toPx(),
+                        )
+                    }
                     isNonCurrent -> Modifier.drawBehind {
                         drawRoundRect(
                             color = courseBorderColor(colorIndex, isDark),
@@ -671,6 +703,7 @@ private fun PreviewGridCourseCard(
             centered = centered,
             textSize = textSize,
             hasHomework = hasHomework,
+            homeworkUrgent = homeworkUrgent,
             verticalLayout = verticalLayout,
             otherWeekAlpha = otherWeekAlpha
         )
@@ -689,6 +722,7 @@ private fun PreviewGridCardContent(
     centered: Boolean,
     textSize: Int,
     hasHomework: Boolean,
+    homeworkUrgent: Boolean,
     verticalLayout: Boolean,
     otherWeekAlpha: Float
 ) {
@@ -731,12 +765,9 @@ private fun PreviewGridCardContent(
                 modifier = Modifier.weight(1f)
             )
             if (hasHomework) {
-                Icon(
-                    Icons.Filled.Warning,
-                    contentDescription = "有作业",
-                    tint = Color(0xFFFFB800),
-                    modifier = Modifier.size(12.dp)
-                )
+                // 与课表真页面同一份文案：读屏用户拿不到颜色，"有作业"三个字分不清该不该今天做
+                val label = if (homeworkUrgent) "有作业已逾期" else "有作业"
+                Spacer(Modifier.size(1.dp).semantics { contentDescription = label })
             }
         }
         if (isNonCurrent) {

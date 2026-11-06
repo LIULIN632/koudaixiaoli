@@ -26,11 +26,31 @@ kotlin {
     }
 
     sourceSets {
+        // JVM + Android 共同的 JVM 源集：OkHttp / Gson 两端用的是同一组构件（okhttp 4.12
+        // 同时发布 android 与 jvm 变体），SSE 解析这类纯 JVM 逻辑放这里，不必引 Ktor。
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
+        }
+        jvmMain.get().dependsOn(jvmAndroidMain)
+        androidMain.get().dependsOn(jvmAndroidMain)
+
         commonMain.dependencies {
             // 阶段 1 只放纯函数，刻意不引任何第三方依赖
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+        }
+        jvmTest.dependencies {
+            implementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+        }
+        jvmAndroidMain.dependencies {
+            // Delta 里公开了 JsonObject，所以 Gson 必须是 api；OkHttp 不外露，用 implementation。
+            api("com.google.code.gson:gson:2.11.0")
+            implementation("com.squareup.okhttp3:okhttp:4.12.0")
+            // 教务页面解析：Android 本来就在用 jsoup。Element 出现在公共解析函数签名里，故用 api。
+            api("org.jsoup:jsoup:1.18.1")
+            // 登录/抓课表是 suspend 函数，两端都要协程运行时
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
         }
     }
 }
@@ -40,9 +60,11 @@ kotlin {
 // 规则（为什么是这几条）：
 // 1) commonMain 是唯一被两端共用的代码，**不得**出现 Android / Compose / AWT-Swing
 //    任何一方 —— 出现即意味着另一端起不来（Android 没有 AWT，桌面没有 android.*）。
-// 2) androidMain / jvmMain 可以有平台 import，但仍然不能有 Compose UI：UI 必须留在各自端。
-// 3) commonMain 不得声明第三方 implementation 依赖：阶段 1 的共享层只有纯函数，
-//    一旦加依赖（比如 okhttp），桌面端与 Android 的传递依赖就会分叉，必须先改这条规则再说。
+// 2) androidMain / jvmMain / jvmAndroidMain 可以有平台 import，但仍然不能有 Compose UI：
+//    UI 必须留在各自端。
+// 3) commonMain 不得声明第三方依赖；jvmAndroidMain 的依赖必须命中白名单。
+//    okhttp/gson 是两端本来就在用的同一组 JVM 构件（不是新引入的第二套网络栈）；
+//    别的库要加进来，先改白名单再谈，避免两端传递依赖悄悄分叉。
 val verifyCoreScope by tasks.registering {
     val commonMainSources = fileTree("src/commonMain") { include("**/*.kt") }
     val allSources = fileTree("src") { include("**/*.kt") }
@@ -92,6 +114,24 @@ val verifyCoreScope by tasks.registering {
             hits += "core/build.gradle.kts → commonMain 不得声明第三方依赖，当前内容：\n$block"
         }
 
+        // 依赖边界：jvmAndroidMain 只能是两端已经在用的 JVM 构件
+        val allowedSharedDeps = listOf(
+            "com.google.code.gson:gson:",
+            "com.squareup.okhttp3:okhttp:",
+            "org.jsoup:jsoup:",
+            "org.jetbrains.kotlinx:kotlinx-coroutines-core:",
+        )
+        val sharedBlock = Regex("jvmAndroidMain\\.dependencies\\s*\\{([\\s\\S]*?)\\n\\s*\\}")
+            .find(script)?.groupValues?.get(1)
+        if (sharedBlock != null) {
+            Regex("""(?:api|implementation)\("([^"]+)"\)""").findAll(sharedBlock).forEach { match ->
+                val coord = match.groupValues[1]
+                if (allowedSharedDeps.none { coord.startsWith(it) }) {
+                    hits += "core/build.gradle.kts → jvmAndroidMain 依赖不在白名单：$coord"
+                }
+            }
+        }
+
         if (hits.isNotEmpty()) {
             throw GradleException(
                 "共享核心边界被破坏（commonMain 必须零平台依赖）：\n" + hits.joinToString("\n")
@@ -100,4 +140,6 @@ val verifyCoreScope by tasks.registering {
     }
 }
 
-tasks.named("check") { dependsOn(verifyCoreScope) }
+tasks.named("check") {
+    dependsOn(verifyCoreScope)
+}

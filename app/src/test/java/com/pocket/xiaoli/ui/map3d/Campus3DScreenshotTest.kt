@@ -519,5 +519,31 @@ class Campus3DScreenshotTest {
         composeRule.onNodeWithText("测试教室").assertExists()
     }
 
+    /**
+     * 烟大南校区沙盘（`225-campus-3d-ytu-south.png`）。
+     *
+     * 第二个校区用的是同一套 [Campus3DScreen] 与线上同一份 `ytu_south/campus_3d.json`，
+     * 所以这张图同时守住：资产能被解析、相机能把新校区框进来、渲染链路不依赖 ytlg 的字段。
+     */
+    @Test
+    fun `南校区 3D 沙盘截图`() {
+        val scene = Campus3DTestAssets.loadScene("ytu_south")
+        assertTrue(scene.hasGeometry)
+        assertTrue("南校应有 20 栋以上 OSM 楼栋", scene.buildings.size >= 20)
+
+        composeRule.setContent {
+            PocketXiaoliTheme(darkTheme = false) {
+                Campus3DScreen(scene = scene, onClose = {})
+            }
+        }
+        composeRule.waitForIdle()
+
+        // 无障碍描述跟着场景走，不能把「烟台理工学院」念到南校区头上。
+        composeRule
+            .onNodeWithContentDescription("烟台大学南校区 3D 校园沙盘，可拖动旋转、双指缩放、点选楼栋")
+            .assertExists()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/225-campus-3d-ytu-south.png")
+    }
+
     private fun loadScene(): Campus3DScene = Campus3DTestAssets.loadScene()
 }

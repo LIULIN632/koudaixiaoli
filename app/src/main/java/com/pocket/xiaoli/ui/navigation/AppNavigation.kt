@@ -1029,8 +1029,9 @@ fun AppNavigation(initialDeepLink: String? = null) {
             // 它是"背景保持原样"的关键 —— 系统 `Dialog` 会被 ROM 加背景模糊，这里不会。
             AppOverlayLayer(overlayHost)
 
-            // 更新抽屉：自己带一个窗口（WindowBottomSheet），放在组合树里只是为了
-            // 跟随导航层存活 —— 任何 tab / 子页上都能弹，不靠某个页面恰好被组合。
+            // 更新抽屉：挂在导航层，任何 tab / 子页上都能弹，不靠某个页面恰好被组合。
+            // 它现在走页内浮层（AppOverlaySheet → 上面那个 overlayHost），不再是独立窗口；
+            // 位置仍然要留在这里，因为"跟着导航层存活"这件事与外壳无关。
             AppUpdateSheetHost(updatePrompt)
             }
         }

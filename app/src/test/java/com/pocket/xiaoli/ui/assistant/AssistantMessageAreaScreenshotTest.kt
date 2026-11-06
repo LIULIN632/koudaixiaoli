@@ -353,6 +353,61 @@ class AssistantMessageAreaScreenshotTest {
                 answer("选课 **10 月 28 日 12:00** 开放，**11 月 3 日 23:59** 截止；必修已预置，选修先到先得。"),
             ),
         ),
+        // ⑫ 资料卡：`search_library` 命中资料站文件时的卡片（`AssistantCard.MaterialList`）
+        //
+        // 这一格盯四件事，全是只有看图才会暴露的：
+        // ① 文件名（「数据结构期末卷 2023.pdf」）两行截断后，编号 `[L1]` 是否还在标题左侧 ——
+        //    编号丢了就看不出这句话靠哪份资料答的；
+        // ② 「学科 · 课程 · 类型 · 大小 · 更新于」这一长串元信息会不会把标题挤成竖排
+        //    （培养方案卡踩过同一个坑，见 `AcademicProgressRow` 的注释）；
+        // ③ 不可下载那条的「暂不可下载」是警告色而不是主色 —— 它是提醒，不是可点的东西；
+        // ④ 卡片底部提示与来源条同时出现时，会不会把回答顶得太远。
+        Case(
+            name = "61-turn-material-card",
+            messages = listOf(
+                user("有没有数据结构期末卷？"),
+                tool(
+                    name = "资料库",
+                    preview = "[L1] 数据结构期末卷 2023.pdf / 来源：资料站\n2023 秋期末，7 道大题。",
+                    card = AssistantCard.MaterialList(
+                        header = "找到 2 份相关资料",
+                        rows = listOf(
+                            AssistantCard.MaterialList.Row(
+                                marker = "L1",
+                                title = "数据结构期末卷 2023.pdf",
+                                meta = "计算机 · 数据结构 · 历年卷 · 1.8 MB\n更新于 2026-10-30",
+                                summary = "2023 秋期末，7 道大题，图与排序占 60 分。",
+                                downloadable = true,
+                                fileId = "ds-final-2023",
+                                provider = "22 级计算机 王同学",
+                            ),
+                            AssistantCard.MaterialList.Row(
+                                marker = "L2",
+                                title = "数据结构期末卷 2024（待上传）.pdf",
+                                meta = "计算机 · 数据结构 · 历年卷\n更新于 2026-10-30",
+                                summary = "2024 秋期末，选择题 20 道 + 3 道大题。",
+                                downloadable = false,
+                                fileId = "ds-final-2024",
+                                provider = "23 级计算机 李同学",
+                            ),
+                        ),
+                        hint = "有 1 份还没传上去；其余在「服务 → 资料站」下载",
+                    ),
+                    sources = listOf(
+                        AssistantSource(
+                            marker = "L1",
+                            title = "数据结构期末卷 2023.pdf",
+                            meta = "来源：资料站\n更新于 2026-10-30",
+                            snippet = "2023 秋期末，7 道大题，图与排序占 60 分。",
+                        ),
+                    ),
+                ),
+                answer(
+                    "资料站里有 **2023 年**的数据结构期末卷[L1]，共 7 道大题，图和排序占 60 分。\n\n" +
+                        "2024 年那份还没传上来，先看 2023 的题型。"
+                ),
+            ),
+        ),
     )
 
     /** 与 `52-turn-sources` 同一份内容，只用于点开后的展开态基线。 */

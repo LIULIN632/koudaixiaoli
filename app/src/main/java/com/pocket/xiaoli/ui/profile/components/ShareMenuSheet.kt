@@ -36,14 +36,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.ui.components.SectionCaption
-import com.pocket.xiaoli.ui.components.SheetBackToDismiss
+import com.pocket.xiaoli.ui.overlay.AppOverlaySheet
 import com.pocket.xiaoli.ui.theme.LocalDarkMode
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.ServiceAccent
 import com.pocket.xiaoli.ui.theme.miuixPress
 import com.pocket.xiaoli.ui.theme.serviceAccentColor
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 /**
  * 「备份与分享」：把原来一条七项的平铺菜单按**用途**拆成三组。
@@ -58,7 +57,8 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
  * - 分组告诉用户"这是分享 / 这是导出 / 这是整机备份"；
  * - 每行都有副标题，说明产物是什么、用在哪；
  * - 恢复项用警示色，与危险操作同语义；
- * - 外壳换成 [WindowBottomSheet]，长菜单不再挤在对话框里。
+ * - 外壳是页内浮层 [AppOverlaySheet]（2026-10-30；原来是 MIUIX 的窗口式抽屉，
+*   会被 ROM 把背景糊成一块空白，见 `memory/03` §九），长菜单不再挤在对话框里。
  *
  * ⚠️ 恢复项**不做二次确认**：调用方 `ProfileDialogHost` 在选完之后会弹出
  * 口令输入框，并再次说明会覆盖当前数据 —— 真正的闸门在那里，不重复设卡。
@@ -74,12 +74,10 @@ internal fun ShareMenuDialog(
     onRestoreFullBackup: () -> Unit = {},
     onExportImage: () -> Unit = {}
 ) {
-    WindowBottomSheet(
-        show = true,
+    AppOverlaySheet(
         title = "备份与分享",
-        onDismissRequest = onDismiss,
+        onDismiss = onDismiss,
     ) {
-        SheetBackToDismiss(onDismiss = onDismiss)
         ShareMenuBody(
             onGenerateCode = onGenerateCode,
             onExportImage = onExportImage,
@@ -95,7 +93,7 @@ internal fun ShareMenuDialog(
 /**
  * 抽屉正文（与窗口外壳分开，只为了能单独截图）。
  *
- * `WindowBottomSheet` 是独立窗口，JVM 快照抓不到它 —— 与 `RecommendSheetBody`
+ * 单独拆出来是为了拍**只含正文**的基线（外壳现在也截得到，但要连遮罩和背后页面一起）—— 与 `RecommendSheetBody`
  * / `AppUpdateSheetBody` / `SchemeManagerBody` 同一条限制。
  */
 @Composable
@@ -158,7 +156,7 @@ internal fun ShareMenuBody(
             ShareActionRow(
                 icon = Icons.Outlined.CalendarMonth,
                 title = ".ics 日历文件",
-                subtitle = "导入手机系统日历，课前自动提醒",
+                subtitle = "课表与作业截止一起进系统日历，到点提醒",
                 accent = ServiceAccent.INFO,
                 onClick = onExportIcs,
             )

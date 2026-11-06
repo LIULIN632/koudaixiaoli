@@ -178,11 +178,12 @@ internal fun FeedbackAttachCard(
         SettingsSwitchItem(
             icon = Icons.Outlined.Smartphone,
             title = "附带设备信息",
+            // 这句原来挂在行尾的「?」里；问号撤掉后留在副标题 —— "不勾就只发你写的字"
+            // 是勾之前必须知道的那件事（隐私承诺），不是"解释这个开关干什么"。
+            subtitle = "不勾就只发你写的字",
             checked = included,
             onToggle = { onToggle(!included) },
             accent = ServiceAccent.QUERY,
-            hint = "勾上会一起带上机型、系统版本与 App 版本（下面能看到全部）。" +
-                "不勾就只发你写的字，一个字节都不多。",
         )
         if (included) {
             // 展开的就是"到底会带什么"，所以必须**逐字给看**：只说"会带设备信息"

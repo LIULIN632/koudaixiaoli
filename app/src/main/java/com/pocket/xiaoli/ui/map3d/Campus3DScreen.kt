@@ -251,6 +251,7 @@ fun Campus3DScreen(
                     animateCameraTo(layout.focusCamera(hit, aspect))
                 }
             },
+            campusName = scene.name,
             modifier = Modifier.fillMaxSize(),
             todayBuildingIds = todayBuildingIds,
         )

@@ -51,7 +51,7 @@ import com.pocket.xiaoli.network.DownloadProgressText
 import com.pocket.xiaoli.network.NetworkLogStore
 import com.pocket.xiaoli.telemetry.Telemetry
 import com.pocket.xiaoli.telemetry.TelemetryEvent
-import com.pocket.xiaoli.ui.components.SheetBackToDismiss
+import com.pocket.xiaoli.ui.overlay.AppOverlaySheet
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.accentColor
 import com.pocket.xiaoli.util.AppVersion
@@ -59,7 +59,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import java.io.File
 
 /**
@@ -120,6 +119,17 @@ internal class AppUpdatePromptController(
     private var promptedThisRun = 0
 
     /**
+     * 用户点过「稍后提醒」的是哪个版本：这个版本在本进程内不再自动弹。
+     *
+     * 故意**不做持久化** —— 它表达的就是「这次先不装，下次打开再说」，
+     * 进程一死就该忘掉；写进 prefs 会变成"点了稍后，这个版本永远不提醒"。
+     *
+     * 比的是版本号而不是布尔值：点过稍后之后，如果又发布了**更新的版本**，
+     * 那是另一件事，应该照常提醒（否则一个紧急修复版会因为"稍后"而看不见）。
+     */
+    private var postponedVersionCode = 0
+
+    /**
      * feed 状态每次变化都来过一遍，够条件才开抽屉。
      *
      * 调用方只在**一级 Tab** 上调用：更新提示不该盖住专注计时、网页登录、导入向导这些
@@ -137,19 +147,31 @@ internal class AppUpdatePromptController(
         if (state.blocking != null) return
         val code = state.latestVersionCode
         if (code <= 0) return
+        // 用户点过「稍后提醒」：这个版本在本进程内不再自己弹（切后台回来也不算），
+        // 下一次冷启动才重新判断；期间若发布了更新的版本（code 更大），仍然照常提醒。
+        // 强更照样绕过 —— 那是底线，不是可以商量的事。
+        if (!state.forceUpdate && code <= postponedVersionCode) return
         if (!state.forceUpdate && code <= promptedThisRun) return
         promptedThisRun = code
         info = state.toInfo()
     }
 
-    /** 关掉抽屉。普通更新只影响这次前台会话，下次打开 App 仍会主动提。 */
+    /**
+     * 关掉抽屉（「稍后提醒」按钮 / 点遮罩）。
+     *
+     * 语义是**推迟到下次冷启动**：当前这个版本本进程内不再自动弹，用户从后台切回来也不弹 ——
+     * 否则「稍后」等于没说，按一次 Home 就回来了。真正的重新提醒发生在进程重启之后，
+     * 或者期间又发布了更新的版本。
+     */
     fun dismiss() {
+        postponedVersionCode = promptedThisRun
         info = null
     }
 
     /**
-     * App 退到后台。下次回到前台时普通更新会重新主动弹一次 ——
-     * 用户要的是「每次打开都弹」，而不是一个版本只提醒一次。
+     * App 退到后台。**不再**因此重新弹（那是 [dismiss] 之前的行为）；
+     * 这里只保住「本次已弹过」的清零，让没点过稍后的用户在切回前台时能看到
+     * 期间新出现的版本（`promptedThisRun` 归零，但 [postponedUntilRestart] 仍然拦着）。
      */
     fun onBackground() {
         promptedThisRun = 0
@@ -265,7 +287,9 @@ private fun AppFeedRepository.State.toInfo(message: String? = null) = AppUpdateI
 /**
  * 更新抽屉本体：全局只挂这一份，谁触发都走这里。
  *
- * 外壳是 MIUIX 的 [WindowBottomSheet]（自带窗口、圆角、下滑关闭），高度只包住内容。
+ * 外壳是页内浮层 [AppOverlaySheet]（2026-10-30 换的，原来是 MIUIX 的 `WindowBottomSheet`）：
+ * 高度只包住内容，背景保持原页面。`dismissible = !force` 让强制更新关不掉 ——
+ * 点遮罩、按返回、内容里的按钮走的是同一个闸门。
  * 强更时 `allowDismiss = false`：点外面和下滑都关不掉，也没有「稍后」按钮 ——
  * 当前版本已经不受支持，留一个假出口只会让用户带着坏版本继续用。
  */
@@ -392,13 +416,12 @@ internal fun AppUpdateSheetHost(controller: AppUpdatePromptController) {
         }
     }
 
-    WindowBottomSheet(
-        show = true,
+    AppOverlaySheet(
         title = info.title,
-        allowDismiss = !info.force,
-        onDismissRequest = { if (!info.force) controller.dismiss() },
+        onDismiss = { controller.dismiss() },
+        // 强制更新关不掉：点遮罩、按返回、内容里的关闭，全走同一个闸门
+        dismissible = !info.force,
     ) {
-        SheetBackToDismiss(enabled = !info.force) { controller.dismiss() }
         AppUpdateSheetBody(
             force = info.force,
             notes = info.notes,
@@ -425,7 +448,8 @@ internal fun AppUpdateSheetHost(controller: AppUpdatePromptController) {
 /**
  * 抽屉内容（与窗口外壳分开，只为了能单独截图）。
  *
- * `WindowBottomSheet` 是独立窗口，JVM 快照抓不到它；这里只收纯展示参数，
+ * 拆出来是为了拍**只含正文**的基线（外壳现在也截得到，见 `AppOverlaySheetTest`）；
+ * 这里只收纯展示参数，
  * 排版与文案的回归用 `AppUpdateSheetScreenshotTest` 盯着。
  */
 @Composable

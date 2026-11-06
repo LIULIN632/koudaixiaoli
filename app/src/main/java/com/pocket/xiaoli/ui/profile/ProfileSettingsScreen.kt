@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CardGiftcard
@@ -44,6 +43,7 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.GridOn
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Notifications
@@ -103,7 +103,6 @@ import com.pocket.xiaoli.ui.theme.serviceAccentColor
 import com.pocket.xiaoli.ui.theme.serviceAccentContainer
 import com.pocket.xiaoli.ui.components.MiuixSettingsScaffold
 import com.pocket.xiaoli.ui.components.MiuixSettingsSection
-import com.pocket.xiaoli.ui.proactive.BubbleTip
 import com.pocket.xiaoli.ui.theme.rememberSinkIndication
 import top.yukonga.miuix.kmp.basic.Switch as MiuixSwitch
 
@@ -317,20 +316,10 @@ private val SETTINGS_CATEGORIES = listOf(
         title = "服务功能",
         accent = ServiceAccent.LIFE,
     ),
+    // 反馈与关于**排在最后**（2026-10-30 用户点名"往下放"）：这两类是"出了问题才去找"的，
+    // 而课表 / 外观 / 服务功能 / 更新 / 贡献 / 致谢是日常会动的。
     // 反馈单独成类（2026-10-25）：表单、复制/邮件/GitHub、回复记录都在这一页，
     // 不再散在「关于」和「贡献」两处。
-    SettingsCategory(
-        page = SettingsSubPage.FEEDBACK,
-        icon = Icons.Outlined.Feedback,
-        title = "反馈",
-        accent = ServiceAccent.INFO,
-    ),
-    SettingsCategory(
-        page = SettingsSubPage.ABOUT,
-        icon = Icons.AutoMirrored.Outlined.HelpOutline,
-        title = "关于口袋小鲤",
-        accent = ServiceAccent.INFO,
-    ),
     SettingsCategory(
         page = SettingsSubPage.UPDATE,
         icon = Icons.Filled.SystemUpdate,
@@ -348,6 +337,21 @@ private val SETTINGS_CATEGORIES = listOf(
         icon = Icons.Filled.Star,
         title = "致谢",
         accent = ServiceAccent.ACADEMIC,
+    ),
+    SettingsCategory(
+        page = SettingsSubPage.FEEDBACK,
+        icon = Icons.Outlined.Feedback,
+        title = "反馈",
+        accent = ServiceAccent.INFO,
+    ),
+    // 行名就叫「关于」（用户：不用叫"关于口袋小鲤"—— 这一页本身就在口袋小鲤的设置里）
+    // 图标不用问号：2026-10-31 用户要求全 App 去掉问号形状的东西，
+    // 「常见问题」那一行例外（它真的是问题列表，见 SettingsSubPages.kt）。
+    SettingsCategory(
+        page = SettingsSubPage.ABOUT,
+        icon = Icons.Outlined.Info,
+        title = "关于",
+        accent = ServiceAccent.INFO,
     ),
 )
 
@@ -458,7 +462,6 @@ private fun TimetableSettingsPage(
                 title = "学期设置",
                 accent = ServiceAccent.ACADEMIC,
                 onClick = onSemesterSettings,
-                hint = "学期开始日期决定「当前第几周」怎么算，开学前改一次就行。",
             )
             SettingsDivider()
             SettingsMenuItem(
@@ -466,7 +469,6 @@ private fun TimetableSettingsPage(
                 title = "调休补课",
                 accent = ServiceAccent.ACADEMIC,
                 onClick = onAdjustedWorkday,
-                hint = "指定补班日按哪天的课表上课。例如周六补周一的课，就在这里选周一。",
             )
             SettingsDivider()
             // 从「通用设置 · 外观」搬来的：它的消费方是 PeriodGrid（课表网格）
@@ -483,7 +485,6 @@ private fun TimetableSettingsPage(
                 selected = borderStyle,
                 onSelect = { container.setBorderStyle(it) },
                 accent = ServiceAccent.STUDY,
-                hint = "同时作用于课表网格和教室平面图。虚线比实线轻，课程块多时更不吵。",
             )
             SettingsDivider()
             SettingsMenuItem(
@@ -580,7 +581,6 @@ private fun AppearanceSettingsPage(
                 selected = AppearanceMode.fromKey(appearanceMode),
                 onSelect = { container.setAppearanceMode(it.key) },
                 accent = ServiceAccent.ACADEMIC,
-                hint = "彩虹：每张卡按类型配色。纯净：全站用同一套中性色，只留主色做强调。",
             )
             SettingsDivider()
             // 原名「布局模式」，副标题原写"服务页密度"是错的：CampusLayoutMode
@@ -592,7 +592,6 @@ private fun AppearanceSettingsPage(
                 selected = campusLayoutMode,
                 onSelect = { container.setCampusLayoutMode(it) },
                 accent = ServiceAccent.ACADEMIC,
-                hint = "紧凑会缩小首页、我的与百宝箱的行距和卡片高度，一屏多放几项。",
             )
             SettingsDivider()
             SettingsMenuChoiceItem(
@@ -604,7 +603,6 @@ private fun AppearanceSettingsPage(
                 accent = ServiceAccent.INFO,
                 // tierNote 只在「液态玻璃」下非空，讲的是**本机能力**（有无模糊/折射），
                 // 属于"该知道但不必天天看"的一句，收进问号。
-                hint = bottomBarStyle.tierNote().ifBlank { null },
             )
             SettingsDivider()
             // 震动反馈原在「首页与交互」组。2026-10-18 并进「外观」：
@@ -862,8 +860,10 @@ internal fun SettingsIcon(icon: ImageVector, accent: ServiceAccent?) {
  * 1. **当前值**（校区名、分钟数、版本号）—— 不写就得进页面才知道；
  * 2. **不读就会做错的事**（"长按发安装包"、"全部清空"）。
  *
- * 其余"解释这个功能是干什么的"一律删掉；真的值得保留的解释挪进 [hint]，
- * 变成行尾一枚「?」，点开看 — 这样每行剩一行字，页面的密度才降得下来。
+ * 其余"解释这个功能是干什么的"一律删掉。2026-10-30 用户进一步要求**把行尾那枚「?」也去掉**
+ * （`hint` 参数与 `BubbleTip` 已从 `SettingsMenuItem` / `SettingsSwitchItem` /
+ * `SettingsMenuChoiceItem` 三个行组件上摘掉）：他不要"点开才看得见"的说明，也不要为了
+ * 一句解释多一层交互。做错才会出事的信息留在副标题里，其余不解释。
  *
  * [onLongClick] 默认 null（= 这一行只有单击）。目前唯一的使用者是「推荐给同学」：
  * 轻点看链接、**长按直接把安装包发出去** —— 同一行的第二个手势，页面上不占任何空间。
@@ -880,8 +880,6 @@ internal fun SettingsMenuItem(
     subtitle: String? = null,
     onLongClick: (() -> Unit)? = null,
     accent: ServiceAccent? = null,
-    /** 「?」说明。非空时在行尾挂一枚问号，点开弹气泡（见 [BubbleTip]）。 */
-    hint: String? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -903,7 +901,6 @@ internal fun SettingsMenuItem(
                 Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
             }
         }
-        if (hint != null) BubbleTip(text = hint)
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             null,
@@ -931,11 +928,9 @@ internal fun <T> SettingsMenuChoiceItem(
     options: List<Pair<String, T>>,
     selected: T,
     onSelect: (T) -> Unit,
-    /** 只在"当前值不方便放在右侧"或"不读会做错"时才写；纯解释走 [hint]。 */
+    /** 只在"当前值不方便放在右侧"或"不读会做错"时才写。 */
     subtitle: String? = null,
     accent: ServiceAccent? = null,
-    /** 「?」说明。非空时在行尾挂一枚问号，点开弹气泡（见 [BubbleTip]）。 */
-    hint: String? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -958,7 +953,6 @@ internal fun <T> SettingsMenuChoiceItem(
                 Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
             }
         }
-        if (hint != null) BubbleTip(text = hint)
         Text(currentLabel, fontSize = 13.sp, color = colors.textSecondary)
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -1037,11 +1031,9 @@ internal fun SettingsSwitchItem(
     title: String,
     checked: Boolean,
     onToggle: () -> Unit,
-    /** 只在"开着/关掉会发生什么"不读就会理解错时才写；纯解释走 [hint]。 */
+    /** 只在"开着/关掉会发生什么"不读就会理解错时才写。 */
     subtitle: String? = null,
     accent: ServiceAccent? = null,
-    /** 「?」说明。非空时在行尾挂一枚问号，点开弹气泡（见 [BubbleTip]）。 */
-    hint: String? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -1061,7 +1053,6 @@ internal fun SettingsSwitchItem(
                 Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
             }
         }
-        if (hint != null) BubbleTip(text = hint)
         MiuixSwitch(checked = checked, onCheckedChange = { onToggle() })
     }
 }
