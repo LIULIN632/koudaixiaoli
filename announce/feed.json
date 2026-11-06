@@ -12,24 +12,24 @@
     "desktop.versionCode 与 gradle.properties 的 versionCode 同源；客户端只在「远程 > 本机」时提示，绝不自动安装。"
   ],
   "app": {
-    "versionCode": 111,
-    "versionName": "0.2.10",
+    "versionCode": 113,
+    "versionName": "0.2.12",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.10/koudaixiaoli_v0.2.10.apk",
-    "sha256": "1ef8034c037a54912041f2bf0092ee3144296d9cbeb3409ba3bd42d6861f0fc1",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.12/koudaixiaoli_v0.2.12.apk",
+    "sha256": "e9abcb096584aaeb472862587b57210592fd8c25d940b45b1901a63700fdc86f",
     "rollout": 100,
-    "publishedAt": "2026-10-19T21:36:00+08:00",
+    "publishedAt": "2026-11-05T23:39:52+08:00",
     "notes": [
-      "成绩页整张卡都能点：点一下展开某门课的成绩，不用再找小箭头",
-      "学分构成与成绩分布重排，深色模式下分隔线和底色不再糊在一起",
-      "窄屏（360dp）下课名与分数不再互相挤压"
+      "电费提醒线自己定：默认降到 10 元才提醒，点「知道了」当天不再说",
+      "换学校不再串数据：课表、成绩等 10 张表按校分开，切回去数据还在",
+      "设置 → 服务功能里也能改提醒线，不用先进电费页"
     ]
   },
   "desktop": {
-    "versionCode": 111,
-    "versionName": "0.2.10",
+    "versionCode": 113,
+    "versionName": "0.2.12",
     "url": "",
-    "sha256": "1ef8034c037a54912041f2bf0092ee3144296d9cbeb3409ba3bd42d6861f0fc1",
+    "sha256": "e9abcb096584aaeb472862587b57210592fd8c25d940b45b1901a63700fdc86f",
     "notes": [
       "桌面端与手机端同源：课表/校历/成绩/考试/知识库都读同一份 :core",
       "url 留空 = 客户端不提示更新；有桌面安装包后填上地址即可"
