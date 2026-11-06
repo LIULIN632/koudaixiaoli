@@ -25,6 +25,20 @@
       "设置 → 服务功能里也能改提醒线，不用先进电费页"
     ]
   },
+  "beta": {
+    "versionCode": 114,
+    "versionName": "0.2.13",
+    "minSupported": 0,
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.13/koudaixiaoli_v0.2.13.apk",
+    "sha256": "68066eceeca07a7f467afcff7b31d72245069b6a74d4ad63a145ba909a7d6bfa",
+    "rollout": 20,
+    "publishedAt": "2026-11-05T23:49:31+08:00",
+    "notes": [
+      "内测通道联调包：代码与 0.2.12 相同，用来确认「加入内测」能收到它",
+      "内测包比稳定版高一个版本号（114），出问题用 -Rollout 0 刹车"
+    ]
+  },
+
   "desktop": {
     "versionCode": 113,
     "versionName": "0.2.12",
