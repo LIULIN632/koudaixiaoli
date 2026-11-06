@@ -17,7 +17,7 @@
     "minSupported": 0,
     "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.12/koudaixiaoli_v0.2.12.apk",
     "sha256": "e9abcb096584aaeb472862587b57210592fd8c25d940b45b1901a63700fdc86f",
-    "rollout": 100,
+    "rollout": 0,
     "publishedAt": "2026-11-05T23:39:52+08:00",
     "notes": [
       "电费提醒线自己定：默认降到 10 元才提醒，点「知道了」当天不再说",
@@ -53,5 +53,11 @@
   "endpoints": {
     "feedback": "https://www.linyang62633.vip/v1/feedback"
   },
-  "announcements": []
+  "announcements": [
+    {
+      "id": "withdraw-0.2.12",
+      "level": "CRITICAL",
+      "title": "v0.2.12 撤回：这一版存在影响使用的问题，建议先不要更新，等修复版。",
+      "body": "已经装了 v0.2.12 的同学请等修复版；还没更新的先别更。安装包与旧版本的下载入口见「我的 → 更新」。"
+    },]
 }
