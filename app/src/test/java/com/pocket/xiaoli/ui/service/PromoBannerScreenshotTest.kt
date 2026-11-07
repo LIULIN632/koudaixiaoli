@@ -5,9 +5,15 @@ import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
@@ -128,5 +134,48 @@ class PromoBannerScreenshotTest {
         composeRule.setContent { Host(listOf(promo("only", url, priority = 1))) }
         composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/screenshots/25-promo-single.png")
+    }
+
+    /**
+     * 指示条的**拖动中 + 半程**状态。
+     *
+     * 宽度拉伸由 `promoIndicatorWidths` 的单测钉几何，但"填充真的画出半根"只有像素能证明 ——
+     * 静止态的 `24` 里 progress 恒为 1（整根全白），看不出填充逻辑在不在。
+     */
+    @Test
+    fun `指示条拖动与进度截图`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalPocketXiaoliColors.current.surfaceBase)
+                        .padding(16.dp),
+                ) {
+                    // 深色块模拟"海报照片"：白条压在有内容的底上才看得出对比
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF4B5A80)),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        PromoIndicator(
+                            pageCount = 3,
+                            position = 0.5f,
+                            progress = 0.5f,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/34-promo-indicator-progress.png")
     }
 }

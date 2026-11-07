@@ -74,6 +74,8 @@ fun ImportScreen(
     rememberPasswordByDefault: Boolean = false,
     /** 成功卡上离开按钮的文案。向导里是「开始使用」，普通导入页是「返回课表」。 */
     successActionLabel: String = "返回课表",
+    /** 解析结果摘要；为空时退回旧的「已导入 N 门课程」。 */
+    summary: ImportSummary? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -457,6 +459,7 @@ fun ImportScreen(
                         onBackToTimetable = { viewModel.reset(); (onImported ?: onBack)() },
                         onRetry = { viewModel.reset() },
                         successActionLabel = successActionLabel,
+                        summary = summary ?: result!!.courses?.let { ImportSummary.of(it) },
                     )
                 }
             }
@@ -774,6 +777,8 @@ internal fun ImportResultCard(
     onRetry: () -> Unit,
     /** 成功卡离开按钮的文案；默认按普通导入页的叫法。 */
     successActionLabel: String = "返回课表",
+    /** 解析结果摘要；为空时退回旧的「已导入 N 门课程」。 */
+    summary: ImportSummary? = null,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -820,10 +825,28 @@ internal fun ImportResultCard(
 
             if (success) {
                 Text(
-                    "已导入 $courseCount 门课程",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary,
+                    summary?.headline() ?: "已导入 $courseCount 门课程",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
                 )
+                val warns = summary?.warnings().orEmpty()
+                if (warns.isNotEmpty()) {
+                    warns.forEach { w ->
+                        Text("· $w", fontSize = 12.sp, color = colors.danger)
+                    }
+                    Text(
+                        "先照着上面的提示核对一遍，再回课表看",
+                        fontSize = 11.sp,
+                        color = colors.textTertiary,
+                    )
+                } else if (summary != null) {
+                    Text(
+                        "课程、节次、周次都对上了，回课表看一眼就能用",
+                        fontSize = 12.sp,
+                        color = colors.textTertiary,
+                    )
+                }
                 if (onOpenSettings != null) {
                     Text(
                         "上课提醒与桌面小组件默认关闭，可在「我的 → 设置」中开启",

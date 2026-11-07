@@ -56,6 +56,7 @@ import com.pocket.xiaoli.data.announcement.AppFeedRepository
 import com.pocket.xiaoli.di.AppContainer
 import com.pocket.xiaoli.notification.AppFeedScheduler
 import com.pocket.xiaoli.data.legal.AgreementText
+import com.pocket.xiaoli.data.legal.ossLicenses
 import com.pocket.xiaoli.telemetry.Telemetry
 import com.pocket.xiaoli.ui.legal.AgreementMode
 import com.pocket.xiaoli.ui.legal.UserAgreementScreen
@@ -186,6 +187,8 @@ internal fun SettingsSubPageHost(
     var agreementOpen by remember { mutableStateOf(false) }
     // 共建榜与协议页同理：它是整页（有自己的滚动与顶栏），不能塞进设置卡里。
     var leaderboardOpen by remember { mutableStateOf(false) }
+    // 开源许可清单同理：几十条要点开核对，塞回致谢页会让那页长到没法读。
+    var licensesOpen by remember { mutableStateOf(false) }
     // 协议页整页替换 ⇒ 下面这一页会离开组合。状态按页各记一份、且提到分流之前，
     // 从用户协议返回时还停在原来的位置（换到另一张设置页则从顶部开始）。
     val pageScrollState = remember(page) { ScrollState(0) }
@@ -195,6 +198,10 @@ internal fun SettingsSubPageHost(
     }
     if (leaderboardOpen) {
         ContributionLeaderboardScreen(container = container, onBack = { leaderboardOpen = false })
+        return
+    }
+    if (licensesOpen) {
+        SettingsSubPageScaffold(title = "开源许可", onBack = { licensesOpen = false }) { LicensesContent() }
         return
     }
 
@@ -213,7 +220,7 @@ internal fun SettingsSubPageHost(
             SettingsSubPage.CONTRIBUTE -> ContributeContent(
                 onOpenLeaderboard = { leaderboardOpen = true },
             )
-            SettingsSubPage.THANKS -> ThanksContent()
+            SettingsSubPage.THANKS -> ThanksContent(onOpenLicenses = { licensesOpen = true })
             SettingsSubPage.DANGER -> DangerContent(onClearData, onDeleteAllData)
             // 这三页实现在 ProfileSettingsScreen.kt 里（它们要带一堆父页回调），走不到这里。
             SettingsSubPage.TIMETABLE, SettingsSubPage.APPEARANCE, SettingsSubPage.SERVICES -> Unit
@@ -577,7 +584,7 @@ private fun ContributeContent(onOpenLeaderboard: () -> Unit) {
 // （"版本信息与开源致谢"），点进去只有版本号。GPL 项目要求保留出处，
 // 而用户也想知道自己装的东西用了谁的劳动成果 —— 所以单独给一页。
 @Composable
-private fun ThanksContent() {
+private fun ThanksContent(onOpenLicenses: () -> Unit) {
     val context = LocalContext.current
     val colors = LocalPocketXiaoliColors.current
 
@@ -694,6 +701,17 @@ private fun ThanksContent() {
         color = colors.textTertiary,
         lineHeight = 18.sp,
     )
+    // 完整清单独占一页：这里只放得下一段散文，而"用了哪些库、什么许可证、去哪儿核对"
+    // 是能逐条点开的东西。清单由 `OssLicensesTest` 对着 build.gradle.kts 卡住，不会过期。
+    SettingsCard {
+        SettingsMenuItem(
+            icon = Icons.Filled.Star,
+            title = "完整许可清单",
+            subtitle = "${ossLicenses.size} 个直接依赖 · 按许可证分组",
+            onClick = onOpenLicenses,
+            accent = ServiceAccent.QUERY,
+        )
+    }
 }
 
 // ═══ 危险操作 ═══
@@ -739,7 +757,7 @@ private fun DangerContent(
  * 2026-11 修：此前这里静默失败 —— 用户报「致谢里点一个链接、取消后再点另一个就没反应」。
  * 现在失败会复制链接并提示，至少能分清"系统没有浏览器"和"点击没被处理"。
  */
-private fun openUrl(context: android.content.Context, url: String) {
+internal fun openUrl(context: android.content.Context, url: String) {
     ExternalLinks.open(context, url)
 }
 

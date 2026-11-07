@@ -230,6 +230,62 @@ class ImportScreenPartsScreenshotTest {
         assertEquals(1, backs)
     }
 
+    @Test
+    fun `导入成功卡给出摘要`() {
+        val courses = listOf(
+            com.pocket.xiaoli.data.entity.CourseEntity(name = "建设法规", teacher = "王立群", room = "2-101", dayOfWeek = 1, startSlot = 1, endSlot = 2, weeks = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16"),
+            com.pocket.xiaoli.data.entity.CourseEntity(name = "大学英语", teacher = "李敏", room = "1-305", dayOfWeek = 2, startSlot = 3, endSlot = 4, weeks = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16"),
+            com.pocket.xiaoli.data.entity.CourseEntity(name = "工程会计", teacher = "赵彦", room = "文一教313", dayOfWeek = 5, startSlot = 1, endSlot = 2, weeks = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16"),
+        )
+        composeRule.setContent {
+            PocketXiaoliTheme(appearanceMode = AppearanceMode.RAINBOW, skinStyle = SkinStyle.VIVID) {
+                PageBackdrop {
+                    ImportResultCard(
+                        success = true,
+                        error = null,
+                        courseCount = courses.size,
+                        onOpenSettings = {},
+                        onBackToTimetable = {},
+                        onRetry = {},
+                        summary = ImportSummary.of(courses),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/299-import-result-summary.png")
+    }
+
+    @Test
+    fun `导入成功卡给出异常提示`() {
+        // 全周日：正是 0.2.19 之前「六门课全挤周日」那一刻的样子
+        val courses = (1..3).map {
+            com.pocket.xiaoli.data.entity.CourseEntity(
+                name = "第${it}门课", teacher = "", room = "", dayOfWeek = 7,
+                startSlot = it * 2 - 1, endSlot = it * 2, weeks = "",
+            )
+        }
+        composeRule.setContent {
+            PocketXiaoliTheme(appearanceMode = AppearanceMode.RAINBOW, skinStyle = SkinStyle.VIVID) {
+                PageBackdrop {
+                    ImportResultCard(
+                        success = true,
+                        error = null,
+                        courseCount = courses.size,
+                        onOpenSettings = {},
+                        onBackToTimetable = {},
+                        onRetry = {},
+                        summary = ImportSummary.of(courses),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/300-import-result-warning.png")
+    }
+
     @Composable
     private fun PageBackdrop(content: @Composable () -> Unit) {
         Box(

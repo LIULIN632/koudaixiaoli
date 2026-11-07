@@ -1442,65 +1442,65 @@ private fun ColumnScope.ServicesBody(
             }
 
             // ── 两种布局范式（2026-10）──
-            //
-            // `CampusLayoutMode` 早在 2026-05 就存在、`ServiceCard` 也一直在读它，但它**只改卡片尺寸**
-            //（78→64dp），布局形状始终是 `chunked(2)` 的富卡片 —— 于是「工具箱模式」名不副实。
-            // 这里补上缺的另一半：TOOLBOX → 真正的紧凑图标宫格。
-            //
-            // ⚠️ 默认值 `MODERN` 就是现状，而现有 golden 基线**全部** provide `MODERN`
-            //（见 `HomeCourseCardScreenshotTest` 等），所以这个分支**不会改变任何基线**。
-            if (gridLayout) {
-                section.entries.chunked(SERVICE_GRID_COLUMNS).forEach { rowEntries ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)
-                    ) {
-                        rowEntries.forEach { entry ->
-                            val display = entry.withSummary(entry.serviceRegistryKey?.let(summaries::get), campus, dormInfo)
-                            ServiceGridCell(
-                                entry = display,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    Telemetry.featureUsed(display.key)
-                                    display.onClick()
-                                },
-                            )
+                //
+                // `CampusLayoutMode` 早在 2026-05 就存在、`ServiceCard` 也一直在读它，但它**只改卡片尺寸**
+                //（78→64dp），布局形状始终是 `chunked(2)` 的富卡片 —— 于是「工具箱模式」名不副实。
+                // 这里补上缺的另一半：TOOLBOX → 真正的紧凑图标宫格。
+                //
+                // ⚠️ 默认值 `MODERN` 就是现状，而现有 golden 基线**全部** provide `MODERN`
+                //（见 `HomeCourseCardScreenshotTest` 等），所以这个分支**不会改变任何基线**。
+                if (gridLayout) {
+                    section.entries.chunked(SERVICE_GRID_COLUMNS).forEach { rowEntries ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)
+                        ) {
+                            rowEntries.forEach { entry ->
+                                val display = entry.withSummary(entry.serviceRegistryKey?.let(summaries::get), campus, dormInfo)
+                                ServiceGridCell(
+                                    entry = display,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        Telemetry.featureUsed(display.key)
+                                        display.onClick()
+                                    },
+                                )
+                            }
+                            // 末行不足一列时补空位，否则最后几个格子会被拉宽、与上面的列对不齐
+                            //（现状的 `chunked(2)` 用 `if (rowEntries.size == 1) Spacer(weight(1f))` 是同一手法）。
+                            repeat(SERVICE_GRID_COLUMNS - rowEntries.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
-                        // 末行不足一列时补空位，否则最后几个格子会被拉宽、与上面的列对不齐
-                        //（现状的 `chunked(2)` 用 `if (rowEntries.size == 1) Spacer(weight(1f))` 是同一手法）。
-                        repeat(SERVICE_GRID_COLUMNS - rowEntries.size) {
-                            Spacer(Modifier.weight(1f))
+                    }
+                } else {
+                    section.entries.chunked(2).forEach { rowEntries ->
+                        // `height(IntrinsicSize.Max)`：一行两张卡按"较高那张"等高。
+                        // 卡片里的 `fillMaxHeight` 需要**有界**的最大高度才能拉平，
+                        // 而外层是 LazyColumn（高度约束无限），所以这一行必须自己把高度定下来。
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Max),
+                            horizontalArrangement = Arrangement.spacedBy(skin.spaceMd)
+                        ) {
+                            rowEntries.forEach { entry ->
+                                val display = entry.withSummary(entry.serviceRegistryKey?.let(summaries::get), campus, dormInfo)
+                                ServiceCard(
+                                    entry = display,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        Telemetry.featureUsed(display.key)
+                                        display.onClick()
+                                    },
+                                )
+                            }
+                            if (rowEntries.size == 1) {
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
                 }
-            } else {
-                section.entries.chunked(2).forEach { rowEntries ->
-                    // `height(IntrinsicSize.Max)`：一行两张卡按"较高那张"等高。
-                    // 卡片里的 `fillMaxHeight` 需要**有界**的最大高度才能拉平，
-                    // 而外层是 LazyColumn（高度约束无限），所以这一行必须自己把高度定下来。
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Max),
-                        horizontalArrangement = Arrangement.spacedBy(skin.spaceMd)
-                    ) {
-                        rowEntries.forEach { entry ->
-                            val display = entry.withSummary(entry.serviceRegistryKey?.let(summaries::get), campus, dormInfo)
-                            ServiceCard(
-                                entry = display,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    Telemetry.featureUsed(display.key)
-                                    display.onClick()
-                                },
-                            )
-                        }
-                        if (rowEntries.size == 1) {
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
         }
     }
 }

@@ -7,8 +7,35 @@ import com.google.gson.JsonParser
 /** JSON schedule parsing — extracted from ZhengfangClient to keep file sizes manageable. */
 object ZhengfangScheduleParser {
 
+    /**
+     * 最近一次 JSON 解析里「星期是从哪个键读出来的」的样本（最多 3 条，形如 xqj="6"）。
+     *
+     * 存在的原因：教务系统各家把星期放在不同字段，一旦整表挤到周六/周日，
+     * 只看「解析到 N 门课」无法判断是字段选错、还是值本身带偏移。界面把这几条打在进度里。
+     */
+    @Volatile
+    var lastDayNotes: List<String> = emptyList()
+
+    /**
+     * 教务系统设置的一周起始星期几（正方返回里的 qsxqj，1=周一…7=周日）。
+     *
+     * 拾光课程表的适配脚本里有同样的处理：qsxqj 缺失时按周一（1）算；学校若设成
+     * 周日为首，xqj 的 1 代表的就是周日，不旋转会把整张课表错位一周。
+     */
+    @Volatile
+    var lastWeekStartDay: Int = 1
+        private set
+
+    private var weekStartDay: Int = 1
+        private set
+
+    /** parseJsonSchedule 期间收集的「星期字段样本」，最多 3 条。 */
+    private val dayNotes = LinkedHashSet<String>()
+
     fun parseJsonSchedule(json: String): List<ParsedCourse> {
         val courses = mutableListOf<ParsedCourse>()
+        dayNotes.clear()
+        lastDayNotes = emptyList()
         try {
             val rootEl = JsonParser.parseString(json)
 
@@ -19,14 +46,21 @@ object ZhengfangScheduleParser {
                     addCourseFromJsonObj(obj, courses)
                 }
                 AcademicLog.d("ZhengfangSchedule", "JSON root array: parsed ${courses.size} courses")
+                lastDayNotes = dayNotes.toList()
                 return courses
             }
 
             if (!rootEl.isJsonObject) {
                 AcademicLog.w("ZhengfangSchedule", "JSON root is not object or array")
+                lastDayNotes = dayNotes.toList()
                 return courses
             }
             val root = rootEl.asJsonObject
+            weekStartDay = readWeekStartDay(root)
+            lastWeekStartDay = weekStartDay
+            if (weekStartDay != 1) {
+                AcademicLog.d("ZhengfangSchedule", "week starts on `` (qsxqj), days will be rotated")
+            }
 
             val allArrays = mutableListOf<com.google.gson.JsonArray>()
             findJsonArrays(root, allArrays)
@@ -67,10 +101,64 @@ object ZhengfangScheduleParser {
             }
             AcademicLog.d("ZhengfangSchedule",
                 "JSON parsed: ${courses.size} courses, rejected: name=$rejectedName day=$rejectedDay section=$rejectedSection")
+            mergeAdjacentBlocks(courses)
         } catch (e: Exception) {
             AcademicLog.e("ZhengfangSchedule", "JSON parse error: ${e.message}", e)
         }
+        mergeAdjacentBlocks(courses)
+        lastDayNotes = dayNotes.toList()
         return courses
+    }
+
+    /** 读一周起始日：正方把 qsxqj 放在 root 或 xsxx 里，缺失按周一（1）。 */
+    private fun readWeekStartDay(root: com.google.gson.JsonObject): Int {
+        val direct = oneOfInt(root, "qsxqj", "xqjStart", "firstDayOfWeek", "weekStartDay")
+        if (direct in 1..7) return direct
+        val xsxx = root.get("xsxx")
+        if (xsxx != null && xsxx.isJsonObject) {
+            val nested = oneOfInt(xsxx.asJsonObject, "qsxqj", "xqjStart", "firstDayOfWeek", "weekStartDay")
+            if (nested in 1..7) return nested
+        }
+        return 1
+    }
+
+    /**
+     * 合并「同一门课、同一教师、同一教室、同一周次」的相邻节次。
+     *
+     * 拾光课程表在适配脚本里也做同一件事：正方会把一门 1-2 节的课拆成两条（1 节、2 节各一条），
+     * 不合并的话课表上会出现上下两个紧贴的块，看起来像“挤在一起”。
+     * 只合并严格相邻（next.startSlot <= cur.endSlot + 1）的，中间有别的课就不动。
+     */
+    private fun mergeAdjacentBlocks(courses: MutableList<ParsedCourse>) {
+        if (courses.size < 2) return
+        val merged = mutableListOf<ParsedCourse>()
+        val used = BooleanArray(courses.size)
+        val order = courses.indices.sortedWith(compareBy({ courses[it].dayOfWeek }, { courses[it].startSlot }))
+        for (i in order) {
+            if (used[i]) continue
+            var cur = courses[i]
+            used[i] = true
+            for (j in order) {
+                if (used[j]) continue
+                val other = courses[j]
+                if (other.dayOfWeek != cur.dayOfWeek) continue
+                if (other.name != cur.name || other.teacher != cur.teacher || other.room != cur.room) continue
+                if (other.weeks != cur.weeks || other.weekType != cur.weekType) continue
+                if (other.startSlot > cur.endSlot + 1) continue
+                if (other.endSlot < cur.startSlot) continue
+                cur = cur.copy(
+                    startSlot = minOf(cur.startSlot, other.startSlot),
+                    endSlot = maxOf(cur.endSlot, other.endSlot),
+                )
+                used[j] = true
+            }
+            merged.add(cur)
+        }
+        if (merged.size != courses.size) {
+            AcademicLog.d("ZhengfangSchedule", "merged ${courses.size} → ${merged.size} blocks")
+        }
+        courses.clear()
+        courses.addAll(merged.sortedWith(compareBy({ it.dayOfWeek }, { it.startSlot })))
     }
 
     private fun findJsonArrays(node: JsonElement, result: MutableList<com.google.gson.JsonArray>) {
@@ -108,6 +196,8 @@ object ZhengfangScheduleParser {
         var teacher = ""
         var room = ""
         var day = 0
+        var dayKey = ""
+        var dayRaw = ""
         var startSecInt = 0
         var endSecInt = 0
         var weekStr = ""
@@ -123,6 +213,8 @@ object ZhengfangScheduleParser {
             }
             if (day == 0 && hasDayField(key, value)) {
                 day = safeInt(value)
+                dayKey = key
+                dayRaw = safeString(value) ?: ""
             }
             if (startSecInt == 0 && hasSectionField(key, value)) {
                 if (value.isJsonPrimitive && value.asJsonPrimitive.isNumber) {
@@ -161,15 +253,27 @@ object ZhengfangScheduleParser {
         if (teacher.isEmpty()) teacher = oneOf(obj, "xm", "jsxm", "teacher", "jsxx", "teacherName", "skjs", "teacher_name", "jsm")
         if (room.isEmpty()) room = oneOf(obj, "cdmc", "jsmc", "room", "classroom", "location", "skdd", "place", "classRoom")
         if (day == 0) day = oneOfInt(obj, "xqj", "xq", "day", "weekDay", "dayOfWeek", "xingqi", "xinqi")
-        if (day !in 1..7) {
-            val dayName = oneOf(obj, "xqjmc", "dayName")
-            day = when {
-                dayName.contains("一") -> 1; dayName.contains("二") -> 2
-                dayName.contains("三") -> 3; dayName.contains("四") -> 4
-                dayName.contains("五") -> 5; dayName.contains("六") -> 6
-                dayName.contains("日") || dayName.contains("天") -> 7
-                else -> day
+        // 星期名称优先：有的教务把 xqj 当「列号」用（表格里多一列节次就会整体右移一位），
+        // 而 xqjmc 是文字（"周三"），按文字算不会带偏移。数字仍是兜底。
+        val dayNameText = oneOf(obj, "xqjmc", "xqmc", "dayName", "weekName")
+        val dayFromName = dayOfWeekFromText(dayNameText)
+        if (dayFromName != null) {
+            if (day != dayFromName && day != 0) {
+                AcademicLog.d("ZhengfangSchedule", "day mismatch: xqj=$day but name='$dayNameText' → use $dayFromName")
             }
+            day = dayFromName
+            dayKey = if (dayKey.isEmpty()) "xqjmc" else dayKey + "+xqjmc"
+            dayRaw = if (dayRaw.isEmpty()) dayNameText else dayRaw + "/" + dayNameText
+        }
+        // 学校的「一周起始日」不是周一时，xqj 是按该日起算的列号，要旋转成周一=1。
+        if (weekStartDay in 2..7 && day in 1..7) {
+            val rotated = ((weekStartDay - 1 + (day - 1)) % 7) + 1
+            if (rotated != day) {
+                AcademicLog.d("ZhengfangSchedule", "day `` → `` (weekStart=``)")
+                dayKey = if (dayKey.isEmpty()) "qsxqj" else dayKey + "+qsxqj"
+                dayRaw = "``→``"
+            }
+            day = rotated
         }
         if (startSecInt == 0) startSecInt = oneOfInt(obj, "ksjc", "djj", "startSection", "startSec", "qsz", "qjz")
         if (endSecInt == 0) endSecInt = oneOfInt(obj, "jsjc", "endSection", "endSec", "jsz")
@@ -191,6 +295,8 @@ object ZhengfangScheduleParser {
             return "name"
         }
         if (day !in 1..7) {
+            // 诊断：把「哪个键给了什么值」写下来——同一门课挤到周六/周日时，这一行能直接指出字段
+            AcademicLog.d("ZhengfangSchedule", "day unresolved (day=$day key=$dayKey raw=$dayRaw): name='$name'")
             // 日期解析失败直接拒绝该课程，绝不 coerce 到周一（错误数据比无数据更伤信任）
             AcademicLog.d("ZhengfangSchedule", "Rejected (day=$day not in 1..7): name='$name' keys=$keySetStr")
             return "day"
@@ -212,6 +318,8 @@ object ZhengfangScheduleParser {
         val startSlot = rawStart.coerceIn(1, 12)
         val endSlot = rawEnd.coerceIn(startSlot, 12)
 
+        if (dayNotes.size < 3 && dayKey.isNotEmpty()) dayNotes.add(dayKey + "=" + dayRaw)
+        AcademicLog.d("ZhengfangSchedule", "day=$day (key=$dayKey raw=$dayRaw) name='$name'")
         val weeks = parseWeeks(weekStr)
         val weekType = computeWeekType(weeks)
 
@@ -233,6 +341,22 @@ object ZhengfangScheduleParser {
             kl.contains("course") && kl.contains("name") ||
             kl == "kcm" || kl.contains("kcmcview") || kl.contains("title") ||
             kl == "cn" || kl.contains("classname")
+    }
+
+    /** 把「周三」「星期三」「周三/周五」「3」这类文本解析成 1..7；认不出返回 null。 */
+    private fun dayOfWeekFromText(text: String): Int? {
+        val t = text.trim()
+        if (t.isEmpty()) return null
+        return when {
+            t.contains("一") -> 1
+            t.contains("二") -> 2
+            t.contains("三") -> 3
+            t.contains("四") -> 4
+            t.contains("五") -> 5
+            t.contains("六") -> 6
+            t.contains("日") || t.contains("天") -> 7
+            else -> t.firstOrNull { it in '1'..'7' }?.let { it - '0' }
+        }
     }
 
     private fun hasDayField(key: String, value: JsonElement?): Boolean {

@@ -1,6 +1,7 @@
 package com.pocket.xiaoli.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.ui.components.FieldActionChip
+import com.pocket.xiaoli.ui.components.rememberStaggeredMenu
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 
@@ -152,8 +154,14 @@ internal fun AddTodoForm(
         }
 
         if (state.courses.isNotEmpty() && state.usePicker) {
-            ExposedDropdownMenuBox(
+            // 课程列表可能很长（一学期的课全在这）：逐项错开出场，回收时最后一项先走
+            val courseReveal = rememberStaggeredMenu(
                 expanded = state.courseExpanded,
+                itemCount = state.courses.size + 2,
+                onClosed = { state.courseExpanded = false },
+            )
+            ExposedDropdownMenuBox(
+                expanded = courseReveal.menuExpanded,
                 onExpandedChange = { state.courseExpanded = it }
             ) {
                 OutlinedTextField(
@@ -170,29 +178,35 @@ internal fun AddTodoForm(
                     shape = RoundedCornerShape(skin.radiusChip)
                 )
                 ExposedDropdownMenu(
-                    expanded = state.courseExpanded,
-                    onDismissRequest = { state.courseExpanded = false }
+                    expanded = courseReveal.menuExpanded,
+                    onDismissRequest = courseReveal.close
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("不关联课程", fontWeight = FontWeight.Medium) },
-                        onClick = { state.course = ""; state.courseExpanded = false }
-                    )
-                    HorizontalDivider()
-                    state.courses.forEach { name ->
+                    Box(courseReveal.itemModifier(0)) {
                         DropdownMenuItem(
-                            text = { Text(name, fontWeight = FontWeight.Medium) },
-                            onClick = { state.course = name; state.courseExpanded = false }
+                            text = { Text("不关联课程", fontWeight = FontWeight.Medium) },
+                            onClick = { state.course = ""; state.courseExpanded = false }
                         )
                     }
                     HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("+ 自定义输入", color = colors.accentMain, fontSize = 13.sp) },
-                        onClick = {
-                            state.usePicker = false
-                            state.course = ""
-                            state.courseExpanded = false
+                    state.courses.forEachIndexed { index, name ->
+                        Box(courseReveal.itemModifier(index + 1)) {
+                            DropdownMenuItem(
+                                text = { Text(name, fontWeight = FontWeight.Medium) },
+                                onClick = { state.course = name; state.courseExpanded = false }
+                            )
                         }
-                    )
+                    }
+                    HorizontalDivider()
+                    Box(courseReveal.itemModifier(state.courses.size + 1)) {
+                        DropdownMenuItem(
+                            text = { Text("+ 自定义输入", color = colors.accentMain, fontSize = 13.sp) },
+                            onClick = {
+                                state.usePicker = false
+                                state.course = ""
+                                state.courseExpanded = false
+                            }
+                        )
+                    }
                 }
             }
         } else {

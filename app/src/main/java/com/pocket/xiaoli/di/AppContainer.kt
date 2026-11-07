@@ -944,32 +944,72 @@ class AppContainer(context: Context) {
     private val _academicSchoolId = MutableStateFlow(prefs.getString("academic_school_id", null))
     val academicSchoolId: StateFlow<String?> = _academicSchoolId
 
-    // ── 宿舍绑定（按校区本地保存）──
-    private val _dormInfo = MutableStateFlow(dormCampusIdOrNull()?.let { loadDormInfo(it) })
+    // ── 宿舍绑定（独立于学籍校：一个学校多个校区，也可能 A 校学生住 B 校宿舍）──
+    //
+    // 存储分两半：`dorm_owner_campus` 记住**这份宿舍属于哪个生活区/校区**，`dorm_<校区 id>`
+    // 存楼栋房间。读的时候先看 owner，再回退「本校该用的校区」——这样换学籍校、换校区
+    // 都不会把宿舍弄丢，也不会拿别人的房间号去查电费。
+    private val _dormInfo = MutableStateFlow(dormOwnerCampusId()?.let { loadDormInfo(it) })
     val dormInfo: StateFlow<DormInfo?> = _dormInfo
 
     private fun dormPrefKey(campusId: String) = "dorm_$campusId"
 
-    /**
-     * 当前学校名下**可以存宿舍的校区** id；未收录的学校返回 null。
-     *
-     * ## 为什么不能退回默认校区
-     *
-     * 宿舍是按校区存（`dorm_ytlg_main`）的，而 [selectedCampus] 对学校没收录时会静默
-     * 回退到烟台理工本校区。改造前山东理工的学生绑宿舍，写进去的是 `dorm_ytlg_main` ——
-     * 电费页于是拿**别人的宿舍编号**去查别人的账户，看到的可能是别人的余额。
-     * 少一个入口可以接受，给错数据不行（与服务页 [currentSchoolHasCampusConfig] 同一条纪律）。
-     */
-    private fun dormCampusIdOrNull(): String? = campusForCurrentSchool()?.id
+    /** 老存档的 owner 迁移只做一次（进程内），见 [migrateLegacyDormOwner]。 */
+    private var dormOwnerMigrated = false
+
+    /** 宿舍绑定属于哪个校区（生活区）。空 = 没绑过，此时按本校默认校区猜。 */
+    private fun dormOwnerCampusId(): String? =
+        prefs.getString(DORM_OWNER_KEY, null)?.let { id -> CampusConfig.byIdOrNull(id)?.id }
+            ?: migrateLegacyDormOwner()
+            ?: currentSchoolCampus()?.id
 
     /**
-     * 这个校区是不是**当前学校**名下的（多校区学校要逐个校区判，不能只看第一个）。
+     * 老存档迁移：解耦之前宿舍键是 `dorm_<校区 id>`，没有 owner。
      *
-     * [dormCampusIdOrNull] 只给出学校的第一校区，而「我的 → 校区」可以选到同校的另一个校区；
-     * 那条路径要按**选中的校区**读宿舍，所以单独给一个判据。
+     * 挑**第一个已绑定**的校区记成 owner（按 [CampusConfig.campuses] 的顺序，保证同一份存档
+     * 每次迁移结果一致），旧键**不删**：迁移判断错了还能回退，而且解绑只清 owner 指向的那份。
+     * 只跑一次（[dormOwnerMigrated]）。
      */
-    private fun isCampusOfCurrentSchool(campus: CampusInfo): Boolean =
-        campus.schoolId != null && campus.schoolId == currentAcademicSchool()?.id
+    private fun migrateLegacyDormOwner(): String? {
+        if (dormOwnerMigrated) return null
+        dormOwnerMigrated = true
+        val candidate = CampusConfig.campuses
+            .map { it.id }
+            .firstOrNull { id -> loadDormInfo(id) != null }
+        if (candidate != null) {
+            prefs.edit().putString(DORM_OWNER_KEY, candidate).apply()
+        }
+        return candidate
+    }
+
+    /**
+     * 宿舍现在挂在哪个生活区（校区）；没绑过时返回「本校该用的校区」。
+     *
+     * 宿舍与学籍校**是两件事**：烟台理工有本校区/新校区，A 校学生也可能住 B 校宿舍
+     * （考研公寓、跨校借宿）。所以读宿舍只看 `dorm_owner_campus`，
+     * 学校切换不再影响它（2026-11-06 用户要求解耦）。
+     */
+    fun dormOwnerCampus(): CampusInfo? = dormOwnerCampusId()?.let { CampusConfig.byIdOrNull(it) }
+
+    /**
+     * 「本校该用哪个校区」——宿舍、电费、洗衣这类**按校区存**的东西必须用它，而不是
+     * [campusForCurrentSchool]（那永远给学校的第一校区）。
+     *
+     * ## 为什么不能只用第一校区（2026-11-06 修的线上问题）
+     *
+     * 烟台理工有两个校区（`ytlg_main` 本校区 / `ytlg_new` 新校区），宿舍存档的键是
+     * `dorm_<校区 id>`。改造时把绑定页的校区从"用户选的那个"换成了"学校第一个"，
+     * 于是新校区的学生读到的永远是 `dorm_ytlg_main`：填好保存、回到清单还是"未绑定"，
+     * 用户看到的就是「宿舍绑定不了了」。
+     *
+     * 判据：**用户选中的校区属于当前学校就用它**，否则（没选过、或选中的是别的学校的档）
+     * 退回学校的第一校区 —— 后者是"未收录学校"那条纪律所需要的 null 语义。
+     */
+    fun currentSchoolCampus(): CampusInfo? =
+        pickCurrentSchoolCampus(currentAcademicSchool()?.id, _selectedCampus.value)
+
+    /** 这个校区是否是**已收录**的生活区（能存宿舍）；未收录/在建的一律不接受。 */
+    private fun isKnownCampus(campus: CampusInfo): Boolean = !campus.underConstruction
 
     private fun loadDormInfo(campusId: String): DormInfo? {
        val raw = prefs.getString(dormPrefKey(campusId), null) ?: return null
@@ -986,13 +1026,19 @@ class AppContainer(context: Context) {
     fun dormInfoFor(campusId: String): DormInfo? = loadDormInfo(campusId)
 
     /**
-     * 保存指定校区的宿舍绑定；[dormCode] 是缴费系统用的宿舍编号（见 [DormInfo.dormCode]）。
+     * 保存宿舍绑定，并把它记成「属于 [campusId] 这个生活区」。
      *
-     * ⚠️ 只允许写**当前学校名下的校区**：改造前绑定页把 `campusId` 一路传到这里，而那个值
-     * 来自 [selectedCampus] 借用的默认校区，于是未收录学校的宿舍被存进 `dorm_ytlg_main`。
-     * 判据落在数据层而不是只落在界面，是因为漏一个调用点就等于又把键写错。
+     * ## 为什么不再限制「必须是本校校区」（2026-11-06 解耦）
      *
-     * @return 是否落盘；false = 这个校区不属于当前学校（调用方据此说实话）。
+     * 用户提出两种真实情况：一个学校多个校区（本/新校区宿舍归不同生活区），
+     * 以及 **A 校学生住 B 校宿舍**（考研公寓、跨校借宿、联合培养）。
+     * 宿舍本质上是「我住哪」，与「我在哪上学」无关，所以这里只校验校区**存在且已收录**，
+     * 不再校验它属于哪个学校。
+     *
+     * 写入时同步刷新 `dorm_owner_campus`：读路径只认这一个键，因此换学籍校不会丢宿舍；
+     * 解绑时若它指向这个校区就一并清掉，避免留下一份指向空档的 owner。
+     *
+     * @return 是否落盘；false = 校区不存在或在建（调用方据此说实话）。
      */
     fun setDormInfoFor(
        campusId: String,
@@ -1002,7 +1048,7 @@ class AppContainer(context: Context) {
        dormCode: String = "",
     ): Boolean {
        val campus = CampusConfig.byIdOrNull(campusId) ?: return false
-       if (!isCampusOfCurrentSchool(campus)) return false
+       if (!isKnownCampus(campus)) return false
        val info = DormInfo(
            building = building.trim(),
            room = room.trim(),
@@ -1010,12 +1056,17 @@ class AppContainer(context: Context) {
            dormCode = dormCode.trim(),
        )
        val edit = prefs.edit()
-       if (info.isBound) edit.putString(dormPrefKey(campus.id), gson.toJson(info))
-       else edit.remove(dormPrefKey(campus.id))
-       edit.apply()
-       if (campus.id == _selectedCampus.value.id) {
-           _dormInfo.value = info.takeIf { it.isBound }
+       if (info.isBound) {
+           edit.putString(dormPrefKey(campus.id), gson.toJson(info))
+           // 记住「这份宿舍属于哪个生活区」——读路径只认它，换学校/换校区都不会漂
+           edit.putString(DORM_OWNER_KEY, campus.id)
+       } else {
+           edit.remove(dormPrefKey(campus.id))
+           if (prefs.getString(DORM_OWNER_KEY, null) == campus.id) edit.remove(DORM_OWNER_KEY)
        }
+       edit.apply()
+       // 宿舍与「教务页选的校区」已无关，落库后按 owner 重读一遍
+       _dormInfo.value = dormOwnerCampusId()?.let { loadDormInfo(it) }
        return true
     }
 
@@ -1023,9 +1074,11 @@ class AppContainer(context: Context) {
        val campus = CampusConfig.byId(id)
        if (campus.underConstruction) return
        _selectedCampus.value = campus
-       // 宿舍存档按**校区**存，但只有属于当前学校的那些校区才是他的宿舍；
-       // 借来的默认校区一律读成 null，否则未收录学校会顶着烟台理工的楼栋跑。
-       _dormInfo.value = if (isCampusOfCurrentSchool(campus)) loadDormInfo(campus.id) else null
+       // 宿舍是**独立绑定**：换教务页上的校区不再清空它（2026-11-06 解耦）。
+       // 只有从来没绑过宿舍时，才跟着本校默认校区给一个预选值。
+       if (prefs.getString(DORM_OWNER_KEY, null) == null) {
+           _dormInfo.value = loadDormInfo(campus.id)
+       }
        prefs.edit().putString("selected_campus_id", campus.id).apply()
     }
 
@@ -1118,13 +1171,10 @@ class AppContainer(context: Context) {
         // 教师 / 学期快照 / 调课 / 时间段的主键是业务键，跨校会互相覆盖；
         // 它们都能重算，所以换校时清空重种，而不是并存。
         runCatching { PocketXiaoliDatabase.resetPerSchoolCaches(app, school.id) }
-        CampusConfig.forSchoolId(school.id)?.let { setSelectedCampus(it.id) }
-        // ⚠️ 宿舍必须**无条件**跟着学校重读一遍。上面那路只有"这所学校配了校区"才会走
-        // `setSelectedCampus`，而换到没收录的学校时它直接被跳过 —— 于是烟台理工绑的宿舍
-        // 留在 `_dormInfo` 里继续被消费：首页低余额提醒拿别人的房间号去查账单，
-        // 查回来的数字还会挂在这名学生眼前。冷启动不会有这个问题（初值就按学校读），
-        // 只有"在同一台设备上换学校"这条路会踩到，所以只能靠这条断言/这段代码守。
-        _dormInfo.value = dormCampusIdOrNull()?.let { loadDormInfo(it) }
+        currentSchoolCampus()?.let { setSelectedCampus(it.id) }
+        // 宿舍是**独立绑定**（2026-11-06 解耦）：换学校**不再清空**它，只按 owner 重读一遍。
+        // A 校学生住 B 校宿舍是真实情况（考研公寓/跨校借宿），宿舍跟着学籍校变反而是错的。
+        _dormInfo.value = dormOwnerCampusId()?.let { loadDormInfo(it) }
         setSchool(school.name)
 
         val schemes = repository.allSchemes.first()
@@ -1785,6 +1835,24 @@ class AppContainer(context: Context) {
 
 }
 
+/**
+ * 「本校该用哪个校区」的判据（纯函数，好测）。
+ *
+ * 规则只有一条：**用户选中的校区属于当前学校就用它**，否则退回学校的第一校区。
+ *
+ * ## 为什么值得单独钉住
+ *
+ * 烟台理工有两个校区（`ytlg_main` 本校区 / `ytlg_new` 新校区），宿舍存档按校区 id 分开。
+ * 2026-11-06 用户报「宿舍绑定不了」的根因就是这里被简化成"永远取学校第一个校区"：
+ * 新校区的学生把宿舍填好保存，回来读的还是 `dorm_ytlg_main` —— 界面永远显示未绑定。
+ * 守卫见 `SchoolCampusPickTest`。
+ */
+internal fun pickCurrentSchoolCampus(schoolId: String?, selected: CampusInfo?): CampusInfo? {
+    if (schoolId == null) return null
+    if (selected != null && selected.schoolId == schoolId) return selected
+    return CampusConfig.forSchoolId(schoolId)
+}
+
 /** SharedPreferences key：内置 POI 已播种到的版本 */
 private const val KEY_POI_SEED_VERSION = "poi_seed_version"
 
@@ -1839,3 +1907,11 @@ private const val KEY_HOME_MODULE_ORDER = "home_module_order"
 /** SharedPreferences key：首页隐藏模块 key 集合 */
 private const val KEY_HIDDEN_HOME_MODULES = "hidden_home_modules"
 private const val KEY_NOTES = "notes_json"
+
+/**
+ * SharedPreferences key：宿舍绑定属于哪个**生活区/校区**。
+ *
+ * 宿舍与学籍校解耦（2026-11-06）：一个学校多个校区，A 校学生也可能住 B 校宿舍，
+ * 所以「我住哪」单独记一份，读宿舍只认它，换学校/换校区都不会把它弄丢。
+ */
+private const val DORM_OWNER_KEY = "dorm_owner_campus"

@@ -60,6 +60,15 @@ data class UsageStats(
     val perDayYuan: Double? = null,
     val daysUntilEmpty: Int? = null,
     val daysUntilThreshold: Int? = null,
+    /**
+     * 最后一条采样的余额**已经在提醒线以下**。
+     *
+     * 为什么单独一个布尔而不是"天数 = 0"：0 有两种完全不同的意思 ——
+     * "已经越线了"和"还没越线，但不到一天就要越线"。
+     * 截图验收时抓到过一次把两者混起来：余额 14 元、线在 10 元，
+     * 卡片却写着「已经低于提醒线」，而同一屏的大字是 14.00 元 —— 自己跟自己矛盾。
+     */
+    val belowLowBalance: Boolean = false,
 ) {
     /** 至少两个点、且跨了一天以上，才谈得上"走势"。 */
     val plottable: Boolean get() = points.size >= 2 && spanDays >= 1
@@ -146,7 +155,20 @@ fun usageStatsOf(
         } else {
             projectedDays(current - lowBalanceThreshold, perDay)
         },
+        belowLowBalance = current + MONEY_EPSILON < lowBalanceThreshold,
     )
+}
+
+/**
+ * "几天后"那句话的说法。**不足一天要说"不到 1 天"而不是"约 0 天"** ——
+ * 向下取整是为了不吹满话（说 4 天而第 4 天中途断电），
+ * 但取整到 0 之后必须换个说法，否则读起来像"现在就没电了"。
+ */
+fun daysPhrase(days: Int?, alreadyBelow: Boolean = false): String = when {
+    alreadyBelow -> "已经低于提醒线"
+    days == null -> "算不出（没有稳定用量）"
+    days == 0 -> "不到 1 天"
+    else -> "约 $days 天"
 }
 
 /**
@@ -221,17 +243,18 @@ fun usageNotice(stats: UsageStats): String? = when {
 internal fun usageStatLines(usage: UsageStats, threshold: Double): List<Pair<String, String>> =
     listOf<Pair<String, String>>(
         "日均花费" to (usage.perDayYuan?.let { "约 %.2f 元 / 天".format(it) } ?: "看不出来"),
-        "还能用" to (usage.daysUntilEmpty?.let { "约 $it 天" } ?: "算不出（没有稳定用量）"),
-        "距提醒线 %.0f 元".format(threshold) to when {
-            usage.daysUntilThreshold == null -> "算不出"
-            usage.daysUntilThreshold == 0 -> "已经低于提醒线"
-            else -> "约 ${usage.daysUntilThreshold} 天"
-        },
+        "还能用" to daysPhrase(usage.daysUntilEmpty),
+        "距提醒线 %.0f 元".format(threshold) to daysPhrase(usage.daysUntilThreshold, usage.belowLowBalance),
     )
 
-/** 脚注：窗口、天数、充值怎么处理 —— 一句话把口径说完。 */
+/**
+ * 脚注：天数、窗口、充值怎么处理 —— 一句话把口径说完。
+ *
+ * ⚠️ 这里说「N 天的余额记录」而不是「最近 N 天」：`observedDays` 是**有记录的天数**，
+ * 中间可能断了好几天（没查就没有），写成"最近 8 天"会让人以为这 8 天是连续的。
+ */
 internal fun usageFootnote(usage: UsageStats): String {
-    val base = "按本机最近 ${usage.observedDays} 天余额记录推算（窗口 ${USAGE_WINDOW_DAYS} 天），不是后勤系统给的数据"
+    val base = "按本机 ${usage.observedDays} 天余额记录推算（最近 $USAGE_WINDOW_DAYS 天窗口），不是后勤系统给的数据"
     val recharges = usage.rechargeDays.size
     return if (recharges > 0) {
         "$base；期间有 $recharges 天余额上涨（充值），这些天不计入用量"

@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.data.entity.GoodItemEntity
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.rememberStaggeredMenu
 import com.pocket.xiaoli.ui.components.ServiceEmptyCard
 import com.pocket.xiaoli.ui.components.ServiceHeroBadge
 import com.pocket.xiaoli.ui.components.ServiceHeroCard
@@ -603,8 +604,9 @@ private fun AddGoodItemDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accentMain, cursorColor = colors.accentMain)
                 )
+                val catReveal = rememberStaggeredMenu(catExpanded, categories.size) { catExpanded = false }
                 ExposedDropdownMenuBox(
-                    expanded = catExpanded,
+                    expanded = catReveal.menuExpanded,
                     onExpandedChange = { catExpanded = it }
                 ) {
                     OutlinedTextField(
@@ -617,9 +619,11 @@ private fun AddGoodItemDialog(
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accentMain)
                     )
-                    ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
-                        categories.forEach { c ->
-                            DropdownMenuItem(text = { Text(c) }, onClick = { category = c; catExpanded = false })
+                    ExposedDropdownMenu(expanded = catReveal.menuExpanded, onDismissRequest = catReveal.close) {
+                        categories.forEachIndexed { index, c ->
+                            Box(catReveal.itemModifier(index)) {
+                                DropdownMenuItem(text = { Text(c) }, onClick = { category = c; catExpanded = false })
+                            }
                         }
                     }
                 }

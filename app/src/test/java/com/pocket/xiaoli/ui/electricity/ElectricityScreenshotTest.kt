@@ -218,6 +218,9 @@ class ElectricityScreenshotTest {
         composeRule.onNodeWithText("清空").assertExists()
         // 口径必须在卡上：这几行是推算，不是后勤给的读数
         composeRule.onNodeWithText(usageFootnote(usage), substring = true).assertExists()
+        // 14 元、线在 10 元：**不许**说"已经低于提醒线"（第一版就在这里自相矛盾）
+        composeRule.onNodeWithText("已经低于提醒线").assertDoesNotExist()
+        composeRule.onNodeWithText("不到 1 天").assertExists()
     }
 
     /**

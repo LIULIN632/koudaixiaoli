@@ -427,6 +427,8 @@ class AccountBindingScreenshotTest {
                 casStudentId = if (case.casBound) "2023123456789" else "",
                 portalLoggedIn = case.portalLoggedIn,
                 dormLabel = case.dormLabel,
+                // 宿舍与学籍校解耦后，绑定态会把生活区写在前面（真实页里来自 dormOwnerCampus）
+                dormAreaLabel = if (case.dormLabel != null) "烟台理工本校区" else null,
                 cardBound = case.cardBound,
                 onNavigate = {},
             )

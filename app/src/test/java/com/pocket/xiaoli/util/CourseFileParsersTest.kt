@@ -246,6 +246,21 @@ class CourseFileParsersTest {
     }
 
     @Test
+    fun `备份里缺坐标的行被跳过而不是落到第 0 节`() {
+        // 这三行都缺星期或节次。写进去的话课程会画在网格上方（节次 0 ⇒ y 为负），
+        // 剩下的课叠成一坨，而导入条数看着正常 —— 所以「缺什么都只当没有那门课」。
+        val json = """{"version":2,"courses":[
+            {"name":"高等数学","dayOfWeek":1,"startSlot":1,"endSlot":2},
+            {"name":"大学英语","startSlot":3,"endSlot":4},
+            {"name":"体育","dayOfWeek":8,"startSlot":1,"endSlot":2},
+            {"name":"实验课","dayOfWeek":2,"endSlot":4}
+        ]}"""
+        val parsed = CourseFileParsers.backup(json, 0L)
+        assertEquals(1, parsed.size)
+        assertEquals("高等数学", parsed[0].name)
+    }
+
+    @Test
     fun `损坏的 JSON 返回空列表而不是抛异常`() {
         assertTrue(CourseFileParsers.backup("{不是json", 0L).isEmpty())
         assertTrue(CourseFileParsers.backup("[1,2,3]", 0L).isEmpty())

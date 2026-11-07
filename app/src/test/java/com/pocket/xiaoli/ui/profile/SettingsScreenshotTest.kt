@@ -221,6 +221,48 @@ class SettingsScreenshotTest {
     }
 
     /**
+     * 开源许可清单整页。
+     *
+     * 这张图守三件事：① 清单真的渲染出条目（不是一张"加载中"的空页）；
+     * ② 按许可证分组的分区标题在；③ 深色/浅色下卡片与坐标小字都读得清。
+     * 条目内容由 `data/legal/OssLicenses.kt` 决定，`OssLicensesTest` 管它跟依赖不脱节。
+     */
+    @Test
+    fun `开源许可清单整页截图`() {
+        composeRule.setContent {
+            PocketXiaoliTheme(
+                appearanceMode = AppearanceMode.RAINBOW,
+                skinStyle = SkinStyle.VIVID,
+                darkTheme = false,
+            ) {
+                CompositionLocalProvider(LocalProfileRowPadding provides 14.dp) {
+                    MiuixSettingsScaffold(
+                        title = "开源许可",
+                        onBack = {},
+                        manageStatusBar = true,
+                    ) { padding ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                                .background(LocalPocketXiaoliColors.current.surfaceBase)
+                                .verticalScroll(rememberScrollState())
+                                .padding(
+                                    horizontal = LocalSkin.current.spaceLg,
+                                    vertical = 12.dp,
+                                ),
+                        ) {
+                            LicensesContent()
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onRoot().captureRoboImage("src/test/screenshots/177-settings-licenses.png")
+    }
+
+    /**
      * 「设置 → 更新」整页，按**检查结果**拍三张（常态 / 有新版·内测 / 这一轮没查上）。
      *
      * 这一页 2026-10-28 重排过：动作（检查更新、更新日志）提到第一张卡，三个开关归进

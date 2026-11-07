@@ -29,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
@@ -216,8 +217,12 @@ fun TimetableScreen(
     // ⚠️ 同理提到 early return 之前：`LaunchedEffect` 属于"按槽位记账"的调用，
     // 打开/关闭学期设置页时它会插入或消失，导致同一 Composable 的调用数量前后不一致。
     LaunchedEffect(Unit) {
-        if (timeSlots.isEmpty()) {
-            (context.applicationContext as PocketXiaoliApplication).repository.initTimeSlots()
+        // 时间段表读空时补默认节次表（写回数据库，让小组件/提醒/导出也拿得到节次时间）。
+        // ⚠️ 判空必须读 Flow 的**第一次真实发射**，不能读 `viewModel.allTimeSlots.value`：
+        // 那个 StateFlow 的初值本来就是空表，数据库还没回话时它也是"空" —— 于是每次进课表页
+        // 都会把 12 行默认时间 REPLACE 回表里，用户在「节次管理」改过的时间被悄悄覆盖。
+        if (app.repository.allTimeSlots.first().isEmpty()) {
+            app.repository.initTimeSlots()
         }
         viewModel.goToToday()
     }
@@ -574,6 +579,9 @@ fun TimetableScreen(
                         // 看起来也就是"tab 后面多了一块白板"。改成把留白交给网格内部的滚动内容。
                         bottomContentPadding = LocalBottomBarInset.current,
                         onCourseClick = { viewModel.openEditEditor(it) },
+                        // 点格子里的教室 → 教室分布图（`room_layout?q=教室名`，按名查楼层与位置）。
+                        // 与「全屏地图」里那条 `onOpenRoomLayout("")` 是同一个出口，只是带上教室名。
+                        onRoomClick = onOpenRoomLayout,
                         onEmptyCellClick = { day, slot -> viewModel.openAddEditor(day, slot) },
                         onCourseMoved = { ids, dayDelta, slotDelta ->
                             if (!hasDayRemap) {

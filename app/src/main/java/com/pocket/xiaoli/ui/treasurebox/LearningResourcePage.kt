@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.rememberStaggeredMenu
 import com.pocket.xiaoli.ui.components.ServiceEmptyCard
 import com.pocket.xiaoli.ui.components.ServiceHeroBadge
 import com.pocket.xiaoli.ui.components.ServiceHeroCard
@@ -476,8 +477,15 @@ private fun AddResourceDialog(
                 verticalArrangement = Arrangement.spacedBy(skin.spaceSm)
             ) {
                 // Subject dropdown
-                ExposedDropdownMenuBox(
+                // 学科是最长的列表（12 项）：逐项错开出场，收回时最后一项先走
+                val subjectItems = SUBJECTS.filter { it != "自定义" }
+                val subjectReveal = rememberStaggeredMenu(
                     expanded = subjectExpanded,
+                    itemCount = subjectItems.size + 1,
+                    onClosed = { subjectExpanded = false },
+                )
+                ExposedDropdownMenuBox(
+                    expanded = subjectReveal.menuExpanded,
                     onExpandedChange = { subjectExpanded = it }
                 ) {
                     OutlinedTextField(
@@ -489,11 +497,15 @@ private fun AddResourceDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectExpanded) },
                         singleLine = true
                     )
-                    ExposedDropdownMenu(expanded = subjectExpanded, onDismissRequest = { subjectExpanded = false }) {
-                        SUBJECTS.filter { it != "自定义" }.forEach { s ->
-                            DropdownMenuItem(text = { Text(s) }, onClick = { subject = s; subjectExpanded = false })
+                    ExposedDropdownMenu(expanded = subjectReveal.menuExpanded, onDismissRequest = subjectReveal.close) {
+                        subjectItems.forEachIndexed { index, s ->
+                            Box(subjectReveal.itemModifier(index)) {
+                                DropdownMenuItem(text = { Text(s) }, onClick = { subject = s; subjectExpanded = false })
+                            }
                         }
-                        DropdownMenuItem(text = { Text("自定义") }, onClick = { subject = "自定义"; subjectExpanded = false })
+                        Box(subjectReveal.itemModifier(subjectItems.size)) {
+                            DropdownMenuItem(text = { Text("自定义") }, onClick = { subject = "自定义"; subjectExpanded = false })
+                        }
                     }
                 }
 
@@ -518,36 +530,51 @@ private fun AddResourceDialog(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
                     var dayExpanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = dayExpanded, onExpandedChange = { dayExpanded = it }, modifier = Modifier.weight(1f)) {
+                    val dayReveal = rememberStaggeredMenu(dayExpanded, weekdays.size) { dayExpanded = false }
+                    ExposedDropdownMenuBox(expanded = dayReveal.menuExpanded, onExpandedChange = { dayExpanded = it }, modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
                             value = weekdays[dayOfWeek - 1], onValueChange = {}, readOnly = true,
                             label = { Text("星期") }, singleLine = true,
                             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
-                        ExposedDropdownMenu(expanded = dayExpanded, onDismissRequest = { dayExpanded = false }) {
-                            weekdays.forEachIndexed { i, d -> DropdownMenuItem(text = { Text(d) }, onClick = { dayOfWeek = i + 1; dayExpanded = false }) }
+                        ExposedDropdownMenu(expanded = dayReveal.menuExpanded, onDismissRequest = dayReveal.close) {
+                            weekdays.forEachIndexed { i, d ->
+                                Box(dayReveal.itemModifier(i)) {
+                                    DropdownMenuItem(text = { Text(d) }, onClick = { dayOfWeek = i + 1; dayExpanded = false })
+                                }
+                            }
                         }
                     }
                     var sExp by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = sExp, onExpandedChange = { sExp = it }, modifier = Modifier.weight(1f)) {
+                    val sReveal = rememberStaggeredMenu(sExp, 12) { sExp = false }
+                    ExposedDropdownMenuBox(expanded = sReveal.menuExpanded, onExpandedChange = { sExp = it }, modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
                             value = "第${startSlot}节", onValueChange = {}, readOnly = true,
                             label = { Text("开始节") }, singleLine = true,
                             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
-                        ExposedDropdownMenu(expanded = sExp, onDismissRequest = { sExp = false }) {
-                            (1..12).forEach { s -> DropdownMenuItem(text = { Text("第${s}节") }, onClick = { startSlot = s; if (endSlot < s) endSlot = s; sExp = false }) }
+                        ExposedDropdownMenu(expanded = sReveal.menuExpanded, onDismissRequest = sReveal.close) {
+                            (1..12).forEachIndexed { index, s ->
+                                Box(sReveal.itemModifier(index)) {
+                                    DropdownMenuItem(text = { Text("第${s}节") }, onClick = { startSlot = s; if (endSlot < s) endSlot = s; sExp = false })
+                                }
+                            }
                         }
                     }
                     var eExp by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded = eExp, onExpandedChange = { eExp = it }, modifier = Modifier.weight(1f)) {
+                    val eReveal = rememberStaggeredMenu(eExp, 12 - startSlot + 1) { eExp = false }
+                    ExposedDropdownMenuBox(expanded = eReveal.menuExpanded, onExpandedChange = { eExp = it }, modifier = Modifier.weight(1f)) {
                         OutlinedTextField(
                             value = "第${endSlot}节", onValueChange = {}, readOnly = true,
                             label = { Text("结束节") }, singleLine = true,
                             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                         )
-                        ExposedDropdownMenu(expanded = eExp, onDismissRequest = { eExp = false }) {
-                            (startSlot..12).forEach { s -> DropdownMenuItem(text = { Text("第${s}节") }, onClick = { endSlot = s; eExp = false }) }
+                        ExposedDropdownMenu(expanded = eReveal.menuExpanded, onDismissRequest = eReveal.close) {
+                            (startSlot..12).forEachIndexed { index, s ->
+                                Box(eReveal.itemModifier(index)) {
+                                    DropdownMenuItem(text = { Text("第${s}节") }, onClick = { endSlot = s; eExp = false })
+                                }
+                            }
                         }
                     }
                 }

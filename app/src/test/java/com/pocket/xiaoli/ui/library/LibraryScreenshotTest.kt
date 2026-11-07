@@ -10,6 +10,9 @@ import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
 import androidx.compose.runtime.CompositionLocalProvider
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.pocket.xiaoli.data.courseware.Courseware
+import com.pocket.xiaoli.data.courseware.CoursewareRef
+import com.pocket.xiaoli.data.courseware.CoursewareRow
 import com.pocket.xiaoli.data.library.LibraryFile
 import com.pocket.xiaoli.ui.theme.AppearanceMode
 import com.pocket.xiaoli.ui.theme.PocketXiaoliTheme
@@ -103,6 +106,8 @@ class LibraryScreenshotTest {
                     LibraryContent(
                         ui = LibraryUi(
                             files = files,
+                            // 互动课件：两门包内自带，一块排在最上面，不用下载。
+                            coursewares = Courseware.entries.map { CoursewareRow(ref = CoursewareRef.of(it)) },
                             subjects = listOf("计算机", "数学"),
                             // 一条正在下载：尾部显示 42%，其余显示下载图标或「待上传」。
                             busyId = "ds-exam-2023",

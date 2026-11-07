@@ -93,6 +93,10 @@ import com.pocket.xiaoli.ui.proactive.ProactiveBubbleView
 import com.pocket.xiaoli.ui.home.GlobalSearchScreen
 import com.pocket.xiaoli.ui.home.NotificationScreen
 import com.pocket.xiaoli.ui.home.HomeScreen
+import com.pocket.xiaoli.data.courseware.Courseware
+import com.pocket.xiaoli.data.courseware.CoursewareRef
+import com.pocket.xiaoli.data.courseware.CoursewareRepository
+import com.pocket.xiaoli.ui.courseware.CoursewareScreen
 import com.pocket.xiaoli.ui.library.LibraryScreen
 import com.pocket.xiaoli.ui.quickanswer.QuickAnswerScreen
 import com.pocket.xiaoli.ui.import_.FileImportScreen
@@ -827,7 +831,23 @@ fun AppNavigation(initialDeepLink: String? = null) {
                 LibraryScreen(
                     repository = container.libraryRepository,
                     onBack = { navController.popBackStack() },
+                    onOpenCourseware = { ref -> navController.navigate("courseware/${ref.id}") },
                 )
+            }
+
+            // 互动课件单独一条路由：以前它只是服务页的一个子状态，资料站里点不到。
+            // 课件 ref 先按仓库里的清单找（远端包要用到包信息），找不到再退回包内枚举。
+            composable("courseware/{id}") { entry ->
+                val id = entry.arguments?.getString("id").orEmpty()
+                val ref = remember(id) {
+                    CoursewareRepository.state.value.rows.firstOrNull { it.ref.id == id }?.ref
+                        ?: Courseware.fromId(id)?.let { CoursewareRef.of(it) }
+                }
+                if (ref != null) {
+                    CoursewareScreen(item = ref, onBack = { navController.popBackStack() })
+                } else {
+                    LaunchedEffect(id) { navController.popBackStack() }
+                }
             }
 
             // 快问快答：老师每章的提问 + 答案要点。题库先读内置资源，再被远端覆盖。

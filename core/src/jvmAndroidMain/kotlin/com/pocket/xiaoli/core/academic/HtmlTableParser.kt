@@ -94,6 +94,37 @@ fun filterBodyRows(
     return bodyRows to rowSlotRanges
 }
 
+/**
+ * 把「表格里的第几列」换成「星期几」。
+ *
+ * 只信 `dayMap` 是不够的 —— 真实教务页面里表头和数据行的列数经常对不上
+ * （表头把"时间/节次"合成一格、正文却是两列；或者表头带 colspan）。
+ * 以前两个解析器在这种情况下都靠 `col.coerceIn(1, 7)` 兜底，于是**所有列都往右挤**：
+ * 第 8 列、第 9 列一律变成周日，用户看到的就是"课程全挤在最右几格"（2026-11-06 报障）。
+ *
+ * 现在的口径：
+ * 1. 先认 `dayMap`（表头给出的绝对列号，以及减掉 colOffset 的旧口径）；
+ * 2. 认不出来就按"第一列星期之前有几列是表头"推算（dayMap 非空时取它最小键，
+ *    为空时按 `maxCols - 7` 算前导列数）；
+ * 3. 推出来仍不在 1..7 就返回 null（宁可丢掉这一格，也不要堆到周末去）。
+ */
+internal fun resolveDayOfWeek(
+    dayMap: Map<Int, Int>,
+    cellIndex: Int,
+    maxCols: Int,
+    colOffset: Int = 0,
+): Int? {
+    // 老口径优先：dayMap 的键是"减掉 colOffset 之后"的列号
+    if (colOffset != 0) dayMap[cellIndex - colOffset]?.let { return it }
+    dayMap[cellIndex]?.let { return it }
+    // 前导列数 = 第一个星期列之前有多少列（表头没认出来时按总数-7 估）
+    val leading = if (dayMap.isNotEmpty()) {
+        (dayMap.keys.min() - colOffset).coerceAtLeast(0)
+    } else {
+        (maxCols - 7).coerceAtLeast(1)
+    }
+    return (cellIndex - leading + 1).takeIf { it in 1..7 }
+}
 /** Parse a horizontal (横排) timetable: rows=slots, columns=days.
  *  Shared by Zhengfang, Qiangzhi, and URP parsers. */
 fun parseHorizontalTable(
@@ -126,8 +157,7 @@ fun parseHorizontalTable(
         cells.forEachIndexed { ci, cell ->
             if (ci == 0) return@forEachIndexed
             if (isSectionHeader) return@forEachIndexed
-            val day = dayMap[ci - colOffset]
-                ?: (ci - colOffset).takeIf { it in 1..7 }
+            val day = resolveDayOfWeek(dayMap, ci, cells.size, colOffset)
                 ?: return@forEachIndexed
             val text = cell.text().trim()
             if (text.isBlank() || text.length < 2) return@forEachIndexed
@@ -178,7 +208,9 @@ fun parseVerticalTable(
     val maxCols = bodyRows.maxOfOrNull { row -> row.select("td, th").size } ?: return courses
     val colToDay = mutableMapOf<Int, Int>()
     for (col in 1 until maxCols) {
-        colToDay[col] = dayMap[col] ?: col.coerceIn(1, 7)
+        // 不再 `coerceIn(1, 7)` 兜底：那会把第 8、9 列压成周日，整周课程全挤到最右。
+        val day = resolveDayOfWeek(dayMap, col, maxCols) ?: continue
+        colToDay[col] = day
     }
 
     // Pre-scan slot ranges for rowSpan lookahead

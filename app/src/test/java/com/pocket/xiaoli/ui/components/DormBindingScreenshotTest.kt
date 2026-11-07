@@ -103,7 +103,8 @@ class DormBindingScreenshotTest {
                         initialRoom = case.room,
                         initialDormCode = case.dormCode,
                         canUnbind = true,
-                        onConfirm = { _, _, _, _ -> },
+                        // 第 5 个参数是用户选的生活区/校区 id（宿舍与学籍校解耦后才有）
+                        onConfirm = { _, _, _, _, _ -> },
                         onUnbind = {},
                     )
                 }

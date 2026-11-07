@@ -63,7 +63,14 @@ fun DormBindingContent(
     initialDormCode: String = "",
     preferredCampusId: String = DormBuildingCatalog.CAMPUS_MAIN,
     canUnbind: Boolean,
-    onConfirm: (building: String, room: String, serviceCampusId: String?, dormCode: String) -> Unit,
+    onConfirm: (
+        /** 用户在「生活区/校区」轮里选的那一个 —— 宿舍属于它，与学籍校无关。 */
+        campusId: String,
+        building: String,
+        room: String,
+        serviceCampusId: String?,
+        dormCode: String,
+    ) -> Unit,
     onUnbind: () -> Unit,
 ) {
     val skin = LocalSkin.current
@@ -149,7 +156,9 @@ fun DormBindingContent(
                             dormCampusId = option.id
                             roomTouched = true
                         },
-                        label = { Text(option.schoolName ?: option.name, fontSize = 13.sp) },
+                        // 生活区名本身已带学校前缀（「烟台理工本校区」「烟大南校区」），
+                        // 直接用它比 "学校名" 更准 —— 解耦后这里会出现别的学校的生活区。
+                        label = { Text(option.name, fontSize = 13.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = colors.accentMain,
                             selectedLabelColor = androidx.compose.ui.graphics.Color.White,
@@ -334,6 +343,7 @@ fun DormBindingContent(
         Button(
             onClick = {
                 onConfirm(
+                    dormCampusId,
                     selectedBuilding,
                     effectiveRoom,
                     dormCampus.id,

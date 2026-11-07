@@ -101,15 +101,21 @@ class SchoolScopeTest {
             "terms", "teachers", "academic_snapshot", "special_work_day",
             "campus_map_corrections", "time_slots",
         )
+        // 刻意不按校过滤的表：节次表是「上下午几点到几点」这种全校通用的时间刻度，
+        // 不含个人数据；而课表网格的行数就是它的行数——一旦按校过滤读空，网格高度变 0，
+        // 所有课程会叠在同一格（2026-11-06 的「导入后课程全挤在一起」就是这个）。
+        val deviceWide = listOf("time_slots")
         val offenders = mutableListOf<String>()
         daoDir.listFiles { f -> f.name.endsWith(".kt") }?.forEach { file ->
             file.readLines().forEachIndexed { i, line ->
                 if (!line.contains("@Query(\"")) return@forEachIndexed
                 val sql = line.substringAfter("@Query(\"").substringBefore("\")")
-                val touchesScoped = scoped.any { t ->
-                    sql.contains("FROM $t", ignoreCase = true) ||
-                        sql.contains("DELETE FROM $t", ignoreCase = true)
-                }
+                val touchesScoped = scoped
+                    .filterNot { it in deviceWide }
+                    .any { t ->
+                        sql.contains("FROM $t", ignoreCase = true) ||
+                            sql.contains("DELETE FROM $t", ignoreCase = true)
+                    }
                 if (!touchesScoped) return@forEachIndexed
                 // 只有「按主键操作单行」可以不带：id 全局唯一，改不到别校的行。
                 // 按 schemeId / 名字 / 时间格删除**都不豁免**——它们能命中别校的同名课。

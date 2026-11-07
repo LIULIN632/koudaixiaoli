@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -444,12 +445,6 @@ fun AssistantScreen(
                 // 底栏背后因此是真实的对话内容（滚动时看得见玻璃），最后一条消息也仍能滚到输入区上方。
                 .padding(horizontal = skin.spaceLg),
         ) {
-            if (!state.isConfigured) {
-                // 内容区现在从屏幕顶端开始，所以横幅要自己让开顶栏高度
-                Box(Modifier.padding(top = topInset)) {
-                    NotConfiguredBanner(onOpenSettings = { onOpenSettings?.invoke() })
-                }
-            }
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 // 输入区高度由它自己上报：字号 / 系统字体缩放都会改变它，写死会错位
@@ -463,7 +458,8 @@ fun AssistantScreen(
                     // 统一一个间距做不到这件事 —— 那只会让一问一答也离得同样远。
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding = PaddingValues(
-                        // 顶部让开顶栏：内容因此会从顶栏背后滚过去
+                        // 顶部让开顶栏：内容因此会从顶栏背后滚过去。
+                        // 未配置模型的卡片现在也是列表里的一项，跟着内容一起滚，不再需要额外让位。
                         top = topInset + 12.dp,
                         // 让最后一条消息能滚到输入区**上方**：输入区高度 + 间距 + 底栏
                         bottom = 12.dp + composerHeight + LocalBottomBarInset.current,
@@ -483,6 +479,7 @@ fun AssistantScreen(
                                 heroLine = ProactiveBubbleHost.heroLine,
                             )
                         }
+
                     }
                     itemsIndexed(rounds, key = { _, round -> round.key }) { index, round ->
                         val baseDensity = LocalDensity.current
@@ -530,6 +527,19 @@ fun AssistantScreen(
                                 modifier = Modifier.padding(top = skin.spaceMd),
                                 prompts = followUps,
                             )
+                        }
+                    }
+
+                    // 未配置模型的卡片：**只在文末插一次**，空态与有对话都走这里。
+                    // 跟着列表一起滚（不悬浮、不遮挡内容），位置和岱宗一样在输入框上方 ——
+                    // 它解释的是「为什么发不出去」。
+                    //
+                    // ⚠️ 别在空态分支里再插一张同 key 的：LazyColumn 的 key 撞了会在
+                    // 组合期直接抛 `IllegalArgumentException: Key "not-configured" was already used`，
+                    // 而单测渲染不到整页，只有真机打开才崩（0.2.24 就是这么发的）。
+                    if (!state.isConfigured) {
+                        item(key = "not-configured") {
+                            NotConfiguredCard(onOpenSettings = { onOpenSettings?.invoke() })
                         }
                     }
 
@@ -721,72 +731,63 @@ internal fun FollowUpChips(
 }
 
 @Composable
-private fun NotConfiguredBanner(onOpenSettings: () -> Unit) {
+internal fun NotConfiguredCard(onOpenSettings: () -> Unit) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
+    // 一张「页面里」的卡片，不是浮层：整张可点，右侧箭头比按钮更像"去看一眼"，
+    // 而不是每屏都要按一次的确认框。位置在消息流里（空态在欢迎页下面、
+    // 有对话时在输入框上方），所以它跟着内容滚，不会盖住任何东西。
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-        shape = RoundedCornerShape(skin.radiusChip),
-        color = colors.surfaceHighlight,
-        border = BorderStroke(1.dp, colors.accentMain.copy(alpha = 0.18f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = skin.spaceMd)
+            .clip(RoundedCornerShape(skin.radiusCard))
+            .clickable(onClick = onOpenSettings),
+        shape = RoundedCornerShape(skin.radiusCard),
+        color = colors.accentMain.copy(alpha = 0.07f),
+        border = BorderStroke(1.dp, colors.accentMain.copy(alpha = 0.16f)),
     ) {
-        Column(modifier = Modifier.padding(skin.spaceCompact)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // 图标块：让这条横幅看起来是一张"待办卡片"，而不是一块提示文字。
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.accentMain.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Key,
-                        contentDescription = null,
-                        tint = colors.accentMain,
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-                Spacer(Modifier.width(skin.spaceSm))
-                Text("还没配置 AI 模型", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = colors.textPrimary)
-            }
-            Spacer(Modifier.height(skin.spaceXs))
-            Text(
-                "鲤鱼需要一个大模型才能对话。支持任何 OpenAI 兼容接口（DeepSeek、通义、Kimi 等），需要你自己的 API Key。",
-                fontSize = 12.sp,
-                color = colors.textSecondary,
-                lineHeight = 18.sp,
-            )
-            Spacer(Modifier.height(10.dp))
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = colors.accentMain,
-                modifier = Modifier.clickable(onClick = onOpenSettings),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = skin.spaceMd, vertical = skin.spaceMd),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(colors.accentMain.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
             ) {
-                Row(
-                    modifier = Modifier.padding(start = skin.spaceLg, end = skin.spaceMd, top = 7.dp, bottom = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "去配置",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        // 主色实底上的字**必须**显式用白色。
-                        // 这里原先读的是 `MaterialTheme.colorScheme.inverseOnSurface`，
-                        // 而本项目 8 套配色只定义了 light/dark 的主角色，`inverseOnSurface`
-                        // 一路是 Material 的默认值 —— 浅色默认近白（碰巧能看），
-                        // 深色默认是 #313033，于是深色主题下就成了"深灰字压在主题色上"。
-                        color = Color.White,
-                    )
-                    Spacer(Modifier.width(skin.spaceXs))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(13.dp),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.Key,
+                    contentDescription = null,
+                    tint = colors.accentMain,
+                    modifier = Modifier.size(16.dp),
+                )
             }
+            Spacer(Modifier.width(skin.spaceSm))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "先填一下 AI 模型",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "填上 API Key 就能聊，DeepSeek 等都能用",
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                    lineHeight = 17.sp,
+                )
+            }
+            Spacer(Modifier.width(skin.spaceXs))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.accentMain,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

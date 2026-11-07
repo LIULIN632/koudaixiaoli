@@ -95,21 +95,20 @@ import com.pocket.xiaoli.ui.theme.miuixPress
 /**
  * 一个建议问题。
  *
- * [tintIndex] 指向课程色板（`CourseColors` / `CourseColorsDark`）里的一个低饱和色。
- * **复用课程色板而不是另起一套**：那 15 个色本来就是为"低饱和马卡龙 + 明暗两版"挑的，
- * 8 套主题下都已经配好，另起一套迟早会跟主题打架。
+ * 配色不再挂在条目上：`ASSISTANT_PROMPTS` 的条目颜色由它**排在第几**决定
+ * （见 `AiTints.kt` 与 `ASSISTANT_PROMPTS` 的渲染顺序），所以这里没有 `tintIndex` ——
+ * 原来那个字段指向课程色板，改配色后就没有消费者了，留着就是假字段。
  */
 internal data class AssistantPrompt(
     val icon: ImageVector,
     val title: String,
     val subtitle: String,
-    val tintIndex: Int,
 
     /**
      * 面性（`Icons.Filled.*`）变体，供鲜活皮肤的 `IconStyle.FILLED` 使用；
      * 极简皮肤仍用 [icon]（线性）。默认值 = [icon]，未登记时行为不变。
      *
-     * ⚠️ 放在 [tintIndex] **之后**：上面 4 个字段是**位置传参**的，
+     * ⚠️ 放在上面 3 个字段**之后**：它们是**位置传参**的，
      * 插在中间会让 5 条 prompt 的实参整体错位。
      */
     val iconFilled: ImageVector = icon,
@@ -150,16 +149,16 @@ internal data class AssistantPrompt(
 internal val ASSISTANT_PROMPTS: List<AssistantPrompt> = listOf(
     // 副标题压在 8 个字以内：360dp 的双列卡内容宽约 130dp，12sp 下 11 个字会折成两行，
     // 同一行的两张卡就一高一低。短一句反而更有力。
-    AssistantPrompt(Icons.Outlined.CalendarMonth, "今天有什么课？", "列出今天全部课程", 0, iconFilled = Icons.Filled.CalendarMonth, relatedTools = setOf(AssistantTool.TODAY_COURSES)),
-    AssistantPrompt(Icons.Outlined.Schedule, "下节课在哪？", "含楼栋、楼层和教室", 3, iconFilled = Icons.Filled.Schedule, relatedTools = setOf(AssistantTool.NEXT_COURSE)),
-    AssistantPrompt(Icons.Outlined.TaskAlt, "还有什么作业没做？", "按截止日期排好", 6, iconFilled = Icons.Filled.TaskAlt, relatedTools = setOf(AssistantTool.TODOS)),
-    AssistantPrompt(Icons.Outlined.Grade, "我绩点多少？", "读的是本机存档的成绩", 9, iconFilled = Icons.Filled.Grade, relatedTools = setOf(AssistantTool.MY_GRADES)),
-    AssistantPrompt(Icons.Outlined.School, "我还差多少学分？", "读修课情况留下的数据", 12, iconFilled = Icons.Filled.School, relatedTools = setOf(AssistantTool.ACADEMIC_PROGRESS)),
-    AssistantPrompt(Icons.Outlined.MeetingRoom, "A101 在哪？", "在教室分布图里定位", 15, iconFilled = Icons.Filled.MeetingRoom, relatedTools = setOf(AssistantTool.CAMPUS_LOCATION)),
+    AssistantPrompt(Icons.Outlined.CalendarMonth, "今天有什么课？", "列出今天全部课程", iconFilled = Icons.Filled.CalendarMonth, relatedTools = setOf(AssistantTool.TODAY_COURSES)),
+    AssistantPrompt(Icons.Outlined.Schedule, "下节课在哪？", "含楼栋、楼层和教室", iconFilled = Icons.Filled.Schedule, relatedTools = setOf(AssistantTool.NEXT_COURSE)),
+    AssistantPrompt(Icons.Outlined.TaskAlt, "还有什么作业没做？", "按截止日期排好", iconFilled = Icons.Filled.TaskAlt, relatedTools = setOf(AssistantTool.TODOS)),
+    AssistantPrompt(Icons.Outlined.Grade, "我绩点多少？", "读的是本机存档的成绩", iconFilled = Icons.Filled.Grade, relatedTools = setOf(AssistantTool.MY_GRADES)),
+    AssistantPrompt(Icons.Outlined.School, "我还差多少学分？", "读修课情况留下的数据", iconFilled = Icons.Filled.School, relatedTools = setOf(AssistantTool.ACADEMIC_PROGRESS)),
+    AssistantPrompt(Icons.Outlined.MeetingRoom, "A101 在哪？", "在教室分布图里定位", iconFilled = Icons.Filled.MeetingRoom, relatedTools = setOf(AssistantTool.CAMPUS_LOCATION)),
     // 天气两问：都落在 `get_weather` 的报告范围内（未来 12 小时 + 今明两天），
     // 不多不少 —— 「这周末下雨吗」这类问题工具答不了，所以不放。
-    AssistantPrompt(Icons.Outlined.Umbrella, "今天要带伞吗？", "看未来 12 小时降水", 1, iconFilled = Icons.Filled.Umbrella, relatedTools = setOf(AssistantTool.WEATHER)),
-    AssistantPrompt(Icons.Outlined.Thermostat, "明天穿什么？", "按明天的温度给建议", 4, iconFilled = Icons.Filled.Thermostat, relatedTools = setOf(AssistantTool.WEATHER)),
+    AssistantPrompt(Icons.Outlined.Umbrella, "今天要带伞吗？", "看未来 12 小时降水", iconFilled = Icons.Filled.Umbrella, relatedTools = setOf(AssistantTool.WEATHER)),
+    AssistantPrompt(Icons.Outlined.Thermostat, "明天穿什么？", "按明天的温度给建议", iconFilled = Icons.Filled.Thermostat, relatedTools = setOf(AssistantTool.WEATHER)),
 )
 
 /**
@@ -177,7 +176,6 @@ internal data class AssistantAbility(
     val iconFilled: ImageVector,
     val label: String,
     val question: String,
-    val tintIndex: Int,
 )
 
 internal val ASSISTANT_ABILITIES: List<AssistantAbility> = listOf(
@@ -186,10 +184,9 @@ internal val ASSISTANT_ABILITIES: List<AssistantAbility> = listOf(
         Icons.AutoMirrored.Filled.EventNote,
         "考试安排",
         "我什么时候考试？",
-        13,
     ),
-    AssistantAbility(Icons.Outlined.CreditCard, Icons.Filled.CreditCard, "校园卡", "校园卡怎么绑定？", 8),
-    AssistantAbility(Icons.Outlined.FlashOn, Icons.Filled.FlashOn, "电费", "电费在哪交？", 10),
+    AssistantAbility(Icons.Outlined.CreditCard, Icons.Filled.CreditCard, "校园卡", "校园卡怎么绑定？"),
+    AssistantAbility(Icons.Outlined.FlashOn, Icons.Filled.FlashOn, "电费", "电费在哪交？"),
 )
 
 /**
@@ -254,10 +251,12 @@ internal fun AssistantWelcome(
         // 1dp 描边分层，视觉上太"平"；纯净 / 极简模式仍保持中性白卡。
         val heroShape = RoundedCornerShape(skin.radiusLarge)
         val heroBrush = if (colorful) {
+            // 主色 → 紫 → 卡面（岱宗 `AgentWelcome` 的主视觉同款）：单主色的渐变
+            // 在浅色下几乎看不出方向，加一档紫才有"色面"
             Brush.linearGradient(
                 listOf(
                     colors.accentMain.copy(alpha = if (isDark) 0.34f else 0.22f),
-                    colors.accentMain.copy(alpha = if (isDark) 0.14f else 0.07f),
+                    AiHeroViolet.copy(alpha = if (isDark) 0.20f else 0.11f),
                     colors.surfaceCard,
                 )
             )
@@ -329,11 +328,16 @@ internal fun AssistantWelcome(
                 color = colors.textPrimary,
             )
             Spacer(Modifier.height(skin.spaceXs))
+            // ⚠️ 固定一行：`heroLine` 是底栏气泡投过来的主动搭话，长短不一。
+            // 允许换行的话，每来一句长话问候卡就长高一行，**下面整页跟着往下跳** ——
+            // 这正是"没配 Key 时界面老往下跑"的观感来源之一（另一处是横幅与列表重复让出顶栏，见 AssistantScreen）。
             Text(
                 text = heroLine ?: "课表、作业、成绩、天气、教室位置，都可以问我",
                 fontSize = 13.sp,
                 color = colors.textTertiary,
                 lineHeight = 19.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(skin.spaceMd))
             Row(horizontalArrangement = Arrangement.spacedBy(skin.spaceSm)) {
@@ -347,29 +351,21 @@ internal fun AssistantWelcome(
 
         Spacer(Modifier.height(skin.spaceXl))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SectionCaption("试试这些问题")
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "点一下直接问",
-                fontSize = 11.sp,
-                color = colors.textTertiary,
-            )
-        }
+        // 「点一下直接问」删掉：整组卡片本来就是可点的，这句话是在复述形状（见 feedback-ui-clutter）
+        SectionCaption("试试这些问题")
         Spacer(Modifier.height(skin.spaceSm))
 
         // 双列网格：两两成行；单数个时最后一个独占一行
-        cards.chunked(2).forEach { row ->
+        cards.chunked(2).forEachIndexed { rowIndex, row ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = skin.spaceSm),
                 horizontalArrangement = Arrangement.spacedBy(skin.spaceSm),
             ) {
-                row.forEach { prompt ->
+                row.forEachIndexed { columnIndex, prompt ->
                     WelcomeCard(
                         prompt = prompt,
+                        // 位置决定色相：四张卡四种颜色，而不是同一种色的四档深浅
+                        tone = rowIndex * 2 + columnIndex,
                         modifier = Modifier.weight(1f),
                         onClick = { onPick(prompt.title) },
                     )
@@ -380,15 +376,19 @@ internal fun AssistantWelcome(
         }
 
         if (more.isNotEmpty()) {
+            // 与上面的卡片同属"试试这些问题"：原来另起一个「也可以这样问」标题，
+            // 等于把同一件事切成两段、还多占一屏高度（手机上要往下翻才能看到"我还能"）
             Spacer(Modifier.height(skin.spaceXs))
-            SectionCaption("也可以这样问")
-            Spacer(Modifier.height(skin.spaceSm))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(skin.spaceSm),
                 verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
             ) {
-                more.forEach { prompt ->
-                    QuickPromptChip(prompt = prompt, onClick = { onPick(prompt.title) })
+                more.forEachIndexed { index, prompt ->
+                    QuickPromptChip(
+                        prompt = prompt,
+                        tone = cards.size + index,
+                        onClick = { onPick(prompt.title) },
+                    )
                 }
             }
         }
@@ -401,8 +401,12 @@ internal fun AssistantWelcome(
                 horizontalArrangement = Arrangement.spacedBy(skin.spaceSm),
                 verticalArrangement = Arrangement.spacedBy(skin.spaceSm),
             ) {
-                ASSISTANT_ABILITIES.forEach { ability ->
-                    AbilityChip(ability = ability, onClick = { onPick(ability.question) })
+                ASSISTANT_ABILITIES.forEachIndexed { index, ability ->
+                    AbilityChip(
+                        ability = ability,
+                        tone = index,
+                        onClick = { onPick(ability.question) },
+                    )
                 }
             }
         }
@@ -445,24 +449,16 @@ private fun WelcomeChip(icon: ImageVector, text: String) {
 }
 
 /**
- * 建议问题卡与胶囊共用的一套取色：浅底色 + 配套文字色。
- * 中性模式下退回卡片底 + 主色 —— 两处必须一致，否则同一条问题在大卡和小胶囊上会是两种颜色。
+ * 建议问题卡与胶囊共用的一套取色 —— 现在统一走 [aiTint]（同一色相的四档深浅）。
+ *
+ * 原来这里取课程色板，八种糖果色；见 `AiTints.kt` 的 KDoc 说明为什么改。
  */
 private data class PromptTint(val background: Color, val foreground: Color)
 
 @Composable
 private fun promptTint(tintIndex: Int): PromptTint {
-    val colors = LocalPocketXiaoliColors.current
-    if (!currentIconPresentation().colorful) {
-        return PromptTint(colors.surfaceCard, colors.accentMain)
-    }
-    val isDark = LocalDarkMode.current
-    val palette = if (isDark) CourseColorsDark else CourseColors
-    val textPalette = if (isDark) CourseTextColorsDark else CourseTextColors
-    return PromptTint(
-        background = palette[tintIndex % palette.size],
-        foreground = textPalette[tintIndex % textPalette.size],
-    )
+    val tint = aiTint(tintIndex)
+    return PromptTint(tint.background, tint.foreground)
 }
 
 /**
@@ -474,12 +470,14 @@ private fun promptTint(tintIndex: Int): PromptTint {
 @Composable
 private fun QuickPromptChip(
     prompt: AssistantPrompt,
+    /** 组内序号：配色按它轮转（见 `AiTints.kt`） */
+    tone: Int,
     onClick: () -> Unit,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val iconPresentation = currentIconPresentation()
-    val tint = promptTint(prompt.tintIndex)
+    val tint = promptTint(tone)
     val shape = RoundedCornerShape(50)
     // 与大卡同一套"加深"取法：一头压深一档再回到原色，一排胶囊才不是一片扁色。
     // 中性模式（纯净 / 极简）仍是一块纯卡面，不能因为这里把灰调也染上色。
@@ -536,13 +534,15 @@ private fun QuickPromptChip(
 @Composable
 private fun AbilityChip(
     ability: AssistantAbility,
+    /** 组内序号：配色按它轮转 */
+    tone: Int,
     onClick: () -> Unit,
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     val iconPresentation = currentIconPresentation()
     val colorful = iconPresentation.colorful
-    val tint = promptTint(ability.tintIndex)
+    val tint = promptTint(tone)
     val shape = RoundedCornerShape(skin.radiusChip)
     Row(
         modifier = Modifier
@@ -589,6 +589,8 @@ private fun AbilityChip(
 @Composable
 private fun WelcomeCard(
     prompt: AssistantPrompt,
+    /** 组内序号：配色按它轮转（四张卡四种色相，而不是一组蓝色同深浅） */
+    tone: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -603,7 +605,7 @@ private fun WelcomeCard(
     // 与文档描述和历史行为对齐。
     val iconPresentation = currentIconPresentation()
     val colorful = iconPresentation.colorful
-    val tint = promptTint(prompt.tintIndex)
+    val tint = promptTint(tone)
 
     val shape = RoundedCornerShape(skin.radiusLarge)
     // 渐变让卡片从"一块单纯的浅色"变成有方向的色面；同色光晕把它从页面上托起来。

@@ -129,11 +129,20 @@
             android:name=".notification.AppUpdateReceiver"
             android:exported="false" />
 
+        <!--
+          开机后重排闹钟类提醒（上课 / 考试 / 作业）。`AlarmManager` 的闹钟不跨重启，
+          没有它，用户关机再开就再也收不到提醒；同时它也是 0.2.25 开机崩溃
+          （`ClassNotFoundException: .notification.BootReceiver`）的修法 —— 类以前根本没写。
+          `MY_PACKAGE_REPLACED` 也要收：覆盖安装同样会清掉已排的闹钟。
+        -->
         <receiver
             android:name=".notification.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

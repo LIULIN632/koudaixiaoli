@@ -124,6 +124,7 @@ internal data class ServiceEntry(
     val scope: ServiceScope = ServiceScope.ANY_SCHOOL,
 
     val aliases: List<String> = emptyList(),
+
     val onClick: () -> Unit
 ) {
     /** 稳定标识，用于「常用服务」的用户自定义持久化 */

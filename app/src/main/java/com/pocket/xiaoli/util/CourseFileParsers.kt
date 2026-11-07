@@ -175,13 +175,21 @@ internal object CourseFileParsers {
         if (!array.isJsonArray) return emptyList()
         return array.asJsonArray.mapNotNull { element ->
             val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            val name = obj.stringOr("name")
+            val dayOfWeek = obj.intOr("dayOfWeek")
+            val startSlot = obj.intOr("startSlot")
+            // ⚠️ 坐标读不出来 = 没有这门课，不能写成 0。
+            // `intOr` 缺键给 0，而 0 是合法 JSON 里"没有星期/没有节次"的样子：课程会被画到
+            // 网格**上方**（`yDp = 行高 × (节次 - 1)`）并被裁掉，剩下的课程叠成一坨，
+            // 而"导入成功 N 门"的条数看着一切正常。
+            if (name.isBlank() || dayOfWeek !in 1..7 || startSlot < 1) return@mapNotNull null
             CourseEntity(
-                name = obj.stringOr("name"),
+                name = name,
                 teacher = obj.stringOr("teacher"),
                 room = obj.stringOr("room"),
-                dayOfWeek = obj.intOr("dayOfWeek"),
-                startSlot = obj.intOr("startSlot"),
-                endSlot = obj.intOr("endSlot"),
+                dayOfWeek = dayOfWeek,
+                startSlot = startSlot,
+                endSlot = maxOf(startSlot, obj.intOr("endSlot")),
                 weeks = obj.stringOr("weeks"),
                 schemeId = schemeId
             )

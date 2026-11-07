@@ -264,6 +264,8 @@ class PromoCaptureTest {
                             onCourseMoved = { _, _, _ -> },
                             scrollState = rememberScrollState(),
                             modifier = Modifier.fillMaxSize(),
+                            // 基准图必须与真实时钟无关：时间线会随时间往下走，上午/下午各拍一次就不一样。
+                            nowForDisplay = NOW,
                         )
                     }
                 }

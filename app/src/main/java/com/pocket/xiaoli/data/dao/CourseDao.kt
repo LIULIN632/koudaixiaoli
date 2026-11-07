@@ -109,13 +109,25 @@ interface CourseDao {
     suspend fun getTermCount(): Int
 
     // ── Time slots ──
-    @Query("SELECT * FROM time_slots WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1) ORDER BY slot")
+    /**
+     * 节次表**不按校过滤**，这是刻意的：
+     *
+     * 课表网格的行数 = 这张表的行数。一旦读回空表，网格高度就是 0，所有课程卡片
+     * 会叠在同一格 —— 用户在真机上看到的是「导入后课程全挤在一起」（2026-11-06 报障）。
+     * 而按校过滤会在这个场景读空：迁移 21→22 时按**当时**的学校打标，之后换校
+     * （`app_state` 变了）或迁移时 `app_state` 还没对齐，行还在、标签对不上。
+     *
+     * 节次表本身是"上下午几点到几点"这种全校通用的时间刻度，不含任何个人数据；
+     * 换校时 `resetPerSchoolCaches()` 本来就会清空重种。所以这里放开过滤，
+     * 让老标签的行也能兜住场面。
+     */
+    @Query("SELECT * FROM time_slots ORDER BY slot")
     fun getAllTimeSlots(): Flow<List<TimeSlotEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTimeSlots(slots: List<TimeSlotEntity>)
 
-    @Query("DELETE FROM time_slots WHERE schoolId = (SELECT schoolId FROM app_state WHERE id = 1)")
+    @Query("DELETE FROM time_slots")
     suspend fun deleteAllTimeSlots()
 
     /** 原子替换全部时间段：删除+插入在同一事务内，避免第二步失败把表清空 */

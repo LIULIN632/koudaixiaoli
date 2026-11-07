@@ -79,6 +79,7 @@ import com.pocket.xiaoli.data.CampusInfo
 import com.pocket.xiaoli.data.jwTypeLabel
 import com.pocket.xiaoli.data.learning.LearningPlatform
 import com.pocket.xiaoli.data.card.YxyCardRepository
+import com.pocket.xiaoli.data.model.DormBuildingCatalog
 import com.pocket.xiaoli.data.model.LastImportInfo
 import com.pocket.xiaoli.data.service.CasLogin
 import com.pocket.xiaoli.data.service.ServiceAutoLoginMode
@@ -178,7 +179,10 @@ fun AccountBindingScreen(
         container.currentAcademicSchool()
     }
     val campus = remember(currentSchoolId, customSchoolsForOptions) {
-        container.campusForCurrentSchool()
+        // ⚠️ 用「本校该用的那个校区」而不是「学校第一个校区」：烟台理工有本校区/新校区，
+        // 宿舍存档按校区 id 分开（`dorm_ytlg_new`），拿第一校区去读就会永远读到空 ——
+        // 表现就是"绑定好了、回来还是未绑定"（2026-11-06 用户反馈）。
+        container.currentSchoolCampus()
     }
     var studentId by remember { mutableStateOf(initialCred?.first.orEmpty()) }
     var password by remember { mutableStateOf(initialCred?.second.orEmpty()) }
@@ -426,7 +430,7 @@ fun AccountBindingScreen(
             // 宿舍跟着走**新学校名下的校区**：未收录就是 null，表单清空、入口也一起消失。
             // 改造前这里是 `container.dormInfoFor(selectedCampus.value.id)`，
             // 而那 id 对未收录学校还是烟台理工本校区 —— 换完学校表单里留着别人的楼栋。
-            val dorm = container.campusForCurrentSchool()?.let { container.dormInfoFor(it.id) }
+            val dorm = container.currentSchoolCampus()?.let { container.dormInfoFor(it.id) }
             dormBuilding = dorm?.building.orEmpty()
             dormRoom = dorm?.room.orEmpty()
             dormCode = dorm?.dormCode.orEmpty()
@@ -579,6 +583,7 @@ fun AccountBindingScreen(
                     .joinToString(" ")
                     .ifBlank { null }
                     ?.let { label -> if (dormCode.isBlank()) label else "$label · 编号 $dormCode" },
+                dormAreaLabel = container.dormOwnerCampus()?.name,
                 cardBound = cardBound,
             )
 
@@ -699,23 +704,23 @@ fun AccountBindingScreen(
             }
 
             // ── 宿舍绑定（二级页）──
-            // 改造前它是一个弹窗：一个完整表单（两个转轮 + 服务校区 + 编号输入 + 实时摘要 +
-            // 保存/解绑）挤在 AlertDialog 里，转轮最高只给到 168dp，两段说明也没地方放。
-            // 现在它是整页（DormBindingContent）：字段分组进卡、转轮放宽、说明各归其位。
+            // 宿舍与学籍校**解耦**（2026-11-06 用户要求）：一个学校多个校区，A 校学生也可能住
+            // B 校宿舍（考研公寓、跨校借宿）。所以这一页自己带「生活区」轮，写哪个校区由用户定，
+            // 不再要求"本校必须有校区配置"，也不再拿学籍校的校区去兜底。
             //
-            // ⚠️ 只有**本校配了校区**才渲染这一页（清单里那一行也一起消失，见 BindingStatusCard）：
-            // 宿舍是按校区存的，未收录学校存进去的是烟台理工的档，电费页会拿别人的宿舍编号
-            // 查别人的账户 —— 少一个入口可以接受，给错数据不行。
-            val dormCampus = campus
-            if (activeSubPage == BindSubPage.DORM && dormCampus != null) {
+            // 默认预选：已绑过就回到那份绑定的生活区，否则猜本校校区（未收录就给烟台理工本校区，
+            // 用户仍可改到任何已收录生活区）。
+            if (activeSubPage == BindSubPage.DORM) {
+                val dormPageCampus = container.dormOwnerCampus()
+                    ?: container.currentSchoolCampus()
                 DormBindingContent(
                     initialBuilding = dormBuilding,
                     initialRoom = dormRoom,
                     initialDormCode = dormCode,
-                    preferredCampusId = dormCampus.id,
+                    preferredCampusId = dormPageCampus?.id ?: DormBuildingCatalog.CAMPUS_MAIN,
                     canUnbind = dormBuilding.isNotBlank() || dormRoom.isNotBlank(),
-                    onConfirm = { building, room, serviceCampusId, code ->
-                        if (container.setDormInfoFor(dormCampus.id, building, room, serviceCampusId, code)) {
+                    onConfirm = { campusId, building, room, serviceCampusId, code ->
+                        if (container.setDormInfoFor(campusId, building, room, serviceCampusId, code)) {
                             dormBuilding = building
                             dormRoom = room
                             dormServiceCampusId = serviceCampusId.orEmpty()
@@ -724,20 +729,21 @@ fun AccountBindingScreen(
                         } else {
                             // 提示必须跟着真结果：存不进去还说"已保存"，用户会带着一个
                             // 没落盘的表单回清单，下次进来发现又是未绑定。
-                            Toast.makeText(context, "这所学校的宿舍服务还没收录", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "这个生活区还没收录，换个生活区试试", Toast.LENGTH_SHORT).show()
                         }
                         // 保存完回清单 —— 用户进这一页的唯一目的就是把它绑好
                         subPage = null
                     },
                     onUnbind = {
-                        if (container.setDormInfoFor(dormCampus.id, "", "")) {
+                        val owner = container.dormOwnerCampus()?.id
+                        if (owner != null && container.setDormInfoFor(owner, "", "")) {
                             dormBuilding = ""
                             dormRoom = ""
                             dormServiceCampusId = ""
                             dormCode = ""
                             Toast.makeText(context, "已解绑宿舍", Toast.LENGTH_SHORT).show()
                         } else {
-                            Toast.makeText(context, "这所学校的宿舍服务还没收录", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "还没有绑定宿舍", Toast.LENGTH_SHORT).show()
                         }
                         subPage = null
                     },
@@ -981,6 +987,8 @@ internal fun BindingStatusCard(
     casStudentId: String,
     portalLoggedIn: Boolean?,
     dormLabel: String?,
+    /** 已绑宿舍所在的生活区（如「烟台理工 · 南校区」）；null = 还没绑或没解析出。 */
+    dormAreaLabel: String? = null,
     /** 校园卡（易校园）是否已绑 —— 它也是总览里要核对的一项。 */
     cardBound: Boolean,
     // false 时整张卡不渲染 —— 二级页导航用它决定"这一次渲染哪一块"。
@@ -1003,12 +1011,11 @@ internal fun BindingStatusCard(
     // 五项的「绑好了没」，顺序与下面清单、与页面卡片顺序一致 ——
     // 它只回答"绑齐了没"，与"最近一次导入成功没"是两件事（后者归「教务」行的红点）。
     //
-    // ⚠️ 「宿舍」项跟着**校区有没有收录**走，与清单里那一行同一个判据：
-    // 未收录学校没有宿舍可绑，把"宿舍"算进缺项等于告诉他"还差一项就能用校园服务了"，
-    // 而他怎么点都点不到那一格。
+    // 宿舍与学籍校解耦之后，任何学校的人都能绑任意已收录生活区的宿舍，
+    // 所以这一项**始终存在**（不再跟着 `campus != null` 走）：判据只剩「绑了没」。
     val bindItems = listOfNotNull(
         Triple("教务", isBound, ServiceAccent.ACADEMIC),
-        if (campus != null) Triple("宿舍", dormLabel != null, ServiceAccent.LIFE) else null,
+        Triple("宿舍", dormLabel != null, ServiceAccent.LIFE),
         Triple("今日校园", casBound, ServiceAccent.INFO),
         Triple("校园卡", cardBound, ServiceAccent.PAYMENT),
         Triple("学习通", chaoxingBound, ServiceAccent.STUDY),
@@ -1156,20 +1163,24 @@ internal fun BindingStatusCard(
                 // 下面这几行的**顺序与页面上的卡片顺序一致**（教务 → 宿舍 → 今日校园 →
                 // 校园卡 → 学习平台）：用户扫完清单往下滚，能逐项对上，不用来回找。
                 //
-                // ⚠️ 「宿舍」这一行随**校区有没有收录**走：未收录学校的宿舍根本没地方存
-                //（`dorm_<校区>` 那个键不属于他），留一行"未绑定"等于让人去绑一个不会生效的东西。
-                if (campus != null) {
-                    ChecklistRow(
-                        state = if (dormLabel != null) BindState.OK else BindState.TODO,
-                        icon = Icons.Outlined.Home,
-                        accent = ServiceAccent.LIFE,
-                        title = "宿舍",
-                        detail = dormLabel ?: "未绑定 · 绑定后自动匹配生活服务商",
-                        onClick = { onNavigate(BindSubPage.DORM) },
-                    )
+                // 「宿舍」与学籍校**解耦**（2026-11-06）：一人可以住在别的学校的生活区
+                //（考研公寓、跨校借宿），所以绑哪个生活区由用户自己选，这一行**永远存在**。
+                // 隐藏入口曾被当成"绑定不了了"报上来 —— 没有入口比绑错更难解释。
+                ChecklistRow(
+                    state = if (dormLabel != null) BindState.OK else BindState.TODO,
+                    icon = Icons.Outlined.Home,
+                    accent = ServiceAccent.LIFE,
+                    title = "宿舍",
+                    detail = when {
+                        // 绑定后把生活区一并写出来：换校之后这一行就是"我现在住哪儿"的唯一答案
+                        dormLabel != null && dormAreaLabel != null -> "$dormAreaLabel · $dormLabel"
+                        dormLabel != null -> dormLabel
+                        else -> "未绑定 · 可选任意已收录的生活区，与学籍校无关"
+                    },
+                    onClick = { onNavigate(BindSubPage.DORM) },
+                )
 
-                    HorizontalDivider(color = colors.borderDivider)
-                }
+                HorizontalDivider(color = colors.borderDivider)
 
                 // ── 今日校园 ──
                 ChecklistRow(

@@ -79,6 +79,43 @@ data class ImportCourseJson(
     val remark: String? = null
 )
 
+/** JS 桥课程 → 落库实体（纯函数，`ImportJsonCourseTest` 逐条钉住）。
+ *
+ *  所有字段都要当成"可能拿不到"来读：Gson 会绕过 Kotlin 的空安全与默认值
+ *  （`ImportCourseJson.day` 写着默认值 1，JSON 里没这个键时它仍然是 null）。
+ *
+ *  ⚠️ **读不到节次就丢掉这门课，不许退化成第 1 节**。原先是 `startSection ?: 1`，
+ *  于是适配器没给出节次时，一天里的所有课全被写进第 1 节、合并成同一块 ——
+ *  用户看到的就是"导入课表后课程都挤在一起"，而导入条数看着完全正常。
+ *  一门课在第 1 节是事实，几十门课都在第 1 节是编数据。
+ */
+internal fun importJsonToCourse(json: ImportCourseJson, schemeId: Long): CourseEntity? {
+    val name = json.name?.trim()
+    if (name == null || name.length < 2) return null
+    val day = json.day ?: return null
+    if (day !in 1..7) return null
+    val startSlot = json.startSection ?: return null
+    if (startSlot < 1) return null
+    val endSlot = maxOf(startSlot, json.endSection ?: startSlot)
+
+    val weeksList = json.weeks ?: emptyList()
+    val weeks = weeksList.sorted().joinToString(",") { it.toString() }
+    val weekType = computeWeekType(parseWeeks(weeks))
+
+    return CourseEntity(
+        name = name,
+        teacher = (json.teacher ?: "").trim(),
+        room = (json.position ?: "").trim(),
+        dayOfWeek = day,
+        startSlot = startSlot,
+        endSlot = endSlot,
+        weeks = weeks,
+        weekType = weekType,
+        colorIndex = (day * 3 + startSlot) % 15,
+        schemeId = schemeId
+    )
+}
+
 /** JS polyfill injected into WebView before any adapter script runs.
  *  Mirrors shiguangschedule's WebViewUtils.injectAllJavaScript(). */
 val ANDROID_BRIDGE_PROMISE_JS = """
@@ -269,6 +306,10 @@ class WebImportViewModel(
     private val _importedCount = MutableStateFlow(0)
     val importedCount: StateFlow<Int> = _importedCount
 
+    /** 导入成功卡的摘要（门数/星期范围/周次/缺字段），没导入过就是 null。 */
+    private val _importSummary = MutableStateFlow<ImportSummary?>(null)
+    val importSummary: StateFlow<ImportSummary?> = _importSummary
+
     @JvmField val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage
 
@@ -295,12 +336,12 @@ class WebImportViewModel(
     fun updateSearch(query: String) { _searchQuery.value = query }
     fun selectSchool(school: School) {
         if (campusOnly && school.id != lockedSchool?.id) return
-        _selectedSchool.value = school; _freeUrlActive.value = false; _importedCount.value = 0
+        _selectedSchool.value = school; _freeUrlActive.value = false; _importedCount.value = 0; _importSummary.value = null
     }
     fun clearSchool() {
         flushAutoSave()
         cancelPendingInjections()
-        _selectedSchool.value = if (campusOnly) lockedSchool else null; _freeUrlActive.value = false; _importedCount.value = 0; _detectedCount.value = 0
+        _selectedSchool.value = if (campusOnly) lockedSchool else null; _freeUrlActive.value = false; _importedCount.value = 0; _importSummary.value = null; _detectedCount.value = 0
     }
     fun setCustomUrl(url: String) { _customUrl.value = url }
     fun toastShown() { _toastMessage.value = null }
@@ -849,6 +890,7 @@ class WebImportViewModel(
                     val coursesWithScheme = courses.map { it.copy(schemeId = schemeId) }
                     val inserted = withContext(Dispatchers.IO) { insertCourses(coursesWithScheme) }
                     _importedCount.value = inserted
+                    _importSummary.value = ImportSummary.of(courses)
                     _detectedCount.value = 0
                     addLog("OkHttp: 成功导入 $inserted 门课程")
                     saveCredentials()
@@ -896,6 +938,7 @@ class WebImportViewModel(
                     val coursesWithScheme = courses.map { it.copy(schemeId = schemeId) }
                     val inserted = withContext(Dispatchers.IO) { insertCourses(coursesWithScheme) }
                     _importedCount.value = inserted
+                    _importSummary.value = ImportSummary.of(courses)
                     _detectedCount.value = 0
                     addLog("手动导入: 成功导入 $inserted 门课程")
                     saveCredentials()
@@ -959,7 +1002,13 @@ class WebImportViewModel(
                 val importedCourses: List<ImportCourseJson> = gson.fromJson(coursesJson, type)
                 addLog("JS桥接: 解析到 ${importedCourses.size} 门课程")
 
-                val courses = importedCourses.mapNotNull { convertImportCourse(it) }
+                val courses = importedCourses.mapNotNull {
+                    importJsonToCourse(it, schemeIdProvider())
+                }
+                val dropped = importedCourses.size - courses.size
+                if (dropped > 0) {
+                    addLog("JS桥接: $dropped 门课没带节次或星期，已跳过（写进去会让课程挤在同一格里）")
+                }
                 if (courses.isEmpty()) {
                     addLog("JS桥接: 转换后无有效课程 (原始=${importedCourses.size}门)")
                     _toastMessage.value = "未识别到有效课程数据"
@@ -981,33 +1030,6 @@ class WebImportViewModel(
                 _isImporting.value = false
             }
         }
-    }
-
-    /** Convert shiguangschedule-format ImportCourseJson to our CourseEntity.
-     *  All field accesses are null-guarded because Gson can bypass Kotlin null-safety. */
-    private fun convertImportCourse(json: ImportCourseJson): CourseEntity? {
-        val name = json.name?.trim() ?: return null
-        if (name.isEmpty() || name.length < 2) return null
-        val day = json.day.takeIf { it in 1..7 } ?: return null
-
-        val startSlot = json.startSection ?: 1
-        val endSlot = json.endSection ?: startSlot
-        val weeksList = json.weeks ?: emptyList()
-        val weeks = weeksList.sorted().joinToString(",") { it.toString() }
-        val weekType = computeWeekType(parseWeeks(weeks))
-
-        return CourseEntity(
-            name = name,
-            teacher = (json.teacher ?: "").trim(),
-            room = (json.position ?: "").trim(),
-            dayOfWeek = day,
-            startSlot = startSlot,
-            endSlot = endSlot,
-            weeks = weeks,
-            weekType = weekType,
-            colorIndex = (day * 3 + startSlot) % 15,
-            schemeId = schemeIdProvider()
-        )
     }
 
     private suspend fun insertCourses(courses: List<CourseEntity>): Int {
@@ -1119,6 +1141,10 @@ class WebImportViewModel(
         else parseHorizontalTable(bodyRows, dayMap, colOffset, colors, rowSlotRanges)
 
         addLog("正方: 解析到 ${courses.size} 门课程")
+        // 记一条星期分布：格里"课程都挤在右边几列"时，这一行能立刻区分是解析错位还是绘制错位。
+        // 例：`星期分布 1=12 2=9 3=8 4=0 5=2 …` —— 若 1..4 全是 0 而 5..7 有课，就是 colOffset/表头错位。
+        addLog("正方: " + courses.groupingBy { it.dayOfWeek }.eachCount().toSortedMap()
+            .entries.joinToString(" ") { "${it.key}=${it.value}" }.let { "星期分布 $it" })
         return courses
     }
 

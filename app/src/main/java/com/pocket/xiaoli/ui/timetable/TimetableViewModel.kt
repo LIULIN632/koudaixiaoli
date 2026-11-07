@@ -7,6 +7,7 @@ import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.data.entity.SchemeEntity
 import com.pocket.xiaoli.data.entity.TermEntity
 import com.pocket.xiaoli.data.entity.TimeSlotEntity
+import com.pocket.xiaoli.data.entity.defaultTimeSlots
 import com.pocket.xiaoli.data.repository.CourseRepository
 import com.pocket.xiaoli.di.AppContainer
 import kotlinx.coroutines.flow.*
@@ -22,8 +23,18 @@ class TimetableViewModel(
         .flatMapLatest { schemeId -> repository.getCoursesByScheme(schemeId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * 节次表。**读空时退回内置默认节次表**，而不是把空表交给网格。
+     *
+     * 空表不是假设：`time_slots` 自 v22 起按 `app_state` 里的学校过滤，学校这一行
+     * 和插进去的行不一致时读回来就是空（fail-closed）。而网格的行数 = 这张表的行数，
+     * 0 行 ⇒ 整张网格高度 0 ⇒ 所有课程卡片叠在同一处 —— 表现就是"导入后课程都挤在一起"。
+     * 默认节次表本来就是时间段为空时的既定填充值（见 `CourseRepository.initTimeSlots`），
+     * 这里只是在 UI 侧先按它画，不改数据库。
+     */
     val allTimeSlots: StateFlow<List<TimeSlotEntity>> = repository.allTimeSlots
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .map { it.ifEmpty { defaultTimeSlots } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), defaultTimeSlots)
 
     val allSchemes: StateFlow<List<SchemeEntity>> = repository.allSchemes
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

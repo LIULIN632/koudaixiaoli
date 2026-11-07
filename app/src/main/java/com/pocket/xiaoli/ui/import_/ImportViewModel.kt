@@ -249,6 +249,17 @@ class ImportViewModel(
                 _result.value = res
 
                 if (res.success && res.courses != null) {
+                    // 星期分布写一行进度：格里「课程都挤在右边几列」时，这行能立刻区分是解析错位还是绘制错位。
+                    // 例：`星期分布 1=12 2=9 3=8 4=0 5=2` —— 1..4 全 0 而 5..7 有课，就是星期换算错了。
+                    val dayHistogram = res.courses.groupingBy { it.dayOfWeek }.eachCount().toSortedMap()
+                        .entries.joinToString(" ") { "${it.key}=${it.value}" }
+                    val daySample = com.pocket.xiaoli.core.academic.ZhengfangScheduleParser.lastDayNotes
+                        .joinToString(" ")
+                    val weekStart = com.pocket.xiaoli.core.academic.ZhengfangScheduleParser.lastWeekStartDay
+                    val weekStartNote = if (weekStart == 1) "" else " · 一周起始=" + weekStart + "(已换算)"
+                    _progress.value = "教务直连: ${res.courses.size} 门 · 星期 $dayHistogram $weekStartNote" +
+                        if (daySample.isEmpty()) "" else " · 字段 $daySample"
+                    android.util.Log.i("ImportViewModel", "教务直连 星期分布 $dayHistogram")
                     // 与 Web 导入一致：写入当前激活的方案，而不是默认方案
                     val schemeId = appContainer.activeSchemeId.value
                     try {

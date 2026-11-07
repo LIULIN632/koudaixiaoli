@@ -21,10 +21,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -45,6 +47,9 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pocket.xiaoli.data.courseware.CoursewareRef
+import com.pocket.xiaoli.data.courseware.CoursewareRepository
+import com.pocket.xiaoli.data.courseware.CoursewareRow
 import com.pocket.xiaoli.data.library.LibraryFile
 import com.pocket.xiaoli.data.library.LibraryRepository
 import com.pocket.xiaoli.ui.components.AppCard
@@ -80,10 +85,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun LibraryScreen(
     repository: LibraryRepository,
     onBack: () -> Unit,
+    onOpenCourseware: (CoursewareRef) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by repository.state.collectAsStateWithLifecycle()
+    val coursewareState by CoursewareRepository.state.collectAsStateWithLifecycle()
 
     var query by remember { mutableStateOf("") }
     var subject by remember { mutableStateOf("") }
@@ -92,12 +99,19 @@ internal fun LibraryScreen(
     var note by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { repository.refresh() }
+    // 互动课件与资料站共用这一页：课件是包内自带的（不用下载），先把仓库初始化，
+    // 否则只用过资料站、没进过服务页的设备会看到空分区。
+    LaunchedEffect(Unit) {
+        CoursewareRepository.init(context)
+        CoursewareRepository.refresh()
+    }
 
     val files = remember(query, state.files) { state.index.search(query) }
 
     LibraryContent(
         ui = LibraryUi(
             files = files,
+            coursewares = coursewareState.rows,
             query = query,
             subjects = state.index.subjects(),
             subject = subject,
@@ -110,6 +124,7 @@ internal fun LibraryScreen(
         onQueryChange = { query = it },
         onSelectSubject = { subject = it },
         onRefresh = { scope.launch { repository.refresh(force = true) } },
+        onOpenCourseware = onOpenCourseware,
         onFileClick = { file ->
             if (!file.downloadable) {
                 note = "《${file.name}》还没传上来，等作者补上"
@@ -142,6 +157,8 @@ internal fun LibraryScreen(
  */
 internal data class LibraryUi(
     val files: List<LibraryFile> = emptyList(),
+    /** 互动课件（包内自带 / 远端包），排在文件之前——它们不用下载就能开。 */
+    val coursewares: List<CoursewareRow> = emptyList(),
     val query: String = "",
     /** 出现过的学科，按索引顺序；只有一科时不画 chip 行。 */
     val subjects: List<String> = emptyList(),
@@ -162,6 +179,7 @@ internal fun LibraryContent(
     onRefresh: () -> Unit,
     onFileClick: (LibraryFile) -> Unit,
     onBack: () -> Unit,
+    onOpenCourseware: (CoursewareRef) -> Unit = {},
 ) {
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
@@ -211,6 +229,20 @@ internal fun LibraryContent(
                     insideMargin = DpSize(0.dp, 0.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) { }
+            }
+
+            // 互动课件排在文件之前：它们不用下载，点开就能看，是最该被看见的一块。
+            // 搜索框里输的字不会过滤课件——课件的标题是固定几门，硬过滤只会让人以为"搜不到就是没有"。
+            if (ui.coursewares.isNotEmpty()) {
+                SectionCaption("互动课件 · 不用下载")
+                ui.coursewares.forEach { row ->
+                    AppCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onOpenCourseware(row.ref) },
+                    ) {
+                        CoursewareListRow(row)
+                    }
+                }
             }
 
             // 第一层：学科。只有一科时不画，省一行高度。
@@ -348,6 +380,73 @@ private fun LibraryRow(
                 imageVector = Icons.Outlined.CloudDownload,
                 contentDescription = "下载",
                 tint = colors.accentMain,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoursewareListRow(row: CoursewareRow) {
+    val colors = LocalPocketXiaoliColors.current
+    val downloading = row.progress in 0..99
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(colors.accentMain.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.PlayCircleOutline,
+                contentDescription = null,
+                tint = colors.accentMain,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = row.ref.title,
+                style = MiuixTheme.textStyles.body1,
+                color = MiuixTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = row.ref.subtitle,
+                style = MiuixTheme.textStyles.footnote1,
+                color = colors.textSecondary,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = listOfNotNull(
+                    row.ref.course.takeIf { it.isNotBlank() },
+                    if (row.ref.isBuiltin) "随包自带" else "需下载",
+                ).joinToString(" · "),
+                style = MiuixTheme.textStyles.footnote2,
+                color = colors.textSecondary,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        when {
+            downloading -> Text(
+                text = "${row.progress}%",
+                style = MiuixTheme.textStyles.footnote1,
+                color = colors.accentMain,
+                fontWeight = FontWeight.Medium,
+            )
+
+            else -> Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.textSecondary,
                 modifier = Modifier.size(20.dp),
             )
         }

@@ -1,30 +1,135 @@
-/* 口袋小鲤内置版专用覆盖样式。
+/* ── 手机适配（口袋小鲤内置版） ─────────────────────────────────────────
  *
- * 这个文件**不属于课件源项目**（源在仓库外的 D:\AICAN\建模），由
- * tools/sync_courseware.py 在同步时追加到每个课件里。放在仓库里是为了：
- * 源项目改它自己的 styles.css，内置版改这一份，两边不互相牵连。
+ * 这一段只解决「手机上真的会坏」的问题，不改源项目的观感：
  *
- * 只补"手机上是真问题"的两处：
- *
- * 1. **滑杆点不中**。源项目把轨道做成 4px 高、滑块 15px —— 桌面上没问题，
- *    手指按上去十次有八次落在轨道外（本项目对可点元素的底线是 44dp）。
- *    所以把元素本身加高到 30px，同时用 background-size 把**可见**轨道仍锁在 4px：
- *    热区变大、外观不变，源项目的配色与渐变一行都不用动。
- * 2. **面板惯性滚动**。WebView 里长列表没有 -webkit-overflow-scrolling 会发涩。
+ * 1. **`inset` 短写不存在于老 WebView**。源项目 `#view { inset: 0 }` 在
+ *    Chrome 87 以下会被整条忽略，画布回到默认位置与尺寸，表现是「3D 跑到
+ *    左上角一小块」。这里把四条边写全，任何版本都吃。
+ * 2. **安全区**。刘海/挖孔屏上，面板与标题会压到状态栏或手势条下面。
+ * 3. **画布高度用 dvh 兜底**：`vh` 在地址栏收起的 WebView 里会跳，
+ *    `100dvh` 能跟住可视区；不认 dvh 的旧内核自动退回上面的百分比高度。
+ * 4. **手势**：整页禁止橡皮筋与双击缩放（否则拖模型会触发页面缩放）。
+ * 5. **滑杆热区**：轨道仍 4px 粗，但元素高 34px、拇指 24px，手指点得中。
  */
 
+html, body {
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+#view {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: 100%;
+  height: 54vh;
+  touch-action: none;
+}
+
+.hud {
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: calc(14px + env(safe-area-inset-left, 0px));
+  right: calc(14px + env(safe-area-inset-right, 0px));
+}
+
+.hud h1 { font-size: 17px; }
+.hud p { font-size: 11px; }
+
+.panel {
+  left: calc(6px + env(safe-area-inset-left, 0px));
+  right: calc(6px + env(safe-area-inset-right, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  max-height: calc(46dvh - 12px);
+  max-height: calc(46vh - 12px);
+  border-radius: 16px;
+  padding: 10px 12px 12px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* 面板的拖动条：手机上一眼看出「这块能往上滑」 */
+.panel::before {
+  content: "";
+  display: block;
+  width: 38px;
+  height: 4px;
+  margin: 2px auto 8px;
+  border-radius: 2px;
+  background: rgba(160, 180, 200, 0.35);
+}
+
+.group { padding: 10px 0; }
+.group h2 { font-size: 12px; }
+
 input[type="range"] {
-  height: 30px;
+  height: 34px;
   background-size: 100% 4px;
   background-position: center;
   background-repeat: no-repeat;
 }
 
 input[type="range"]::-webkit-slider-thumb {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
-.panel {
-  -webkit-overflow-scrolling: touch;
+/* WebGL 起不来时由 app-mobile.js 打开的兜底层 */
+.fallback {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 54vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0b0f14;
+  color: #dfe7ef;
+  font: 13px/1.5 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  text-align: center;
+  padding: 16px;
+  z-index: 5;
+}
+
+.fallback img {
+  width: min(86vw, 420px);
+  border-radius: 12px;
+  opacity: 0.95;
+}
+
+.fallback p { margin: 0; color: #9fb0c0; }
+.fallback strong { color: #ffb86b; font-weight: 600; }
+/* 面板内的拖动条必须是不可压缩的 flex 项：`.panel` 本身是 flex 容器，
+ * 18px 高的条会被压成 0（第一版就这样，肉眼看不到）。 */
+.panel::before {
+  flex: 0 0 auto;
+}
+
+/* 横屏（如手机横过来看课件）：画布铺满，面板改到右侧抽屉，
+ * 否则 54vh 只剩两百来像素，模型挤成一条线。 */
+@media (orientation: landscape) and (max-height: 520px) {
+  #view {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 100%;
+  }
+
+  .panel {
+    top: calc(8px + env(safe-area-inset-top, 0px));
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    left: auto;
+    width: min(46vw, 340px);
+    max-height: none;
+  }
+
+  .hud { right: calc(48vw + 16px); }
+  .hud h1 { font-size: 15px; }
+  .hud p { display: none; }
 }

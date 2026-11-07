@@ -80,6 +80,7 @@ fun WebImportScreen(
     val filteredSchools by viewModel.filteredSchools.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val importedCount by viewModel.importedCount.collectAsStateWithLifecycle()
+    val importSummary by viewModel.importSummary.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
     val parseLogs by viewModel.parseLogs.collectAsStateWithLifecycle()
@@ -570,6 +571,7 @@ fun WebImportScreen(
                 if (importedCount > 0) {
                     WebImportSuccessOverlay(
                         courseCount = importedCount,
+                        summary = importSummary,
                         onBackToTimetable = onBack,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -1063,6 +1065,7 @@ fun WebImportScreen(
 internal fun WebImportSuccessOverlay(
     courseCount: Int,
     onBackToTimetable: () -> Unit,
+    summary: ImportSummary? = null,
     modifier: Modifier = Modifier,
 ) {
     val skin = LocalSkin.current
@@ -1099,7 +1102,19 @@ internal fun WebImportSuccessOverlay(
             Spacer(Modifier.width(skin.spaceSm))
             Column(modifier = Modifier.weight(1f)) {
                 Text("导入成功", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = colors.textPrimary)
-                Text("已导入 $courseCount 门课程", fontSize = 12.sp, color = colors.textSecondary)
+                Text(
+                    summary?.headline() ?: "已导入 $courseCount 门课程",
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                )
+                val warns = summary?.warnings().orEmpty()
+                if (warns.isNotEmpty()) {
+                    Text(
+                        warns.joinToString(" · ") { it },
+                        fontSize = 11.sp,
+                        color = colors.danger,
+                    )
+                }
             }
             TextButton(onClick = onBackToTimetable) {
                 Text("返回课表", color = accentColor(), fontSize = 13.sp)

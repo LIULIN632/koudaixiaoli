@@ -9,13 +9,13 @@
     "字段与判定规则的完整说明见 docs/更新与公告.md。"
   ],
   "app": {
-    "versionCode": 113,
-    "versionName": "0.2.12",
+    "versionCode": 127,
+    "versionName": "0.2.26",
     "minSupported": 0,
-    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.12/koudaixiaoli_v0.2.12.apk",
-    "sha256": "e9abcb096584aaeb472862587b57210592fd8c25d940b45b1901a63700fdc86f",
-    "rollout": 0,
-    "publishedAt": "2026-11-05T23:39:52+08:00",
+    "apkUrl": "https://gitee.com/liulin62633/pocket-carp/releases/download/v0.2.26/koudaixiaoli_v0.2.26.apk",
+    "sha256": "b8422108cb7b2d431a19698e386d65092dab76a1756a43d793954734ea42fd98",
+    "rollout": 100,
+    "publishedAt": "2026-11-06T23:03:58+08:00",
     "notes": [
       "电费提醒线自己定：默认降到 10 元才提醒，点「知道了」当天不再说",
       "换学校不再串数据：课表、成绩等 10 张表按校分开，切回去数据还在",

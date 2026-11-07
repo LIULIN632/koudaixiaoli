@@ -1,12 +1,20 @@
 package com.pocket.xiaoli.ui.courseware
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.net.Uri
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
+import android.widget.Toast
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,8 +27,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,6 +84,12 @@ internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
     var server by remember { mutableStateOf<CoursewareServer?>(null) }
     var failure by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    // 页面加载完成 ≠ 课件跑起来了：three.js 起不来时网页一样会 200，但画面是空的。
+    // 所以 onPageFinished 之后要再问一次页面「你初始化成功了吗」，失败时给出能复制的诊断。
+    var diagnostics by remember { mutableStateOf("") }
+    var pageProblem by remember { mutableStateOf<String?>(null) }
+    // onConsoleMessage 在 WebView 线程上回调，用线程安全的列表接住
+    val consoleTail = remember { java.util.Collections.synchronizedList(mutableListOf<String>()) }
     // 重试的写法是"换 key 重起一遍"而不是"reload 同一个 WebView"：
     // 服务没起来时根本没有可 reload 的对象，而页面加载失败多半也是服务侧的问题。
     var attempt by remember { mutableIntStateOf(0) }
@@ -126,7 +142,7 @@ internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
             if (loading && failure == null) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            val problem = failure
+            val problem = failure ?: pageProblem
             when {
                 problem != null -> Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -138,9 +154,36 @@ internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
                         color = colors.textSecondary,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
-                    Button(onClick = { attempt++ }) {
-                        Icon(Icons.Filled.Refresh, null, modifier = Modifier.padding(end = 6.dp))
-                        Text("重试")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = { attempt++ }) {
+                            Icon(Icons.Filled.Refresh, null, modifier = Modifier.padding(end = 6.dp))
+                            Text("重试")
+                        }
+                        // 手机内核老、WebGL 被禁时，系统浏览器往往还能开起来——
+                        // 与其卡在「打不开」，不如把地址交出去。
+                        val external = url
+                        if (external != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(external))
+                                        )
+                                    }.onFailure { failure = "没有能打开网页的应用：${it.javaClass.simpleName}" }
+                                },
+                            ) { Text("用浏览器打开") }
+                        }
+                    }
+                    if (diagnostics.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                val clip = context.getSystemService(ClipboardManager::class.java)
+                                clip?.setPrimaryClip(
+                                    ClipData.newPlainText("课件诊断", diagnostics)
+                                )
+                                Toast.makeText(context, "诊断已复制，发给作者就行", Toast.LENGTH_SHORT).show()
+                            },
+                        ) { Text("复制诊断信息") }
                     }
                 }
 
@@ -162,9 +205,52 @@ internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
                                 settings.domStorageEnabled = true
                                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
                                 settings.javaScriptCanOpenWindowsAutomatically = false
+                                // 这两行是「手机上看不对」的关键：WebView 默认
+                                // `useWideViewPort = false`，会**忽略**页面的
+                                // `<meta name="viewport">`，按 980px 桌面宽度排版再整体缩小，
+                                // 表现就是字小、面板被压扁、滑杆挤成一条。
+                                // 打开它、关掉 overview，页面才真的按 device-width 排。
+                                settings.useWideViewPort = true
+                                settings.loadWithOverviewMode = false
+                                // 双指缩放交给课件自己（OrbitControls 做相机缩放），
+                                // 页面级缩放会把画面拽花。
+                                settings.setSupportZoom(false)
+                                settings.builtInZoomControls = false
+                                settings.displayZoomControls = false
+                                // 深色底，避免首帧白闪
+                                setBackgroundColor(android.graphics.Color.parseColor("#0B0F14"))
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         loading = false
+                                        // 给页面 2.6 秒：它自己要先判定 WebGL 是否可用，
+                                        // 并把「黑屏」换成静态图 + 说明（app-mobile.js）。
+                                        // 我们晚一步再看，避免用一层系统提示盖掉页面更好的兜底。
+                                        view?.postDelayed({
+                                            view.evaluateJavascript(PROBE_JS) { raw ->
+                                                val probed = raw?.trim('"')?.replace("\\u003c", "<").orEmpty()
+                                                diagnostics = buildString {
+                                                    append("课件：").append(item.id).append('\n')
+                                                    append("探测：").append(probed).append('\n')
+                                                    if (consoleTail.isNotEmpty()) {
+                                                        append("控制台：\n")
+                                                        consoleTail.forEach { append("  ").append(it).append('\n') }
+                                                    }
+                                                    append("UA：").append(
+                                                        System.getProperty("http.agent").orEmpty()
+                                                    )
+                                                }
+                                                val status = probed.substringBefore('|')
+                                                // 页面已经自己换成静态图的两种状态：不再盖一层，
+                                                // 只把诊断留在「复制诊断信息」里。
+                                                val pageHandled = status == "no-webgl" || status == "stale-engine"
+                                                if (!pageHandled && status.isNotBlank() &&
+                                                    status != "ready" && status != "(none)"
+                                                ) {
+                                                    pageProblem = "课件页面加载了，但没跑起来（状态：$status）。" +
+                                                        "点「用浏览器打开」试试；不行就把诊断信息发给我。"
+                                                }
+                                            }
+                                        }, 2600)
                                     }
 
                                     override fun onReceivedError(
@@ -177,6 +263,16 @@ internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
                                             failure = "课件没能加载出来：${error?.description}"
                                             loading = false
                                         }
+                                    }
+                                }
+                                // 控制台尾部：真跑不起来时，报错信息在这一屏之外，
+                                // 用户能复制的只有它。
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
+                                        val line = "${msg.message()} (${msg.sourceId()}:${msg.lineNumber()})"
+                                        if (consoleTail.size >= 12) consoleTail.removeAt(0)
+                                        consoleTail.add(line)
+                                        return true
                                     }
                                 }
                                 loadUrl(url)
@@ -196,3 +292,13 @@ internal fun CoursewareScreen(item: CoursewareRef, onBack: () -> Unit) {
         }
     }
 }
+/**
+ * 页面自报状态：`data-status` 由课件的 ui.js 在初始化成功后改写成 `ready`；
+ * 顺带探一次 WebGL——手机上打不开多半是这一条为假。
+ */
+private const val PROBE_JS = """(function(){try{
+  var s=document.body.getAttribute('data-status')||'(none)';
+  var c=document.createElement('canvas');
+  var gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+  return s+'|'+(gl?gl.getParameter(gl.VERSION):'no-webgl');
+}catch(e){return 'probe-error|'+e;}})()"""

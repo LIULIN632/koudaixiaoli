@@ -83,6 +83,8 @@ fun PeriodGrid(
     gridBgColor: Int = -1,
     otherWeekAlpha: Float = 0.50f,
     verticalLayout: Boolean = true,
+    /** 绘制用的「现在」；默认真时钟，测试/截图可传固定时刻。 */
+    nowForDisplay: java.time.LocalDateTime = java.time.LocalDateTime.now(),
     /**
      * 课程名 → 这门课**最紧**那条作业的截止档位（值可为 null = 有作业但没写能解析的日期）。
      *
@@ -93,6 +95,11 @@ fun PeriodGrid(
     onCourseClick: (CourseEntity) -> Unit,
     onEmptyCellClick: (Int, Int) -> Unit,
     onCourseMoved: (List<Long>, Int, Int) -> Unit,
+    /**
+     * 点课程块里「教室」那一行。宿主管导航（见 `TimetableScreen` 的 `onOpenRoomLayout`），
+     * 网格本身不知道该跳哪儿；null = 教室行只是文字。
+     */
+    onRoomClick: ((String) -> Unit)? = null,
     /**
      * 滚动内容底部的额外留白（通常 = 底栏高度）。
      *
@@ -109,9 +116,11 @@ fun PeriodGrid(
     modifier: Modifier = Modifier
 ) {
     val skin = LocalSkin.current
-    val today = java.time.LocalDate.now()
+    // 「现在」的取处故意留了注入点：推广位截图（PromoCaptureTest）要拍一个固定时刻，
+    // 否则那条时间线随真实时间往下走，同一张基准图上下午各拍一次就会不一样。
+    val today = nowForDisplay.toLocalDate()
     val todayDay = today.dayOfWeek.value
-    val now = LocalTime.now()
+    val now = nowForDisplay.toLocalTime()
     val density = LocalDensity.current
     val isDark = LocalDarkMode.current
     val colors = LocalPocketXiaoliColors.current
@@ -301,6 +310,23 @@ fun PeriodGrid(
                                     .weight(1f)
                                     .fillMaxHeight()
                                     .padding(horizontal = 0.5.dp)
+                                    .then(
+                                        // 今天整列铺一层极淡的强调底：课表要回答"现在走到哪儿了"，
+                                        // 而 `isToday` 以前**算了却没人用** —— 今天那一列从来没有标记，
+                                        // 只能靠数表头或看侧栏的当前节次去猜。
+                                        if (isToday) Modifier.drawBehind {
+                                            drawRoundRect(
+                                                color = colors.accentMain.copy(alpha = if (isDark) 0.10f else 0.06f),
+                                                cornerRadius = CornerRadius(2.dp.toPx()),
+                                            )
+                                        } else if (day >= 6) Modifier.drawBehind {
+                                            // 周六周日不是"没课的空格"，压一层底与上课日分开（深色用黑，浅色用次级底）
+                                            drawRoundRect(
+                                                color = if (isDark) Color.Black.copy(alpha = 0.28f) else colors.surfaceAlt,
+                                                cornerRadius = CornerRadius(2.dp.toPx()),
+                                            )
+                                        } else Modifier
+                                    )
                                     .drawBehind {
                                         drawRoundRect(
                                             // ⚠️ 这里原先写死 `Color(0xFFE9ECEF)`（浅色态的近白灰），
@@ -385,13 +411,22 @@ fun PeriodGrid(
                             // 整块都是非本周课程 → 虚线幽灵样式（不可拖，保持旧版非本周表现）
                             val isGhost = !hasActive
 
-                            val spanSlots = (block.end - block.start).coerceAtLeast(0.3f)
-                            val cardHeightDp = spanSlots * safeGridHeight
+                            // ⚠️ 坐标来自数据库（导入、手动添加、备份恢复都可能留下 0 或超出行数的节次）。
+                            // 这里只保证「画得下」：顶部不早于第一行、底部不超过最后一行。
+                            // 越界不是靠钳位修好的 —— 该读成几节就是几节，见 `ZhengfangHtmlParser`；
+                            // 少了这一步，startSlot=0 的课会画到网格上方（`clipToBounds` 直接切掉），
+                            // 整周课程就叠成一小坨。
+                            val gridRows = timeSlots.size.coerceAtLeast(1)
+                            val topSlot = block.start.coerceIn(1f, gridRows.toFloat())
+                            val bottomSlot = block.end
+                                .coerceAtLeast(topSlot + 0.3f)
+                                .coerceAtMost((gridRows + 1).toFloat())
+                            val cardHeightDp = (bottomSlot - topSlot) * safeGridHeight
                             val mainColorIndex = mainCourse.colorIndexFor(courseColorMode)
                             val bgColor = courseBgColor(mainColorIndex, isDark)
                             val textColor = courseTextColor(mainColorIndex, isDark)
                             val xDp = sidebarDp + cellPad + cellWDp * (day - 1)
-                            val yDp = safeGridHeight.dp * (block.start - 1)
+                            val yDp = safeGridHeight.dp * (topSlot - 1f)
                             val blockAlpha = when {
                                 isDragging -> (if (isGhost) otherWeekAlpha else gridOpacity) * 0.3f
                                 isGhost -> otherWeekAlpha
@@ -529,10 +564,15 @@ fun PeriodGrid(
                                                 }
                                         }
                                     )
-                                    .padding(horizontal = skin.spaceXs, vertical = 8.dp),
+                                    // 单节块只有一行高（约 64dp），上下各 8dp 会把「课名两行 + 教室」挤没；
+                                    // 多节块留 8dp 的呼吸量。判据与 `CourseCardContent` 省教师行同源：先保内容。
+                                    .padding(
+                                        horizontal = skin.spaceXs,
+                                        vertical = if (block.slots <= 1) 4.dp else 8.dp,
+                                    ),
                                 contentAlignment = if (textCentered) Alignment.Center else Alignment.TopStart
                             ) {
-                                CourseCardContent(mainCourse, textColor, isGhost, showTeacher, showRoom, showCampus, showOddEven, textCentered, gridTextSize, hasHomework = homeworkStageByCourse.containsKey(mainCourse.name), homeworkUrgent = isUrgentStage(homeworkStageByCourse[mainCourse.name]), otherWeekAlpha = if (isGhost) otherWeekAlpha else if (isDragging) 0.5f else 1f, verticalLayout = verticalLayout, slots = block.slots)
+                                CourseCardContent(mainCourse, textColor, isGhost, showTeacher, showRoom, showCampus, showOddEven, textCentered, gridTextSize, hasHomework = homeworkStageByCourse.containsKey(mainCourse.name), homeworkUrgent = isUrgentStage(homeworkStageByCourse[mainCourse.name]), otherWeekAlpha = if (isGhost) otherWeekAlpha else if (isDragging) 0.5f else 1f, verticalLayout = verticalLayout, slots = block.slots, onRoomClick = onRoomClick)
                                 // 非本周 leftover 局部斜纹遮罩（混合块：活跃课 + 非活跃课剩余区域）
                                 if (!isGhost && block.maskRanges.isNotEmpty()) {
                                     NonActiveMaskOverlay(block)
@@ -679,6 +719,15 @@ internal fun CourseCardContent(
      * 所以单节块 + 长课名时主动省掉教师那一行，而不是让教室被裁掉。
      */
     slots: Int = 2,
+    /**
+     * 点「教室」那一行时做什么（通常是打开教室分布图）。null = 教室行只是文字。
+     *
+     * ⚠️ 只有**这一行**可点，整张卡片仍是"点开详情 / 长按拖动"：
+     * 卡片本身用 `detectDragGesturesAfterLongPress`（`awaitFirstDown(requireUnconsumed = false)`），
+     * 内层 clickable 吃掉短按不会打断长按拖拽 —— 但别把可点区域扩大到课名行，
+     * 那是拖拽手势的落点。
+     */
+    onRoomClick: ((String) -> Unit)? = null,
 ) {
     val skin = LocalSkin.current
     val nameAlpha = if (isNonCurrent) (otherWeekAlpha * 2.78f).coerceIn(0.3f, 1f) else 1f
@@ -693,6 +742,12 @@ internal fun CourseCardContent(
             val campusIdx = room.indexOf("校区")
             if (campusIdx > 0) room.substring(campusIdx + 2).trimStart(' ', '·', '-') else room
         }
+    }
+    // 教室行可点：只有真的写了教室、且宿主给了动作时才挂 clickable（没有教室的格子不该有"可点"的错觉）
+    val roomClickModifier = if (onRoomClick != null && displayRoom.isNotBlank()) {
+        Modifier.clickable { onRoomClick(displayRoom) }
+    } else {
+        Modifier
     }
 
     if (!verticalLayout) {
@@ -766,7 +821,7 @@ internal fun CourseCardContent(
                     overflow = TextOverflow.Ellipsis,
                     softWrap = false,
                     textAlign = if (textCentered) TextAlign.Center else TextAlign.Start,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().then(roomClickModifier)
                 )
             }
             if (showOddEven && course.weekType != "all") {
@@ -859,7 +914,7 @@ internal fun CourseCardContent(
                 overflow = TextOverflow.Ellipsis,
                 softWrap = true,
                 textAlign = if (textCentered) TextAlign.Center else TextAlign.Start,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().then(roomClickModifier)
             )
         }
         if (showOddEven && course.weekType != "all") {

@@ -1,8 +1,6 @@
 package com.pocket.xiaoli.notification
 
 import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -21,7 +19,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-internal const val REMINDER_CHANNEL_ID = "class_reminder"
+internal const val REMINDER_CHANNEL_ID = ReminderNotifications.CHANNEL_CLASS
 private const val REQUEST_CODE = 4101
 
 data class ClassReminder(
@@ -33,19 +31,11 @@ data class ClassReminder(
 
 object ClassReminderScheduler {
 
-    fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(REMINDER_CHANNEL_ID) == null) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    REMINDER_CHANNEL_ID,
-                    "上课提醒",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply { description = "上课前提醒下一节课" }
-            )
-        }
-    }
+    /**
+     * 建渠道。**真源在 [ReminderNotifications.ensureChannels]** —— 这里只是保住旧调用点，
+     * 三类提醒（上课 / 作业 / 考试）的渠道不能再各建各的。
+     */
+    fun ensureChannel(context: Context) = ReminderNotifications.ensureChannels(context)
 
     fun rescheduleAsync(context: Context) {
         val appContext = context.applicationContext

@@ -37,6 +37,7 @@ import com.pocket.xiaoli.ui.zhengfang.ZhengfangSchoolList
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.rememberStaggeredMenu
 import com.pocket.xiaoli.ui.components.InlineError
 import com.pocket.xiaoli.ui.components.ServiceEmptyCard
 import com.pocket.xiaoli.ui.components.ServiceHeroBadge
@@ -324,8 +325,15 @@ private fun TermDropdown(
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
+    // 逐项错开出场：`reveal.menuExpanded` 在收回动画放完之前一直是 true，
+    // 否则菜单会先消失、"逆序收回"看不见（见 `rememberStaggeredMenu`）。
+    val reveal = rememberStaggeredMenu(
         expanded = expanded,
+        itemCount = terms.size,
+        onClosed = { expanded = false },
+    )
+    ExposedDropdownMenuBox(
+        expanded = reveal.menuExpanded,
         onExpandedChange = { expanded = it },
         modifier = modifier
     ) {
@@ -347,17 +355,19 @@ private fun TermDropdown(
             )
         )
         ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
+            expanded = reveal.menuExpanded,
+            onDismissRequest = reveal.close
         ) {
-            terms.forEach { term ->
-                DropdownMenuItem(
-                    text = { Text(term.label, fontSize = 13.sp) },
-                    onClick = {
-                        onSelect(term)
-                        expanded = false
-                    }
-                )
+            terms.forEachIndexed { index, term ->
+                Box(reveal.itemModifier(index)) {
+                    DropdownMenuItem(
+                        text = { Text(term.label, fontSize = 13.sp) },
+                        onClick = {
+                            onSelect(term)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }

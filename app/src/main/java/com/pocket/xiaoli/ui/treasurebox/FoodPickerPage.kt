@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pocket.xiaoli.ui.components.AppCard
+import com.pocket.xiaoli.ui.components.rememberStaggeredMenu
 import com.pocket.xiaoli.ui.components.ServiceEmptyCard
 import com.pocket.xiaoli.ui.components.ServiceHeroBadge
 import com.pocket.xiaoli.ui.components.ServiceHeroCard
@@ -487,8 +488,9 @@ private fun FoodFormDialog(
                         modifier = Modifier.weight(0.7f)
                     )
                 }
+                val catReveal = rememberStaggeredMenu(catExpanded, categories.size) { catExpanded = false }
                 ExposedDropdownMenuBox(
-                    expanded = catExpanded,
+                    expanded = catReveal.menuExpanded,
                     onExpandedChange = { catExpanded = it }
                 ) {
                     OutlinedTextField(
@@ -500,9 +502,11 @@ private fun FoodFormDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = catExpanded) },
                         singleLine = true
                     )
-                    ExposedDropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
-                        categories.forEach { c ->
-                            DropdownMenuItem(text = { Text(c) }, onClick = { category = c; catExpanded = false })
+                    ExposedDropdownMenu(expanded = catReveal.menuExpanded, onDismissRequest = catReveal.close) {
+                        categories.forEachIndexed { index, c ->
+                            Box(catReveal.itemModifier(index)) {
+                                DropdownMenuItem(text = { Text(c) }, onClick = { category = c; catExpanded = false })
+                            }
                         }
                     }
                 }

@@ -233,6 +233,10 @@ private fun runApp(args: Array<String>) = application {
                 exitApplication()
             }
         },
+        // ⚠️ 不给 icon 的话，窗口/任务栏显示的是 **JVM 默认图标（Java 咖啡杯）**——
+        // `--icon` 只决定 exe 文件在资源管理器/开始菜单里的样子，管不到运行时的窗口图标。
+        // 两者要分别设置，否则就是「装好的程序图标对了，打开后任务栏还是 Java」。
+        icon = painterResource("app-icon.png"),
         title = "口袋小鲤 · 桌面版",
         state = rememberWindowState(
             position = WindowPosition(Alignment.Center),
@@ -242,6 +246,17 @@ private fun runApp(args: Array<String>) = application {
         LaunchedEffect(Unit) {
             windowRef = window
             WindowActivator.action = { WindowActivator.showWindow(window) }
+            // 任务栏单独再设一次：Windows 上从 jar 直接跑时，任务栏条目挂在 java.exe 上，
+            // 只设窗口图标偶尔仍显示 Java 杯；Taskbar.setIconImage 能覆盖这一层。
+            runCatching {
+                if (java.awt.Taskbar.isTaskbarSupported()) {
+                    val taskbar = java.awt.Taskbar.getTaskbar()
+                    val bytes = object {}.javaClass.getResourceAsStream("/app-icon.png")?.readBytes()
+                    if (bytes != null && taskbar.isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) {
+                        taskbar.setIconImage(javax.imageio.ImageIO.read(bytes.inputStream()))
+                    }
+                }
+            }
             window.minimumSize = Dimension(1000, 660)
             if (devTab != null) state.tab = devTab.coerceIn(0, 4)
             when (demo) {

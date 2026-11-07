@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pocket.xiaoli.data.entity.CourseEntity
 import com.pocket.xiaoli.ui.components.FieldActionChip
+import com.pocket.xiaoli.ui.components.rememberStaggeredMenu
 import com.pocket.xiaoli.ui.components.SectionCaption
 import com.pocket.xiaoli.ui.theme.CourseColors
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
@@ -533,7 +534,9 @@ private fun EditorDropdown(
     val skin = LocalSkin.current
     val colors = LocalPocketXiaoliColors.current
     var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
+    // 三个下拉并排、选项 7~12 个：逐项错开出场，收回时最后一项先走
+    val reveal = rememberStaggeredMenu(expanded, options.size) { expanded = false }
+    ExposedDropdownMenuBox(expanded = reveal.menuExpanded, onExpandedChange = { expanded = it }, modifier = modifier) {
         OutlinedTextField(
             value = display,
             onValueChange = {},
@@ -551,9 +554,11 @@ private fun EditorDropdown(
                 unfocusedContainerColor = colors.surfaceBase,
             ),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ExposedDropdownMenu(expanded = reveal.menuExpanded, onDismissRequest = reveal.close) {
             options.forEachIndexed { i, o ->
-                DropdownMenuItem(text = { Text(o) }, onClick = { onSelect(i); expanded = false })
+                Box(reveal.itemModifier(i)) {
+                    DropdownMenuItem(text = { Text(o) }, onClick = { onSelect(i); expanded = false })
+                }
             }
         }
     }

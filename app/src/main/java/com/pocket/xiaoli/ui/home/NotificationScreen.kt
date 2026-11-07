@@ -151,7 +151,8 @@ internal fun NotificationScreen(
                             state.notes.isNotEmpty() -> state.notes.joinToString("；")
                             else -> "点这一行直接下载安装，装完回来看。"
                         },
-                        meta = "点这里下载安装",
+                        meta = "下载并安装",
+                        tag = "更新",
                         accent = if (state.forceUpdate) colors.danger else colors.accentMain,
                         icon = { NotificationIcon(Icons.Outlined.SystemUpdateAlt, colors.accentMain) },
                         onClick = { startUpdate(context, state) },
@@ -166,7 +167,11 @@ internal fun NotificationScreen(
                         NotificationRow(
                             title = announcement.title,
                             body = announcement.body,
-                            meta = announcement.url?.takeIf { it.isNotBlank() }?.let { "点这里查看详情" },
+                            meta = announcement.url?.takeIf { it.isNotBlank() }?.let { "查看详情" },
+                            // 角标按**公告等级**上色：两张公告除了图标颜色完全一样时，
+                            // 读者分不出哪条是"必须看"的那条
+                            tag = announcement.tagLabel(),
+                            tagAccent = announcement.accent(colors),
                             accent = announcement.accent(colors),
                             icon = { NotificationIcon(Icons.Outlined.Description, announcement.accent(colors)) },
                             onClick = announcement.url?.takeIf { it.isNotBlank() }?.let { url ->
@@ -268,6 +273,10 @@ private fun NotificationRow(
     title: String,
     body: String,
     meta: String?,
+    /** 右上角的类型角标（更新 / 公告 / 重要）。null = 不画。 */
+    tag: String? = null,
+    /** 角标配色；null 用 [accent]。 */
+    tagAccent: Color? = null,
     accent: Color,
     icon: @Composable () -> Unit,
     onClick: (() -> Unit)?,
@@ -285,14 +294,21 @@ private fun NotificationRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(
-                title,
-                style = MiuixTheme.textStyles.body1,
-                fontWeight = FontWeight.Medium,
-                color = MiuixTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f),
+                    style = MiuixTheme.textStyles.body1,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (tag != null) {
+                    Spacer(Modifier.width(8.dp))
+                    NotificationTag(text = tag, accent = tagAccent ?: accent)
+                }
+            }
             if (body.isNotBlank()) {
                 Text(
                     body,
@@ -326,6 +342,36 @@ private fun NotificationRow(
             }
         }
     }
+}
+
+/**
+ * 类型角标（更新 / 公告 / 重要 / 提醒）。
+ *
+ * 把"这一条是什么"从**只有图标颜色**里解出来：两张公告的图标形状一样，
+ * 只靠底色区分时扫一眼分不清哪条是必须看的。文字比颜色可靠，也照顾色觉障碍。
+ */
+@Composable
+private fun NotificationTag(text: String, accent: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(accent.copy(alpha = 0.12f))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text,
+            style = MiuixTheme.textStyles.footnote2,
+            fontWeight = FontWeight.Medium,
+            color = accent,
+        )
+    }
+}
+
+/** 公告的类型文案：要紧的那两档直说，普通公告写「公告」。 */
+private fun Announcement.tagLabel(): String = when (level) {
+    AnnouncementLevel.CRITICAL, AnnouncementLevel.FORCE_UPDATE -> "重要"
+    AnnouncementLevel.WARN -> "提醒"
+    else -> "公告"
 }
 
 /** 圆角小方块里的图标：与设置页的 `SettingsIcon` 同一尺寸体系（32dp 圈、18dp 图标）。 */

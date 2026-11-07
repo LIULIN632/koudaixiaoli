@@ -462,7 +462,7 @@ abstract class PocketXiaoliDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE TRIGGER IF NOT EXISTS stamp_$table AFTER INSERT ON $table " +
                             "WHEN NEW.schoolId = '' BEGIN " +
-                            "UPDATE $table SET schoolId = (SELECT schoolId FROM app_state WHERE id = 1) " +
+                            "UPDATE $table SET schoolId = COALESCE((SELECT schoolId FROM app_state WHERE id = 1), '') " +
                             "WHERE rowid = NEW.rowid; END"
                     )
                 }
@@ -492,7 +492,7 @@ abstract class PocketXiaoliDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE TRIGGER IF NOT EXISTS stamp_$table AFTER INSERT ON $table " +
                             "WHEN NEW.schoolId = '' BEGIN " +
-                            "UPDATE $table SET schoolId = (SELECT schoolId FROM app_state WHERE id = 1) " +
+                            "UPDATE $table SET schoolId = COALESCE((SELECT schoolId FROM app_state WHERE id = 1), '') " +
                             "WHERE rowid = NEW.rowid; END"
                     )
                 }

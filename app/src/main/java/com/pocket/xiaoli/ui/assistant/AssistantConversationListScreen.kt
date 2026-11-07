@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -175,18 +177,64 @@ fun AssistantConversationListScreen(
 
     // 删除确认：会话删了就没了（消息是级联删的），不能点一下就执行
     pendingDelete?.let { target ->
+        // 与全 App 的卡片语言一致：圆角走皮肤、卡底走 surfaceCard，
+        // 标题前放一枚危险色图标块，主操作是实底红而不是一段红字 ——
+        // 默认 AlertDialog 的直角 + 纯文字按钮放在这个界面里像系统弹窗。
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除这条对话？") },
-            text = { Text("「${target.title}」的全部消息会一起删除，无法恢复。") },
+            shape = RoundedCornerShape(skin.radiusLarge),
+            containerColor = colors.surfaceCard,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(colors.danger.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = null,
+                            tint = colors.danger,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(skin.spaceSm))
+                    Text("删除这条对话？", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            text = {
+                Text(
+                    text = "「${target.title}」的全部消息会一起删除，无法恢复。",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary,
+                    lineHeight = 19.sp,
+                )
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    onDelete(target.id)
-                    pendingDelete = null
-                }) { Text("删除", color = colors.danger) }
+                Button(
+                    onClick = {
+                        onDelete(target.id)
+                        pendingDelete = null
+                    },
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.danger,
+                        contentColor = Color.White,
+                    ),
+                    contentPadding = PaddingValues(horizontal = skin.spaceLg, vertical = 8.dp),
+                ) {
+                    Text("删除", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+                TextButton(
+                    onClick = { pendingDelete = null },
+                    shape = RoundedCornerShape(50),
+                ) {
+                    Text("取消", fontSize = 13.sp, color = colors.textSecondary)
+                }
             },
         )
     }

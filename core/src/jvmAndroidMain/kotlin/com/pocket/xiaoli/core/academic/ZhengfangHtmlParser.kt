@@ -271,7 +271,7 @@ object ZhengfangHtmlParser {
             return parseVerticalTable(rows, html)
         }
 
-        return parseHorizontalTable(rows, html)
+        return parseHorizontalTable(rows)
     }
 
     private fun detectVerticalTable(rows: List<MatchResult>, fullHtml: String): Boolean {
@@ -378,7 +378,7 @@ object ZhengfangHtmlParser {
         return courses.distinctBy { "${it.name}_${it.dayOfWeek}_${it.startSlot}" }
     }
 
-    private fun parseHorizontalTable(rows: List<MatchResult>, html: String): List<ParsedCourse> {
+    private fun parseHorizontalTable(rows: List<MatchResult>): List<ParsedCourse> {
         val courses = mutableListOf<ParsedCourse>()
 
         val headerCells = Regex("""<t[dh][^>]*>(.*?)</t[dh]>""",
@@ -399,7 +399,12 @@ object ZhengfangHtmlParser {
             }
         }
 
+        // ⚠️ 节次以**行标签**为准，标签读不出来才按行数往下数。
+        // 原来这里只认「第N节」，于是「第1-2节」这类标签整个读不出来（正则里 `节` 必须紧跟数字），
+        // 一门 1-2 节的课被压成 1 节 —— 格子高度和真实节次对不上，看着就是"课程挤在一起"。
+        // 0 是"上一行的节次"，第一行会先 ++ 变成 1；改成 1 起步会把整表往下推一节。
         var currentSlot = 0
+        var currentEndSlot = 0
         for (row in rows.drop(1)) {
             val cells = Regex("""<t[dh][^>]*>(.*?)</t[dh]>""",
                 setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
@@ -407,13 +412,17 @@ object ZhengfangHtmlParser {
             if (cells.isEmpty()) continue
 
             val firstCellText = cells.getOrNull(0)?.groupValues?.get(1)
-                ?.replace(Regex("<[^>]*>"), "")?.trim() ?: ""
-            val slotMatch = Regex("""第\s*(\d+)\s*节""").find(firstCellText)
-            if (slotMatch != null) {
-                currentSlot = slotMatch.groupValues[1].toIntOrNull() ?: (currentSlot + 1)
+                .orEmpty().replace(Regex("<[^>]*>"), "").trim()
+            // `parseSlotRange` 认「第N节」「第N-M节」「N-M节」「N」，而**不**认「08:00-08:45」
+            // 这种时间标签（所以时间标签继续走"按行数"那条路，与改造前一致）。
+            val labelRange = parseSlotRange(firstCellText)
+            if (labelRange != null) {
+                currentSlot = labelRange.first
+                currentEndSlot = maxOf(labelRange.first, labelRange.second)
             } else if (firstCellText.isNotEmpty() &&
                 !firstCellText.contains("上午") && !firstCellText.contains("下午") && !firstCellText.contains("晚上")) {
                 currentSlot++
+                currentEndSlot = currentSlot
             }
 
             for ((colIdx, cell) in cells.withIndex()) {
@@ -447,15 +456,16 @@ object ZhengfangHtmlParser {
 
                 val rowSpanMatch = Regex("""row[sS]pan\s*=\s*["'](\d+)["']""").find(cellHtml)
                 val rowSpan = rowSpanMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                val endSlot = currentSlot + rowSpan - 1
+                // 跨行的单元格按 rowspan 往下长；不跨行时用**标签给的区间**（1-2节就是 1..2）
+                val endSlot = maxOf(currentEndSlot, currentSlot + rowSpan - 1)
 
                 courses.add(ParsedCourse(
                     name = name,
                     teacher = if (teacher.length < 10 && !teacher.contains("周") && !teacher.contains("第")) teacher else "",
                     room = if (room.length < 10 && (room.contains("楼") || room.contains("教") || room.contains("室") || room.contains("区") || room.matches(Regex(".*\\d+.*")))) room else "",
                     dayOfWeek = day,
-                    startSlot = currentSlot,
-                    endSlot = endSlot,
+                    startSlot = currentSlot.coerceAtLeast(1),
+                    endSlot = endSlot.coerceAtLeast(currentSlot).coerceAtLeast(1),
                     weekType = weekType,
                     weeks = weeks.joinToString(",") { it.toString() },
                     colorIndex = (day * 3 + currentSlot) % 15
@@ -463,40 +473,11 @@ object ZhengfangHtmlParser {
             }
         }
 
-        // Method 2: fallback regex extraction
-        if (courses.isEmpty()) {
-            val allCellContent = Regex("""<td[^>]*>([\s\S]*?)</td>""", RegexOption.IGNORE_CASE)
-                .findAll(html)
-                .map { it.groupValues[1].replace(Regex("<[^>]*>"), "").trim() }
-                .filter { it.length > 5 && Regex("""[一-鿿]""").containsMatchIn(it) }
-                .toList()
-
-            var i = 0
-            var inferredDay = 1
-            var inferredSlot = 1
-            while (i + 2 < allCellContent.size) {
-                val potentialName = allCellContent[i]
-                val potentialTeacher = allCellContent.getOrElse(i + 1) { "" }
-                val potentialRoom = allCellContent.getOrElse(i + 2) { "" }
-                if (potentialName.length in 2..30 && Regex("""[一-鿿]""").containsMatchIn(potentialName)) {
-                    val weeks = parseWeeks(allCellContent.getOrElse(i + 3) { "" })
-                    courses.add(ParsedCourse(
-                        name = potentialName,
-                        teacher = if (potentialTeacher.length < 15) potentialTeacher else "",
-                        room = if (potentialRoom.length < 15) potentialRoom else "",
-                        dayOfWeek = inferredDay, startSlot = inferredSlot, endSlot = inferredSlot + 1,
-                        weekType = computeWeekType(weeks),
-                        weeks = weeks.joinToString(",") { it.toString() },
-                        colorIndex = (inferredDay * 3 + inferredSlot) % 15
-                    ))
-                    inferredSlot++
-                    if (inferredSlot > 12) { inferredSlot = 1; inferredDay++ }
-                    if (inferredDay > 7) break
-                    i += 4
-                } else { i++ }
-            }
-        }
-
+        // 这里原本还有一段"Method 2 兜底"：把 `<td>` 里的中文按 4 个一组当作
+        // 「课名 / 教师 / 教室 / 周次」，**星期从 1 开始、节次从 1 开始递增**造坐标。
+        // 那是编数据，不是解析：一节都读不出来时它照样"成功导入"几十门课，
+        // 而全部课程被塞进周一的第 1、2、3…节 —— 用户看到的"课程都挤在一起"就是它。
+        // 现在读不出来就返回空，让调用方如实说"没识别到课程"，也比给一张假课表好。
         return courses.distinctBy { "${it.name}_${it.dayOfWeek}_${it.startSlot}" }
     }
 

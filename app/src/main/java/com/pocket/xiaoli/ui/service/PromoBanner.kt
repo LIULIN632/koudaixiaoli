@@ -6,18 +6,17 @@ import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -139,23 +138,32 @@ fun PromoBanner(
             PromoPage(promo = pages[index], modifier = Modifier.fillMaxSize(), onClick = onClick)
         }
 
-        // 小圆点：底部居中。当前页实心白、其余半透明白（压在图上，需要足够对比）
-        Row(
+        // 指示条：当前页拉长 + 按自动翻页倒计时填充（见 `PromoIndicator` 的 KDoc）。
+        // 位置取**连续**位置（currentPage + 拖动偏移），所以拖动时宽度是连续变化的。
+        val animated = autoPlay && !reduceMotion()
+        val progress = remember { Animatable(0f) }
+        LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress, animated) {
+            // 换页 / 松手都从头计时；用户正拖着时停在 0 —— 不能一边被拖着一边显示"快翻页了"
+            progress.snapTo(0f)
+            if (!animated || pagerState.isScrollInProgress) return@LaunchedEffect
+            progress.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    // 与自动翻页同一个时长常量，两处不许各写一个数
+                    durationMillis = PROMO_AUTO_ADVANCE_MS.toInt(),
+                    easing = LinearEasing,
+                ),
+            )
+        }
+        PromoIndicator(
+            pageCount = pages.size,
+            position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
+            // 关掉自动播放（含快照与减少动画）时没有"倒计时"可言 → 指示条画成实心
+            progress = if (animated) progress.value else 1f,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            repeat(pages.size) { index ->
-                val active = index == pagerState.currentPage
-                Box(
-                    modifier = Modifier
-                        .size(if (active) 7.dp else 5.dp)
-                        .clip(CircleShape)
-                        .background(if (active) Color.White else Color.White.copy(alpha = 0.45f)),
-                )
-            }
-        }
+        )
     }
 }
 

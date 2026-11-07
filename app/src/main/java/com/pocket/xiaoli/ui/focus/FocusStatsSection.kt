@@ -32,8 +32,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,6 +46,7 @@ import com.pocket.xiaoli.focus.FocusHeatCell
 import com.pocket.xiaoli.focus.FocusSegment
 import com.pocket.xiaoli.focus.FocusStatsView
 import com.pocket.xiaoli.focus.humanDuration
+import com.pocket.xiaoli.ui.components.AppCard
 import com.pocket.xiaoli.ui.theme.LocalPocketXiaoliColors
 import com.pocket.xiaoli.ui.theme.LocalSkin
 import com.pocket.xiaoli.ui.theme.PocketTypography
@@ -119,11 +118,7 @@ internal fun FocusSummaryCard(
     val colors = LocalPocketXiaoliColors.current
     val skin = LocalSkin.current
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusCard),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard),
-    ) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -180,11 +175,7 @@ internal fun FocusHeatmap(cells: List<FocusHeatCell>, modifier: Modifier = Modif
     val skin = LocalSkin.current
     val weeks = cells.chunked(7)
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusCard),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard),
-    ) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -321,11 +312,7 @@ internal fun FocusWeekChart(
     val totalPomodoros = stats.sumOf { it.completedPomodoros }
     val totalFocusMs = stats.sumOf { it.focusMs }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusCard),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard),
-    ) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -414,11 +401,7 @@ internal fun FocusTodaySegments(
     val focusMs = segments.filter { !it.phase.isBreak }.sumOf { it.actualMs }
     val breakMs = segments.filter { it.phase.isBreak }.sumOf { it.actualMs }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(skin.radiusCard),
-        colors = CardDefaults.cardColors(containerColor = colors.surfaceCard),
-    ) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

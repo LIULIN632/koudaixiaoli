@@ -141,6 +141,39 @@ class ElectricityUsageTest {
             lowBalanceThreshold = 10.0,
         )
         assertEquals(0, stats.daysUntilThreshold)
+        assertTrue("余额 8 元、线在 10 元 → 确实已经越线", stats.belowLowBalance)
+    }
+
+    /**
+     * **截图验收时抓到的那个自相矛盾**。
+     *
+     * 余额 14 元、提醒线 10 元、日均 6.57 元 —— 距越线只剩 0.6 天，向下取整是 0。
+     * 第一版把"0 天"直接说成「已经低于提醒线」，于是同一屏上大字写着 14.00 元、
+     * 下面一行说已经低于 10 元。两种 0 必须分开：越线是一种，不到一天是另一种。
+     */
+    @Test
+    fun `还没越线但不到一天时不能说已经低于`() {
+        val stats = usageStatsOf(
+            samples(0L to 60.0, 1L to 52.0, 2L to 45.0, 3L to 40.0, 4L to 33.0, 5L to 27.0, 6L to 20.0, 7L to 14.0),
+            todayDay = day0 + 7,
+            lowBalanceThreshold = 10.0,
+        )
+        assertTrue(!stats.belowLowBalance)
+        assertEquals(0, stats.daysUntilThreshold)
+        val lines = usageStatLines(stats, threshold = 10.0).toMap()
+        val distance = lines.getValue("距提醒线 10 元")
+        assertEquals("不到 1 天", distance)
+        assertTrue(!distance.contains("已经低于"))
+    }
+
+    @Test
+    fun `天数说法的四种情况`() {
+        assertEquals("约 5 天", daysPhrase(5))
+        assertEquals("不到 1 天", daysPhrase(0))
+        assertEquals("算不出（没有稳定用量）", daysPhrase(null))
+        // 已经越线时优先说越线 —— 这时"不到 1 天"是在绕圈子
+        assertEquals("已经低于提醒线", daysPhrase(0, alreadyBelow = true))
+        assertEquals("已经低于提醒线", daysPhrase(null, alreadyBelow = true))
     }
 
     @Test

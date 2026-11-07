@@ -307,10 +307,10 @@ private fun SettingsEntryRow(
     val colors = LocalPocketXiaoliColors.current
     val isDark = LocalDarkMode.current
     val colorful = currentIconPresentation().colorful
-    val palette = if (isDark) CourseColorsDark else CourseColors
-    val textPalette = if (isDark) CourseTextColorsDark else CourseTextColors
-    val tint = if (colorful) palette[tintIndex % palette.size] else colors.surfaceHighlight
-    val tintText = if (colorful) textPalette[tintIndex % textPalette.size] else colors.accentMain
+    // 与欢迎页同一套取色（见 `AiTints.kt`）：AI 相关几页是一族颜色，不再各借一套色板
+    val tone = aiTint(tintIndex)
+    val tint = if (colorful) tone.background else colors.surfaceHighlight
+    val tintText = if (colorful) tone.foreground else colors.accentMain
 
     Row(
         modifier = Modifier
